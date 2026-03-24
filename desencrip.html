@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desencriptar Archivo</title>
+</head>
+<body>
+    <h2>Subir Archivo TXT para Desencriptar</h2>
+    <input type="file" id="fileInput" accept=".txt">
+    <button onclick="decryptFile()">Desencriptar</button>
+    <p id="output"></p>
+
+    <script>
+        function decryptBase64(encodedStr) {
+            try {
+                return atob(encodedStr);
+            } catch (e) {
+                return "Error al descifrar: " + e.message;
+            }
+        }
+
+        function decryptFile() {
+            const fileInput = document.getElementById('fileInput');
+            const output = document.getElementById('output');
+
+            if (fileInput.files.length === 0) {
+                output.textContent = "Por favor, seleccione un archivo.";
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const encryptedText = event.target.result.trim();
+                const decryptedText = decryptBase64(encryptedText);
+                output.textContent = "Texto Descifrado: " + decryptedText;
+            };
+
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+</html>
