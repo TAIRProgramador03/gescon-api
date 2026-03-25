@@ -7,7 +7,8 @@ const decodeString = (str) => {
 };
 
 function convertirFecha(fecha) {
-  return fecha.replace(/-/g, "");
+  const transFecha = `${fecha}`
+  return transFecha.replace(/-/g, "");
 }
 
 function funcionNumerica(valor) {

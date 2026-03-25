@@ -196,24 +196,24 @@ const listLeasingByContract = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  if (!contratoId)
-    return res.status(400).json({
-      success: false,
-      message: "El parametro contratoId es obligatorio",
-    });
-
   const cn = await connection(globalDbUser, globalPassword);
 
   try {
     const sql = `
       SELECT A.ID, A.NRO_LEASING, A.CANT_VEH, A.FECHA_INI, A.FECHA_FIN, A.ID_CONTRATO, A.ID_CLIENTE
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
-      WHERE A.ID_CONTRATO = ? AND TIPCON = 'P' ${clienteId ? `AND A.ID_CLIENTE = ?` : ""}
+      ${contratoId && clienteId ? `WHERE A.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND TIPCON = 'P'` : contratoId ? `WHERE A.ID_CONTRATO = ? AND TIPCON = 'P'` : clienteId ? `WHERE A.ID_CLIENTE = ?` : ""}
     `;
     
-    const params = [contratoId];
+    const params = [];
 
-    if(clienteId) params.push(clienteId)
+    if(contratoId && clienteId) {
+      params.push(clienteId, contratoId)
+    } else if(contratoId) {
+      params.push(contratoId)
+    } else if(clienteId) {
+      params.push(clienteId)
+    }
 
     const result = await cn.query(sql, params);
 
