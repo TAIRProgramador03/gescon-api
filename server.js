@@ -2,8 +2,10 @@ require("dotenv").config(); // Esto carga las variables del archivo .env
 
 const express = require("express");
 const cors = require("cors");
+const path = require('path');
 const cookieParser = require("cookie-parser");
 const { IP_LOCAL } = require("./src/shared/conf.js");
+const authenticateToken = require("./src/shared/middleware/jwt-valid.js")
 
 // RUTAS DE API
 const authRoutes = require("./src/app/auth/auth.routes.js");
@@ -19,13 +21,6 @@ const reportRoutes = require("./src/app/report/report.routes.js")
 
 const app = express();
 const port = 3000;
-
-// const { OpenAI } = require("openai");
-
-// // Crear una instancia de OpenAI con tu API Key cargada desde las variables de entorno
-// const openai = new OpenAI({
-//   apiKey: process.env.OPENAI_API_KEY, // Usar la clave de API desde las variables de entorno
-// });
 
 app.use(
   cors({
@@ -45,6 +40,9 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 
+// Acceso a los archivos public
+app.use("/files", authenticateToken, express.static(path.join(__dirname, '/public')));
+
 // Rutas de api
 app.use(authRoutes);
 app.use(clientRoutes);
@@ -57,30 +55,7 @@ app.use(fileRoutes);
 app.use(modelRoutes);
 app.use(reportRoutes);
 
-// Servir el archivo HTML
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/Index.html");
-});
-
-// app.get("/get-openai-response", async (req, res) => {
-//   try {
-//     // Usar OpenAI para generar una respuesta
-//     const response = await openai.completions.create({
-//       model: "text-davinci-003", // Modelo de OpenAI
-//       prompt: "Escribe un poema sobre el sol",
-//       max_tokens: 50,
-//     });
-
-//     // Enviar la respuesta de OpenAI al cliente
-//     res.send(response.choices[0].text);
-//   } catch (error) {
-//     console.error("Error al contactar a OpenAI:", error);
-//     res.status(500).send("Error al contactar con OpenAI");
-//   }
-// });
-
 // Iniciar servidor IP_LOCAL/
-
 app.listen(port, () => {
   console.log(`Servidor corriendo en https://${IP_LOCAL}:${port}`);
 });

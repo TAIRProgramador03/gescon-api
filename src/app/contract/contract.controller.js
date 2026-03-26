@@ -733,12 +733,10 @@ const insertContract = async (req, res) => {
     ]);
 
     if (findContract.length > 0)
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "El NRO de contrato ya se encuentra registrado",
-        });
+      return res.status(409).json({
+        success: false,
+        message: "El NRO de contrato ya se encuentra registrado",
+      });
 
     await cn.beginTransaction();
 
@@ -949,6 +947,90 @@ const valideContractQuantity = async (req, res) => {
   }
 };
 
+const getContractById = async (req, res) => {
+  const { globalDbUser, globalPassword } = req.user;
+
+  // Validación de token y sus datos
+  if (!globalDbUser || !globalPassword) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { id } = req.params;
+
+  const contractId = Number(id);
+
+  if (isNaN(contractId))
+    return res.status(400).json({
+      success: false,
+      message: "El parametro id no es un dato numérico",
+    });
+
+  const cn = await connection(globalDbUser, globalPassword);
+
+  try {
+    const sql = `
+      SELECT C.*, C.DURACION AS PLAZO, D.*, D.ID AS ID_DET FROM SPEED400AT.TBLCONTRATO_CAB C
+      LEFT JOIN SPEED400AT.TBLCONTRATO_DET D
+      ON C.ID = D.ID_CON_CAB
+      WHERE C.ID = ?
+    `;
+
+    const result = await cn.query(sql, [contractId]);
+
+    if (result.length == 0)
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el contrato solicitado",
+      });
+
+    const contractDetail = result.map((row) => ({
+      id: row.ID_DET,
+      idContratoCab: row.ID_CON_CAB,
+      secCon: row.SEC_CON,
+      modelo: row.MODELO.trim(),
+      tipoTerreno: row.TIPO_TERRENO,
+      tarifa: row.TARIFA,
+      cpk: row.CPK,
+      rm: row.RM,
+      cantidad: row.CANTIDAD,
+      duracion: row.DURACION.trim(),
+      compraVeh: row.PRECIO_VEH,
+      precioVeh: row.PRECIO_VENTA,
+    }));
+
+    const contractData = {
+      idCliente: result[0].ID_CLIENTE,
+      nroContrato: result[0].NRO_CONTRATO.trim(),
+      cantVehiculos: result[0].CANT_VEHI || 0,
+      fechaFirma: convertirFecha(result[0].FECHA_FIRMA.trim()),
+      duracion: result[0].PLAZO.trim(),
+      kmAdicional: result[0].KM_ADI,
+      kmTotal: result[0].KM_TOTAL,
+      vehSup: result[0].VEH_SUP,
+      vehSev: result[0].VEH_SEV,
+      vehSoc: result[0].VEH_SOC,
+      vehCiu: result[0].VEH_CIU,
+      tipoMoneda: result[0].MONEDA.trim(),
+      tipoCliente: result[0].TIPO_CLI.trim(),
+      contratoEspecial: result[0].TIPO_CONT,
+      story: result[0].DESCRIPCION.trim(),
+      detalles: contractDetail,
+      archivoPdf: result[0].ARCHIVO_PDF.trim(),
+    };
+
+    return res.status(200).json(contractData);
+  } catch (error) {
+    console.error("Error al obtener contrato por id", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contrato por id" });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   contractNro,
   contractNroAdi,
@@ -959,4 +1041,5 @@ module.exports = {
   contClient,
   insertContract,
   valideContractQuantity,
+  getContractById
 };

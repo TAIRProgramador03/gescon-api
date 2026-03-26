@@ -9,6 +9,7 @@ const {
   contClient,
   valideContractQuantity,
   detailVehByCont,
+  getContractById,
 } = require("./contract.controller.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
@@ -25,5 +26,6 @@ Router.post(
   authenticateToken,
   valideContractQuantity,
 );
+Router.get("/contratoPorId/:id", authenticateToken, getContractById)
 
 module.exports = Router;

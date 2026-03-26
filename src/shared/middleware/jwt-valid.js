@@ -8,7 +8,7 @@ const authenticateToken = (req, res, next) => {
   if (!token) {
     return res
       .status(401)
-      .json({ success: false, message: "Token no proporcionado" });
+      .json({ success: false, message: "Acceso prohibido" });
   }
 
   try {
@@ -22,7 +22,7 @@ const authenticateToken = (req, res, next) => {
   } catch (err) {
     console.error("Error de autenticación:", err);
     console.error("Token recibido:", token);
-    return res.status(401).json({ success: false, message: "Token inválido" });
+    return res.status(401).json({ success: false, message: "Acceso no valido o expirado" });
   }
 };
 
