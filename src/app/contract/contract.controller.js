@@ -294,8 +294,10 @@ const detailContract = async (req, res) => {
     let params = [];
 
     // filtro obligatorio
-    filtrosA += " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-    filtrosB += " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+    filtrosA +=
+      " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+    filtrosB +=
+      " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
     params.push(clienteId);
 
     // opcionales
@@ -720,9 +722,26 @@ const insertContract = async (req, res) => {
   const fechaFormatoDB = convertirFecha(fechaFirma);
   let nombreArchivo = `http://${IP_LOCAL}/tair-web/public/pdf/contracts/${archivoPdf}`;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const pool = await connection(globalDbUser, globalPassword);
+  const cn = await pool.connect();
 
   try {
+    const sqlSearchContract = `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`;
+
+    const findContract = await cn.query(sqlSearchContract, [
+      nroContrato.toUpperCase(),
+    ]);
+
+    if (findContract.length > 0)
+      return res
+        .status(409)
+        .json({
+          success: false,
+          message: "El NRO de contrato ya se encuentra registrado",
+        });
+
+    await cn.beginTransaction();
+
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_CAB 
               (ID_CLIENTE, NRO_CONTRATO, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_CONT, TIPO_CLI, MONEDA, DESCRIPCION, ARCHIVO_PDF, CLASE)
@@ -775,8 +794,11 @@ const insertContract = async (req, res) => {
       }
     }
 
+    await cn.commit();
+
     res.json({ success: true });
   } catch (error) {
+    await cn.rollback();
     console.error("Error al insertar contrato:", error);
     res
       .status(500)
