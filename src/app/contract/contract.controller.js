@@ -720,7 +720,7 @@ const insertContract = async (req, res) => {
 
   const claseContra = "P";
   const fechaFormatoDB = convertirFecha(fechaFirma);
-  let nombreArchivo = `http://${IP_LOCAL}/tair-web/public/pdf/contracts/${archivoPdf}`;
+  let nombreArchivo = `http://${IP_LOCAL}:3000/files/pdf/contracts/${archivoPdf}`;
 
   const pool = await connection(globalDbUser, globalPassword);
   const cn = await pool.connect();
@@ -732,13 +732,15 @@ const insertContract = async (req, res) => {
       nroContrato.toUpperCase(),
     ]);
 
+    console.log("PRIMERA QUERY HECHA");
+
     if (findContract.length > 0)
       return res.status(409).json({
         success: false,
-        message: "El NRO de contrato ya se encuentra registrado",
+        message: "El N° contrato ya se encuentra registrado",
       });
 
-    await cn.beginTransaction();
+    // await cn.beginTransaction();
 
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_CAB 
@@ -766,6 +768,8 @@ const insertContract = async (req, res) => {
       claseContra,
     ]);
 
+    console.log("SEGUNDA QUERY HECHA");
+
     const idContratoCab = result.insertId || (await obtenerUltimoId(cn));
 
     const queryDetalle = `
@@ -790,9 +794,266 @@ const insertContract = async (req, res) => {
           detalle.precioVeh,
         ]);
       }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "El contrato no puede quedar sin ningun modelo detallado",
+      });
     }
 
-    await cn.commit();
+    console.log("TERCERA QUERY HECHA");
+
+    // await cn.commit();
+
+    res.json({ success: true });
+  } catch (error) {
+    await cn.rollback();
+    console.error("Error al insertar contrato:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error al insertar contrato" });
+  } finally {
+    if (cn) {
+      await cn.close();
+    }
+  }
+};
+
+const updateContract = async (req, res) => {
+  const { globalDbUser, globalPassword } = req.user;
+
+  // Validación de token y sus datos
+  if (!globalDbUser || !globalPassword) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { id } = req.params;
+
+  const contractId = Number(id);
+
+  if (isNaN(contractId))
+    return res.status(400).json({
+      success: false,
+      message: "El parametro id no es un dato numérico",
+    });
+
+  const {
+    idCliente,
+    nroContrato,
+    cantVehiculos,
+    fechaFirma,
+    duracion,
+    kmAdicional,
+    kmTotal,
+    vehSup,
+    vehSev,
+    vehSoc,
+    vehCiu,
+    tipoMoneda,
+    tipoCliente,
+    contratoEspecial,
+    story,
+    detalles,
+    archivoPdf,
+  } = req.body;
+
+  const claseContra = "P";
+  const fechaFormatoDB = convertirFecha(fechaFirma);
+  let nombreArchivo = `http://${IP_LOCAL}:3000/files/pdf/contracts/${archivoPdf}`;
+
+  const pool = await connection(globalDbUser, globalPassword);
+  const cn = await pool.connect();
+
+  try {
+    // VALIDAR QUE EL ID EXISTA Y TRAIGA UN CONTRATO
+    const sql = `
+      SELECT C.*, C.DURACION AS PLAZO, D.*, D.ID AS ID_DET FROM SPEED400AT.TBLCONTRATO_CAB C
+      LEFT JOIN SPEED400AT.TBLCONTRATO_DET D
+      ON C.ID = D.ID_CON_CAB
+      WHERE C.ID = ?
+    `;
+
+    const findContract = await cn.query(sql, [contractId]);
+
+    console.log("PRIMERA CONSULTA HECHA");
+
+    if (findContract.length == 0)
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el contrato solicitado",
+      });
+
+    // VALIDAR QUE NO SE DUPLIQUE UN NUMERO DE CONTRATO EN CASO SE PASE UNO NUEVO
+    if (
+      findContract[0].NRO_CONTRATO.trim().toUpperCase() !=
+      nroContrato.toUpperCase()
+    ) {
+      const sqlSearchContract = `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`;
+
+      const findNroContract = await cn.query(sqlSearchContract, [
+        nroContrato.toUpperCase(),
+      ]);
+
+      console.log("SEGUNDA CONSULTA HECHA");
+
+      if (findNroContract.length > 0)
+        return res.status(409).json({
+          success: false,
+          message: "El N° contrato ya se encuentra registrado",
+        });
+    }
+
+    // INICIAMOS LA TRANSACCION
+    // await cn.beginTransaction();
+
+    // ACTUALIZAMOS LA CABECERA DEL CONTRATO
+    const queryCabecera = `
+              UPDATE ${SCHEMA_BD}.TBLCONTRATO_CAB 
+              SET ID_CLIENTE = ?, NRO_CONTRATO = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_CONT = ?, TIPO_CLI = ?, MONEDA = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, CLASE = ?
+              WHERE ID = ?
+          `;
+
+    await cn.query(queryCabecera, [
+      idCliente,
+      nroContrato,
+      cantVehiculos,
+      fechaFormatoDB,
+      duracion,
+      kmAdicional,
+      kmTotal,
+      vehSup,
+      vehSev,
+      vehSoc,
+      vehCiu,
+      contratoEspecial,
+      tipoCliente,
+      tipoMoneda,
+      story,
+      nombreArchivo,
+      claseContra,
+      contractId,
+    ]);
+
+    console.log("TERCERA CONSULTA HECHA");
+
+    const idContractCab = contractId;
+
+    // SECCION DE DETALLES
+
+    const detailDelete = [];
+    const detailUpdate = [];
+    const detailNew = [];
+
+    if (detalles && detalles.length > 0) {
+      for (const detalle of detalles) {
+        console.log(detalle);
+        if (!detalle.idDet) {
+          // ASIGNAMOS LA LISTA DE DETALLES PARA CREAR NUEVOS
+          detailNew.push(detalle);
+        } else {
+          // ASIGNAMOS LA LISTA DE DETALLES PARA ACTUALIZAR
+          detailUpdate.push(detalle);
+        }
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "El contrato no puede quedar sin ningun modelo detallado",
+      });
+    }
+
+    // VALIDAMOS Y ASIGNAMOS LA LISTA DE DETALLES A ELIMINAR
+    const paramsDet = detailUpdate.map(() => "?");
+
+    const queryValidDelete = `
+            SELECT D.ID FROM ${SCHEMA_BD}.TBLCONTRATO_DET D
+            LEFT JOIN SPEED400AT.TBLCONTRATO_CAB C
+            ON D.ID_CON_CAB = C.ID
+            WHERE C.ID = ? AND D.ID NOT IN (${paramsDet.join(",")})
+          `;
+    
+    const resultValidDelete = await cn.query(
+      queryValidDelete,
+      [idContractCab, ...detailUpdate.map((det) => det.idDet),]
+    );
+
+    console.log("CUARTA CONSULTA HECHA");
+
+    if (resultValidDelete.length > 0) {
+      resultValidDelete.forEach((row) => {
+        detailDelete.push(row.ID);
+      });
+    }
+
+    const queryUpdDetalle = `
+      UPDATE ${SCHEMA_BD}.TBLCONTRATO_DET 
+      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?
+      WHERE ID = ?
+    `;
+
+    // ACTUALIZAMOS LOS DETALLES
+    for (const detalle of detailUpdate) {
+      await cn.query(queryUpdDetalle, [
+        detalle.secCon,
+        detalle.modelo,
+        detalle.tipoTerreno,
+        detalle.tarifa,
+        detalle.cpk,
+        detalle.rm,
+        detalle.cantidad,
+        detalle.duracion,
+        detalle.compraVeh,
+        detalle.precioVeh,
+        detalle.idDet,
+      ]);
+    }
+
+    console.log("QUINTA CONSULTA HECHA");
+
+    // CREAMOS LOS NUEVOS DETALLES
+    const queryNewDetalle = `
+              INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+    for(const detalle of detailNew) {
+      console.log(detailNew);
+      await cn.query(queryNewDetalle, [
+        idContractCab,
+        detalle.secCon,
+        detalle.modelo,
+        detalle.tipoTerreno,
+        detalle.tarifa,
+        detalle.cpk,
+        detalle.rm,
+        detalle.cantidad,
+        detalle.duracion,
+        detalle.compraVeh,
+        detalle.precioVeh,
+      ]);
+    }
+
+    console.log("SEXTA CONSULTA HECHA");
+
+    // ELIMINAMOS LOS DETALLES
+
+    if (detailDelete.length > 0) {
+      const paramsDel = detailDelete.map(() => "?");
+
+      const queryDelDetalle = `
+        DELETE FROM ${SCHEMA_BD}.TBLCONTRATO_DET
+        WHERE ID IN (${paramsDel.join(",")})
+      `;
+
+      await cn.query(queryDelDetalle, detailDelete);
+    }
+
+    console.log("ULTIMA CONSULTA HECHA");
+
+    // await cn.commit();
 
     res.json({ success: true });
   } catch (error) {
@@ -971,13 +1232,18 @@ const getContractById = async (req, res) => {
 
   try {
     const sql = `
-      SELECT C.*, C.DURACION AS PLAZO, D.*, D.ID AS ID_DET FROM SPEED400AT.TBLCONTRATO_CAB C
-      LEFT JOIN SPEED400AT.TBLCONTRATO_DET D
-      ON C.ID = D.ID_CON_CAB
+      SELECT * FROM SPEED400AT.TBLCONTRATO_CAB C
       WHERE C.ID = ?
     `;
 
     const result = await cn.query(sql, [contractId]);
+
+    const sqlDetail = `
+      SELECT * FROM SPEED400AT.TBLCONTRATO_DET D
+      WHERE D.ID_CON_CAB = ?
+    `
+
+    const resultDet = await cn.query(sqlDetail, [contractId])
 
     if (result.length == 0)
       return res.status(404).json({
@@ -985,8 +1251,8 @@ const getContractById = async (req, res) => {
         message: "No se encontró el contrato solicitado",
       });
 
-    const contractDetail = result.map((row) => ({
-      id: row.ID_DET,
+    const contractDetail = resultDet.map((row) => ({
+      id: row.ID,
       idContratoCab: row.ID_CON_CAB,
       secCon: row.SEC_CON,
       modelo: row.MODELO.trim(),
@@ -1005,7 +1271,7 @@ const getContractById = async (req, res) => {
       nroContrato: result[0].NRO_CONTRATO.trim(),
       cantVehiculos: result[0].CANT_VEHI || 0,
       fechaFirma: convertirFecha(result[0].FECHA_FIRMA.trim()),
-      duracion: result[0].PLAZO.trim(),
+      duracion: result[0].DURACION.trim(),
       kmAdicional: result[0].KM_ADI,
       kmTotal: result[0].KM_TOTAL,
       vehSup: result[0].VEH_SUP,
@@ -1040,6 +1306,7 @@ module.exports = {
   contContract,
   contClient,
   insertContract,
+  updateContract,
   valideContractQuantity,
-  getContractById
+  getContractById,
 };
