@@ -522,6 +522,7 @@ const insertLeasing = async (req, res) => {
 
   const {
     idCliente,
+    idClienteAsoc,
     nroLeasing,
     banco,
     cantVehiculos,
@@ -537,6 +538,8 @@ const insertLeasing = async (req, res) => {
   const fechaIniDB = convertirFecha(fechaIni);
   const fechaFinDB = convertirFecha(fechaFin);
 
+  const validAsoc = idCliente == idClienteAsoc ? null : idClienteAsoc;
+
   let nombreArchivo = `http://${IP_LOCAL}/tair-web/public/pdf/leasings/${archivoPdf}`;
 
   const cn = await connection(globalDbUser, globalPassword);
@@ -544,8 +547,8 @@ const insertLeasing = async (req, res) => {
   try {
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBL_LEASING_CAB 
-              (ID_CLIENTE, NRO_LEASING, BANCO, CANT_VEH, FECHA_INI, FECHA_FIN, PERIODO_GRACIA, PDF, ID_CONTRATO, TIPCON)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CLIENTE, NRO_LEASING, BANCO, CANT_VEH, FECHA_INI, FECHA_FIN, PERIODO_GRACIA, PDF, ID_CONTRATO, TIPCON, ID_CLIENTE_ASOCIADO)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     const result = await cn.query(queryCabecera, [
@@ -559,6 +562,7 @@ const insertLeasing = async (req, res) => {
       nombreArchivo,
       funcionNumerica(idContrato),
       funcionParteVar(idContrato),
+      funcionNumerica(validAsoc)
     ]);
 
     const idLeasingCab = result.insertId || (await obtenerUltimoIdLea(cn));
