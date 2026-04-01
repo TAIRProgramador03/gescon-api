@@ -230,14 +230,28 @@ const contVehicleLeasings = async (req, res) => {
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
-        ) AS DIFERENCIA_DIAS
+        ) AS DIFERENCIA_DIAS,
+        DATE(
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_INI, 7, 2)
+        ) AS FECHA_ACTA_INI,
+        DATE(
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_FIN, 7, 2)
+        ) AS FECHA_ACTA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB C
       ON LC.ID_CONTRATO = C.ID
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'P'
+
       UNION ALL
+
       SELECT 
         LD.ID,
         LD.PLACA,
@@ -314,12 +328,24 @@ const contVehicleLeasings = async (req, res) => {
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
-        ) AS DIFERENCIA_DIAS
+        ) AS DIFERENCIA_DIAS,
+        DATE(
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_INI, 7, 2)
+        ) AS FECHA_ACTA_INI,
+        DATE(
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_FIN, 7, 2)
+        ) AS FECHA_ACTA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
       ON LC.ID_CONTRATO = C.ID
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'H')
       WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0)  
       ${clienteId ? `AND CLIENTE = ?` : ""}
@@ -408,14 +434,28 @@ const contVehicleLeasings = async (req, res) => {
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
-        ) AS DIFERENCIA_DIAS
+        ) AS DIFERENCIA_DIAS,
+        DATE(
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_INI, 7, 2)
+        ) AS FECHA_ACTA_INI,
+        DATE(
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_FIN, 7, 2)
+        ) AS FECHA_ACTA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB C
       ON LC.ID_CONTRATO = C.ID
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'P'
+
       UNION ALL
+
       SELECT 
         LD.ID,
         LD.PLACA,
@@ -492,12 +532,24 @@ const contVehicleLeasings = async (req, res) => {
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
-        ) AS DIFERENCIA_DIAS
+        ) AS DIFERENCIA_DIAS,
+        DATE(
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_INI, 7, 2)
+        ) AS FECHA_ACTA_INI,
+        DATE(
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
+            SUBSTR(AD.FECHA_FIN, 7, 2)
+        ) AS FECHA_ACTA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
       ON LC.ID_CONTRATO = C.ID
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'H')
       WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0) 
       ${clienteId ? `AND CLIENTE = ?` : ""}
@@ -531,6 +583,8 @@ const contVehicleLeasings = async (req, res) => {
       fechaFinLea: row.FECHA_FIN_LEA.trim(),
       añosLeasing: row.ANOS_LEA,
       diferenciaDias: row.DIFERENCIA_DIAS,
+      fechaIniActa: row.FECHA_ACTA_INI.trim(),
+      fechaFinActa: row.FECHA_ACTA_FIN.trim(),
     }));
 
     const totalElements = resultTotal[0].TOTAL;
@@ -573,7 +627,7 @@ const contLeasings = async (req, res) => {
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -30 AND DIFERENCIA_DIAS >= -45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -45 AND DIFERENCIA_DIAS >= -60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
-        COUNT(CASE WHEN  DIFERENCIA_DIAS < -90 THEN 1 END) AS "MAYOR_90_DIAS"
+        COUNT(CASE WHEN  DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120 THEN 1 END) AS "MAYOR_90_DIAS"
       FROM (
       SELECT LC.ID_CLIENTE, LD.MODELO, LD.PLACA, LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
@@ -588,7 +642,7 @@ const contLeasings = async (req, res) => {
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 30 AND DIFERENCIA_DIAS <= 45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 45 AND DIFERENCIA_DIAS <= 60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
-        COUNT(CASE WHEN  DIFERENCIA_DIAS > 90 THEN 1 END) AS "MAYOR_90_DIAS"
+        COUNT(CASE WHEN  DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120 THEN 1 END) AS "MAYOR_90_DIAS"
       FROM (
       SELECT LC.ID_CLIENTE, LD.MODELO, LD.PLACA, LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
@@ -675,8 +729,8 @@ const listVehicleLeasingExpire = async (req, res) => {
       case "Entre 60 y 90 dias":
         sentences = "DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90";
         break;
-      case "Mayor 90 dias":
-        sentences = "DIFERENCIA_DIAS < -90";
+      case "Entre 90 y 120 dias":
+        sentences = "DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120";
         break;
       default:
         return res
@@ -687,7 +741,7 @@ const listVehicleLeasingExpire = async (req, res) => {
     const sql = `
       SELECT *
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -702,6 +756,13 @@ const listVehicleLeasingExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              ORDER BY CLINOM ASC
+        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
       ORDER BY ID
       OFFSET ? ROWS
@@ -713,7 +774,7 @@ const listVehicleLeasingExpire = async (req, res) => {
     const sqlTotal = `
       SELECT COUNT(*) AS TOTAL
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -728,6 +789,13 @@ const listVehicleLeasingExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              ORDER BY CLINOM ASC
+        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
     `;
 
@@ -749,8 +817,10 @@ const listVehicleLeasingExpire = async (req, res) => {
       modelo: row.MODELO.trim(),
       marca: row.MARCA.trim(),
       nroLeasing: row.NRO_LEASING.trim(),
+      fechaIni: row.FECHA_INI.trim(),
       fechaFin: row.FECHA_FIN.trim(),
       cliente: row.CLIENTE.trim(),
+      clienteAsoc: row.CLIENTE_ASOCIADO ? row.CLIENTE_ASOCIADO.trim() : row.CLIENTE.trim(),
     }));
 
     const totalElements = resultTotal[0].TOTAL;
@@ -812,8 +882,8 @@ const listVehicleLeasingToExpire = async (req, res) => {
       case "Entre 60 y 90 dias":
         sentences = "DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90";
         break;
-      case "Mayor 90 dias":
-        sentences = "DIFERENCIA_DIAS > 90";
+      case "Entre 90 y 120 dias":
+        sentences = "DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120";
         break;
       default:
         return res
@@ -824,7 +894,7 @@ const listVehicleLeasingToExpire = async (req, res) => {
     const sql = `
       SELECT *
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -839,6 +909,13 @@ const listVehicleLeasingToExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              ORDER BY CLINOM ASC
+        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
       ORDER BY ID
       OFFSET ? ROWS
@@ -850,7 +927,7 @@ const listVehicleLeasingToExpire = async (req, res) => {
     const sqlTotal = `
       SELECT COUNT(*) AS TOTAL
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -865,6 +942,13 @@ const listVehicleLeasingToExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              ORDER BY CLINOM ASC
+        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
     `;
 
@@ -886,8 +970,10 @@ const listVehicleLeasingToExpire = async (req, res) => {
       modelo: row.MODELO.trim(),
       marca: row.MARCA.trim(),
       nroLeasing: row.NRO_LEASING.trim(),
+      fechaIni: row.FECHA_INI.trim(),
       fechaFin: row.FECHA_FIN.trim(),
       cliente: row.CLIENTE.trim(),
+      clienteAsoc: row.CLIENTE_ASOCIADO ? row.CLIENTE_ASOCIADO.trim() : row.CLIENTE.trim(),
     }));
 
     const totalElements = resultTotal[0].TOTAL;
