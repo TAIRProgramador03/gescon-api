@@ -7,7 +7,7 @@ const {
   funcionParteVar,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
-const {moveFile} = require("../../shared/service/aws-s3.js")
+const {moveFile, fileExists} = require("../../shared/service/aws-s3.js")
 
 const contractNro = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
@@ -777,8 +777,8 @@ const insertContract = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     if (detalles && detalles.length > 0) {
@@ -793,8 +793,10 @@ const insertContract = async (req, res) => {
           detalle.rm,
           detalle.cantidad,
           detalle.duracion,
+          detalle.kmAdicional,
           detalle.compraVeh,
           detalle.precioVeh,
+          detalle.condicion
         ]);
       }
     } else {
@@ -935,7 +937,8 @@ const updateContract = async (req, res) => {
       contractId,
     ]);
 
-    await moveFile(oldKey, newKey)
+    const isExist = await fileExists(`${oldKey}`)
+    if(!isExist) await moveFile(oldKey, newKey);
 
     const idContractCab = contractId;
 
@@ -986,7 +989,7 @@ const updateContract = async (req, res) => {
 
     const queryUpdDetalle = `
       UPDATE ${SCHEMA_BD}.TBLCONTRATO_DET 
-      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?
+      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?
       WHERE ID = ?
     `;
 
@@ -1001,8 +1004,10 @@ const updateContract = async (req, res) => {
         detalle.rm,
         detalle.cantidad,
         detalle.duracion,
+        detalle.kmAdicional,
         detalle.compraVeh,
         detalle.precioVeh,
+        detalle.condicion,
         detalle.idDet,
       ]);
     }
@@ -1010,8 +1015,8 @@ const updateContract = async (req, res) => {
     // CREAMOS LOS NUEVOS DETALLES
     const queryNewDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     for(const detalle of detailNew) {
@@ -1026,8 +1031,10 @@ const updateContract = async (req, res) => {
         detalle.rm,
         detalle.cantidad,
         detalle.duracion,
+        detalle.kmAdicional,
         detalle.compraVeh,
         detalle.precioVeh,
+        detalle.condicion,
       ]);
     }
 
@@ -1114,8 +1121,10 @@ const getContractById = async (req, res) => {
       rm: row.RM,
       cantidad: row.CANTIDAD,
       duracion: row.DURACION.trim(),
+      kmAdicional: row.KM_ADI,
       compraVeh: row.PRECIO_VEH,
       precioVeh: row.PRECIO_VENTA,
+      condicion: row.CONDICION
     }));
 
     const contractData = {
