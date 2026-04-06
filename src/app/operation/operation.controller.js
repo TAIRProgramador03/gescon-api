@@ -7,6 +7,7 @@ const {
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
+const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listOperations = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
@@ -164,7 +165,8 @@ const listAssingByContract = async (req, res) => {
         DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
         DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
         CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-        CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
+        CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA,
+        AD.ARCHIVO_PDF AS ARCHIVO_PDF
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
       ON AD.ID_ASIGNACION = AC.ID
@@ -227,7 +229,8 @@ const listAssingByContract = async (req, res) => {
         DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
         DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
         CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-        CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
+        CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA,
+        AD.ARCHIVO_PDF AS ARCHIVO_PDF
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
       ON AD.ID_ASIGNACION = AC.ID
@@ -292,7 +295,8 @@ const listAssingByContract = async (req, res) => {
       fechaIniCon: row.FECHA_INI_CONTRATO,
       fechaFinCon: row.FECHA_FIN_CONTRATO,
       tarifa: row.TARIFA,
-      moneda: row.MONEDA
+      moneda: row.MONEDA,
+      archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : ""
     }));
 
     return res.status(200).json(convertResult);
@@ -341,8 +345,8 @@ const insertOperation = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBL_ASIGNACION_DET 
-              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     /*const queryTarifa = `
@@ -377,6 +381,9 @@ const insertOperation = async (req, res) => {
       for (let i = 0; i < detalles.length; i++) {
         const detalle = detalles[i];
 
+        const oldKey = detalle.archivoPdf;
+        const newKey = oldKey.replace(/^temp\//, "");
+
         // Si valorRepe es true, toma las fechas del primer detalle y reutilízalas
         if (valorRepe === true || valorRepe === "true") {
           if (i === 0) {
@@ -398,7 +405,10 @@ const insertOperation = async (req, res) => {
           valorRepe ? fechaFinGlobal : convertirFecha(detalle.fechaFin),
           detalle.leasing,
           funcionParteVar(detalle.idContrato),
+          newKey
         ]);
+
+        await moveFile(oldKey, newKey);
       }
     }
 
@@ -433,8 +443,149 @@ const insertOperation = async (req, res) => {
   }
 };
 
+const valideAssign = async (req, res) => {
+  const { globalDbUser, globalPassword } = req.user;
+
+  // Validación de token y sus datos
+  if (!globalDbUser || !globalPassword) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { detalles } = req.body;
+
+  if (!Array.isArray(detalles) || detalles.length === 0) {
+    return res
+      .status(400)
+      .json({ success: false, mensaje: "Detalles faltantes o vacíos" });
+  }
+
+  const agrupados = {};
+  for (let d of detalles) {
+    let clase = funcionParteVar(d.idContrato);
+    console.log(clase);
+    let idContrato = funcionNumerica(d.idContrato);
+    console.log(idContrato);
+
+    if (!clase || !idContrato) {
+      return res.status(400).json({
+        success: false,
+        mensaje: `Formato de contrato inválido en el detalle: ${d.idContrato}`,
+      });
+    }
+
+    let key = `${clase}_${idContrato}`;
+    if (!agrupados[key]) {
+      agrupados[key] = {
+        clase,
+        idContrato,
+        terrenos: [],
+      };
+    }
+
+    agrupados[key].terrenos.push(d.idTerreno);
+    console.log(d.idTerreno);
+  }
+
+  const cn = await connection(globalDbUser, globalPassword);
+
+  try {
+    for (let key in agrupados) {
+      let { clase, idContrato, terrenos } = agrupados[key];
+      let squery = "";
+
+      // Consulta SQL según el tipo de contrato
+      if (clase.trim() === "H") {
+        squery = `SELECT A.ID, A.CANT_VEHI, A.VEH_SUP, A.VEH_SEV, A.VEH_SOC, A.VEH_CIU, TRIM(A.CLASE) AS CLASE, 
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='0') AS SUPERFICIE,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='1') AS SOCAVON,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='2') AS CIUDAD,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='3') AS SEVERO,
+                          (SELECT COUNT(*) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND CLASE_CONTRATO=A.CLASE) AS CANTIDAD 
+                          FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB A WHERE A.ID = ? AND CLASE='H'`;
+      } else {
+        squery = `SELECT A.ID, A.CANT_VEHI, A.VEH_SUP, A.VEH_SEV, A.VEH_SOC, A.VEH_CIU, TRIM(A.CLASE) AS CLASE,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='0') AS SUPERFICIE,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='1') AS SOCAVON,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='2') AS CIUDAD,
+                          (SELECT COUNT(TP_TERRENO) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND TRIM(CLASE_CONTRATO)=TRIM(A.CLASE) AND TP_TERRENO='3') AS SEVERO,
+                          (SELECT COUNT(*) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET WHERE ID_CONTRATO=A.ID AND CLASE_CONTRATO=A.CLASE) AS CANTIDAD 
+                          FROM ${SCHEMA_BD}.TBLCONTRATO_CAB A WHERE A.ID = ? AND CLASE='P'`;
+      }
+
+      let result = await cn.query(squery, [idContrato]);
+
+      if (!result || result.length === 0) {
+        return res.status(404).json({
+          success: false,
+          mensaje: `Contrato no encontrado: ${clase}_${idContrato}`,
+        });
+      }
+
+      let row = result[0];
+      let contadorNuevo = { 0: 0, 1: 0, 2: 0, 3: 0 };
+
+      // Contamos cuántos terrenos de cada tipo existen en el detalle
+      terrenos.forEach((tipo) => {
+        let t = tipo?.toString();
+        if (t in contadorNuevo) contadorNuevo[t]++;
+      });
+
+      console.log(contadorNuevo);
+
+      let validaciones = [
+        {
+          tipo: "SUPERFICIE",
+          cod: "0",
+          maximo: row.VEH_SUP,
+          actual: row.SUPERFICIE,
+        },
+        { tipo: "SOCAVÓN", cod: "1", maximo: row.VEH_SOC, actual: row.SOCAVON },
+        { tipo: "CIUDAD", cod: "2", maximo: row.VEH_CIU, actual: row.CIUDAD },
+        { tipo: "SEVERO", cod: "3", maximo: row.VEH_SEV, actual: row.SEVERO },
+      ];
+
+      for (let v of validaciones) {
+        let nuevos = contadorNuevo[v.cod] || 0;
+        console.log(
+          `Tipo: ${v.tipo}, Actual: ${v.actual}, Nuevos: ${nuevos}, Máximo: ${v.maximo}`,
+        );
+        if (v.actual + nuevos > v.maximo) {
+          console.log("Límite excedido para terreno tipo: " + v.tipo);
+          return res.json({
+            success: false,
+            mensaje: `Límite excedido para terreno tipo ${v.tipo} en contrato ${clase}_${idContrato}. Permitido: ${v.maximo}, asignados: ${v.actual}, nuevos: ${nuevos}.`,
+          });
+        }
+      }
+      // Validación de límite de vehículos
+      if (row.CANTIDAD + terrenos.length > row.CANT_VEHI) {
+        return res.json({
+          success: false,
+          mensaje: `Límite total de vehículos excedido para contrato ${clase}_${idContrato}. Máximo: ${row.CANT_VEHI}, asignados: ${row.CANTIDAD}, nuevos: ${terrenos.length}.`,
+        });
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error en validación de contratos:", error);
+    return res.status(500).json({
+      success: false,
+      mensaje: "Error interno del servidor durante la validación",
+    });
+  } finally {
+    if (cn) {
+      await cn.close();
+    }
+  }
+};
+
+
 module.exports = {
   listOperations,
   listAssingByContract,
   insertOperation,
+  valideAssign
 };

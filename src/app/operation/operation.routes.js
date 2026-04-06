@@ -4,10 +4,12 @@ const {
   listOperations,
   insertOperation,
   listAssingByContract,
+  valideAssign,
 } = require("./operation.controller.js");
 
 Router.get("/operacionesAsig", authenticateToken, listOperations);
 Router.get("/asignacionPorContrato", authenticateToken, listAssingByContract)
 Router.post("/insertaAsignacion", authenticateToken, insertOperation);
+Router.post("/validaContratoCantidad", authenticateToken, valideAssign);
 
 module.exports = Router;

@@ -7,7 +7,6 @@ const {
   contContract,
   insertContract,
   contClient,
-  valideContractQuantity,
   detailVehByCont,
   getContractById,
   updateContract,
@@ -23,11 +22,6 @@ Router.get("/contCliente", authenticateToken, contClient);
 Router.get("/placasPorContrato", authenticateToken, detailVehByCont)
 Router.post("/insertarContrato", authenticateToken, insertContract);
 Router.put("/actualizarContrato/:id", authenticateToken, updateContract);
-Router.post(
-  "/validaContratoCantidad",
-  authenticateToken,
-  valideContractQuantity,
-);
 Router.get("/contratoPorId/:id", authenticateToken, getContractById)
 
 module.exports = Router;
