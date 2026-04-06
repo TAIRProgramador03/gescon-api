@@ -1,25 +1,25 @@
 const Router = require("express").Router();
 const multer = require("multer");
-const { uploadFile, validateFile } = require("./file.controller.js");
+const { uploadFile, validateFile, previewFile } = require("./file.controller.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 const path = require("path");
 const fs = require("fs");
 
 // Guarda el archivo temporalmente en la carpeta "tmp" antes de moverlo a su destino final
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    const rutaDestino = path.join(process.cwd(), "public/pdf/tmp");
-    fs.mkdirSync(rutaDestino, { recursive: true });
-    cb(null, rutaDestino);
-  },
-  filename: (_req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
+// const storage = multer.diskStorage({
+//   destination: (_req, _file, cb) => {
+//     const rutaDestino = path.join(process.cwd(), "public/pdf/tmp");
+//     fs.mkdirSync(rutaDestino, { recursive: true });
+//     cb(null, rutaDestino);
+//   },
+//   filename: (_req, file, cb) => {
+//     cb(null, file.originalname);
+//   },
+// });
 
 // Configura multer para aceptar solo archivos PDF y limitar el tamaño a 5MB
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/pdf") {
       cb(null, true); // Aceptar archivo
@@ -50,5 +50,7 @@ Router.post(
 );
 
 Router.get("/validarArchivo", authenticateToken, validateFile);
+
+Router.get("/previsualizarArchivo", authenticateToken, previewFile);
 
 module.exports = Router;

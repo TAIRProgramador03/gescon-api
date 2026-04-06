@@ -5,6 +5,7 @@ const {
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD, IP_LOCAL } = require("../../shared/conf.js");
+const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listDocumentByNroContract = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
@@ -244,7 +245,8 @@ const insertDocument = async (req, res) => {
     archivoPdf,
   } = req.body;
 
-  let nombreArchivo = `http://${IP_LOCAL}/tair-web/public/pdf/documents/${archivoPdf}`;
+  const oldKey = archivoPdf;
+  const newKey = oldKey.replace(/^temp\//, "");
 
   const claseDocu = "H";
   const fechaFormatoDB = convertirFecha(fechaFirma);
@@ -297,6 +299,7 @@ const insertDocument = async (req, res) => {
       claseDocu,
       motivo,
     ]);
+
     const result = await cn.query(queryCabecera, [
       idCliente,
       idContrato,
@@ -317,6 +320,8 @@ const insertDocument = async (req, res) => {
       claseDocu,
       motivo,
     ]);
+
+    await moveFile(oldKey, newKey)
 
     const idDocumentoCab = result.insertId || (await obtenerUltimoIdDoc(cn));
 

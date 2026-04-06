@@ -34,10 +34,10 @@ const login = async (req, res) => {
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.json({ success: true, message: "Conexión exitosa" });
+    res.json({ success: true, message: "Ingreso autorizado" });
   } catch (error) {
     console.error("Error al iniciar sesión:", error);
-    res.json({ success: false, message: "Error al iniciar sesión" });
+    res.json({ success: false, message: "Usuario o contraseña incorrecta" });
   } finally {
     if (cn) {
       await cn.close();

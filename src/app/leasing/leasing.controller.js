@@ -8,6 +8,7 @@ const {
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD, IP_LOCAL } = require("../../shared/conf.js");
+const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listLeasing = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
@@ -540,7 +541,8 @@ const insertLeasing = async (req, res) => {
 
   const validAsoc = idCliente == idClienteAsoc ? null : idClienteAsoc;
 
-  let nombreArchivo = `http://${IP_LOCAL}/tair-web/public/pdf/leasings/${archivoPdf}`;
+  const oldKey = archivoPdf;
+  const newKey = oldKey.replace(/^temp\//, "");
 
   const cn = await connection(globalDbUser, globalPassword);
 
@@ -564,6 +566,8 @@ const insertLeasing = async (req, res) => {
       funcionParteVar(idContrato),
       funcionNumerica(validAsoc)
     ]);
+
+    await moveFile(oldKey, newKey)
 
     const idLeasingCab = result.insertId || (await obtenerUltimoIdLea(cn));
 

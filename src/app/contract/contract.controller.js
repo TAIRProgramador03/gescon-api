@@ -7,6 +7,7 @@ const {
   funcionParteVar,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
+const {moveFile} = require("../../shared/service/aws-s3.js")
 
 const contractNro = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
@@ -722,7 +723,9 @@ const insertContract = async (req, res) => {
 
   const claseContra = "P";
   const fechaFormatoDB = convertirFecha(fechaFirma);
-  let nombreArchivo = `http://${IP_LOCAL}:3000/files/pdf/contracts/${archivoPdf}`;
+
+  const oldKey = archivoPdf;
+  const newKey = oldKey.replace(/^temp\//, "");
 
   const pool = await connection(globalDbUser, globalPassword);
   const cn = await pool.connect();
@@ -733,8 +736,6 @@ const insertContract = async (req, res) => {
     const findContract = await cn.query(sqlSearchContract, [
       nroContrato.toUpperCase(),
     ]);
-
-    console.log("PRIMERA QUERY HECHA");
 
     if (findContract.length > 0)
       return res.status(409).json({
@@ -766,11 +767,11 @@ const insertContract = async (req, res) => {
       tipoCliente,
       tipoMoneda,
       story,
-      nombreArchivo,
+      newKey,
       claseContra,
     ]);
 
-    console.log("SEGUNDA QUERY HECHA");
+    await moveFile(oldKey, newKey)
 
     const idContratoCab = result.insertId || (await obtenerUltimoId(cn));
 
@@ -802,8 +803,6 @@ const insertContract = async (req, res) => {
         message: "El contrato no puede quedar sin ningun modelo detallado",
       });
     }
-
-    console.log("TERCERA QUERY HECHA");
 
     // await cn.commit();
 
@@ -863,7 +862,9 @@ const updateContract = async (req, res) => {
 
   const claseContra = "P";
   const fechaFormatoDB = convertirFecha(fechaFirma);
-  let nombreArchivo = `http://${IP_LOCAL}:3000/files/pdf/contracts/${archivoPdf}`;
+
+  const oldKey = archivoPdf;
+  const newKey = oldKey.replace(/^temp\//, "");
 
   const pool = await connection(globalDbUser, globalPassword);
   const cn = await pool.connect();
@@ -878,8 +879,6 @@ const updateContract = async (req, res) => {
     `;
 
     const findContract = await cn.query(sql, [contractId]);
-
-    console.log("PRIMERA CONSULTA HECHA");
 
     if (findContract.length == 0)
       return res.status(404).json({
@@ -897,8 +896,6 @@ const updateContract = async (req, res) => {
       const findNroContract = await cn.query(sqlSearchContract, [
         nroContrato.toUpperCase(),
       ]);
-
-      console.log("SEGUNDA CONSULTA HECHA");
 
       if (findNroContract.length > 0)
         return res.status(409).json({
@@ -933,12 +930,12 @@ const updateContract = async (req, res) => {
       tipoCliente,
       tipoMoneda,
       story,
-      nombreArchivo,
+      newKey,
       claseContra,
       contractId,
     ]);
 
-    console.log("TERCERA CONSULTA HECHA");
+    await moveFile(oldKey, newKey)
 
     const idContractCab = contractId;
 
@@ -981,8 +978,6 @@ const updateContract = async (req, res) => {
       [idContractCab, ...detailUpdate.map((det) => det.idDet),]
     );
 
-    console.log("CUARTA CONSULTA HECHA");
-
     if (resultValidDelete.length > 0) {
       resultValidDelete.forEach((row) => {
         detailDelete.push(row.ID);
@@ -1012,8 +1007,6 @@ const updateContract = async (req, res) => {
       ]);
     }
 
-    console.log("QUINTA CONSULTA HECHA");
-
     // CREAMOS LOS NUEVOS DETALLES
     const queryNewDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
@@ -1038,8 +1031,6 @@ const updateContract = async (req, res) => {
       ]);
     }
 
-    console.log("SEXTA CONSULTA HECHA");
-
     // ELIMINAMOS LOS DETALLES
 
     if (detailDelete.length > 0) {
@@ -1052,8 +1043,6 @@ const updateContract = async (req, res) => {
 
       await cn.query(queryDelDetalle, detailDelete);
     }
-
-    console.log("ULTIMA CONSULTA HECHA");
 
     // await cn.commit();
 
