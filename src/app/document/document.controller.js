@@ -327,8 +327,8 @@ const insertDocument = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_DET
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     if (detalles && detalles.length > 0) {
@@ -345,6 +345,8 @@ const insertDocument = async (req, res) => {
           detalle.duracion,
           detalle.compraVeh,
           detalle.precioVeh,
+          detalle.kmAdicional,
+          detalle.condicion,
         ]);
         await cn.query(queryDetalle, [
           idDocumentoCab,
@@ -358,6 +360,8 @@ const insertDocument = async (req, res) => {
           detalle.duracion,
           detalle.compraVeh,
           detalle.precioVeh,
+          detalle.kmAdicional,
+          detalle.condicion,
         ]);
       }
     }
