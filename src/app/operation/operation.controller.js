@@ -171,7 +171,7 @@ const listAssingByContract = async (req, res) => {
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-          CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA,
+          CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
           AD.ARCHIVO_PDF AS ARCHIVO_PDF
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
@@ -235,7 +235,7 @@ const listAssingByContract = async (req, res) => {
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-          CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA,
+          CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
           AD.ARCHIVO_PDF AS ARCHIVO_PDF
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
@@ -354,8 +354,8 @@ const insertOperation = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBL_ASIGNACION_DET 
-              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF, CONDICION)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     /*const queryTarifa = `
@@ -414,7 +414,8 @@ const insertOperation = async (req, res) => {
           valorRepe ? fechaFinGlobal : convertirFecha(detalle.fechaFin),
           detalle.leasing,
           funcionParteVar(detalle.idContrato),
-          newKey
+          newKey,
+          detalle.condicion
         ]);
 
         await moveFile(oldKey, newKey);
