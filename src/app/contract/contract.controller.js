@@ -65,6 +65,62 @@ const contractNro = async (req, res) => {
   }
 };
 
+// const contractNroAdi = async (req, res) => {
+//   const { globalDbUser, globalPassword } = req.user;
+
+//   // Validación de token y sus datos
+//   if (!globalDbUser || !globalPassword) {
+//     return res
+//       .status(401)
+//       .json({ success: false, message: "Token inválido o no proporcionado" });
+//   }
+
+//   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
+
+//   if (!idCli) {
+//     return res
+//       .status(400)
+//       .json({ success: false, message: "El idCli es obligatorio" });
+//   }
+
+//   const cn = await connection(globalDbUser, globalPassword);
+
+//   try {
+//     // Consulta los contratos asociados al cliente
+//     const query = `
+//       SELECT * FROM ((SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE ID_CLIENTE= ? ) 
+//       UNION ALL (SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE ID_CLIENTE= ? )) AS CONTRATOS 
+//       ORDER BY DESCRIPCION ASC
+//     `;
+//     const result = await cn.query(query, [idCli, idCli]);
+
+//     const cleanedResult = result.map((row) => {
+//       return {
+//         ID:
+//           row.ID !== null && row.ID !== undefined
+//             ? row.ID.toString().trim()
+//             : null, // Convierte a string si es necesario
+//         DESCRIPCION:
+//           row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
+//             ? decodeString(row.DESCRIPCION.toString().trim())
+//             : null,
+//       };
+//     });
+
+//     // Devuelve los contratos como respuesta
+//     res.json(cleanedResult);
+//   } catch (error) {
+//     console.error("Error al obtener los contratos:", error);
+//     res
+//       .status(500)
+//       .json({ success: false, message: "Error al obtener contratos" });
+//   } finally {
+//     if (cn) {
+//       await cn.close();
+//     }
+//   }
+// };
+
 const contractNroAdi = async (req, res) => {
   const { globalDbUser, globalPassword } = req.user;
 
@@ -77,22 +133,16 @@ const contractNroAdi = async (req, res) => {
 
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  if (!idCli) {
-    return res
-      .status(400)
-      .json({ success: false, message: "El idCli es obligatorio" });
-  }
-
   const cn = await connection(globalDbUser, globalPassword);
 
   try {
     // Consulta los contratos asociados al cliente
     const query = `
-      SELECT * FROM ((SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE ID_CLIENTE= ? ) 
-      UNION ALL (SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE ID_CLIENTE= ? )) AS CONTRATOS 
+      SELECT * FROM ((SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB ${idCli ? "WHERE ID_CLIENTE= ?" : ""} ) 
+      UNION ALL (SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB ${idCli ? "WHERE ID_CLIENTE= ?" : ""} )) AS CONTRATOS 
       ORDER BY DESCRIPCION ASC
     `;
-    const result = await cn.query(query, [idCli, idCli]);
+    const result = await cn.query(query, idCli ? [idCli, idCli] : []);
 
     const cleanedResult = result.map((row) => {
       return {

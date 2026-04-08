@@ -135,7 +135,7 @@ const listAssingByContract = async (req, res) => {
       } else if (status == "I") {
         filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
         filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
-      } else if (status = "V") {
+      } else if (status == "V") {
         filtrosA += " AND V.ID_OPE = 109";
         filtrosB += " AND V.ID_OPE = 109";
       }

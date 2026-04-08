@@ -84,7 +84,7 @@ const listAllLeasing = async (req, res) => {
           } else if (typeContract == "H") {
             sql += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'H'`;
           }
-          params.push(contractId)
+          params.push(contractId);
         }
       }
     }
@@ -111,7 +111,7 @@ const listAllLeasing = async (req, res) => {
       archivoPdf: row.PDF.trim(),
       tipoCon: transformType(row.TIPCON.trim(), {
         P: "Contrato",
-        H: "Documento"
+        H: "Documento",
       }),
     }));
 
@@ -205,15 +205,15 @@ const listLeasingByContract = async (req, res) => {
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
       ${contratoId && clienteId ? `WHERE A.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND TIPCON = 'P'` : contratoId ? `WHERE A.ID_CONTRATO = ? AND TIPCON = 'P'` : clienteId ? `WHERE A.ID_CLIENTE = ?` : ""}
     `;
-    
+
     const params = [];
 
-    if(contratoId && clienteId) {
-      params.push(clienteId, contratoId)
-    } else if(contratoId) {
-      params.push(contratoId)
-    } else if(clienteId) {
-      params.push(clienteId)
+    if (contratoId && clienteId) {
+      params.push(clienteId, contratoId);
+    } else if (contratoId) {
+      params.push(contratoId);
+    } else if (clienteId) {
+      params.push(clienteId);
     }
 
     const result = await cn.query(sql, params);
@@ -281,6 +281,109 @@ const listLeasingByDocument = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Error al listar leasings por contrato",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const listLeasingGeneral = async (req, res) => {
+  const { globalDbUser, globalPassword } = req.user;
+
+  // Validación de token y sus datos
+  if (!globalDbUser || !globalPassword) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { contratoId, clienteId } = req.query;
+
+  const cn = await connection(globalDbUser, globalPassword);
+
+  try {
+    let initWhere = "";
+    let filtroA = "";
+    let filtroB = "";
+
+    if (contratoId || clienteId) {
+      initWhere = "WHERE";
+    }
+
+    if (contratoId && !clienteId) {
+      filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P'";
+      filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H'";
+    } else if (!contratoId && clienteId) {
+      filtroA += "A.ID_CLIENTE = ?";
+      filtroB += "A.ID_CLIENTE = ?";
+    } else if (contratoId && clienteId) {
+      filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P' AND A.ID_CLIENTE = ?";
+      filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H' AND A.ID_CLIENTE = ?";
+    }
+
+    const sqlContract = `
+      SELECT A.ID, A.NRO_LEASING
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      ${initWhere} ${filtroA}
+    `;
+
+    const sqlDocument = `
+      SELECT A.ID, A.NRO_LEASING
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      ${initWhere} ${filtroB}
+    `;
+
+    let typeDoc = "";
+    let idDoc;
+    const params = [];
+
+    if (contratoId && !clienteId) {
+      typeDoc = contratoId.split("_")[0];
+      idDoc = contratoId.split("_")[1];
+
+      params.push(idDoc);
+    } else if (!contratoId && clienteId) {
+      params.push(clienteId);
+    } else if (contratoId && clienteId) {
+      typeDoc = contratoId.split("_")[0];
+      idDoc = contratoId.split("_")[1];
+
+      params.push(idDoc, clienteId);
+    }
+
+    if (typeDoc == "H") {
+      const result = await cn.query(sqlDocument, params);
+
+      return res.status(200).json(
+        result.map((row) => ({
+          ID: row.ID,
+          NRO_LEASING: row.NRO_LEASING.trim(),
+        })),
+      );
+    } else if (typeDoc == "P") {
+      const result = await cn.query(sqlContract, params);
+
+      return res.status(200).json(
+        result.map((row) => ({
+          ID: row.ID,
+          NRO_LEASING: row.NRO_LEASING.trim(),
+        })),
+      );
+    } else {
+      const result = await cn.query(sqlContract, params);
+
+      return res.status(200).json(
+        result.map((row) => ({
+          ID: row.ID,
+          NRO_LEASING: row.NRO_LEASING.trim(),
+        })),
+      );
+    }
+  } catch (error) {
+    console.error("Error al listar leasing por contrato o documento: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al listar leasing por contrato o documento",
     });
   } finally {
     if (cn) await cn.close();
@@ -564,10 +667,10 @@ const insertLeasing = async (req, res) => {
       nombreArchivo,
       funcionNumerica(idContrato),
       funcionParteVar(idContrato),
-      funcionNumerica(validAsoc)
+      funcionNumerica(validAsoc),
     ]);
 
-    await moveFile(oldKey, newKey)
+    await moveFile(oldKey, newKey);
 
     const idLeasingCab = result.insertId || (await obtenerUltimoIdLea(cn));
 
@@ -619,6 +722,7 @@ module.exports = {
   listLeasingOfClient,
   listLeasingByContract,
   listLeasingByDocument,
+  listLeasingGeneral,
   detailLeasing,
   detailVehByLeasing,
   detailAssignByLeasing,
