@@ -49,15 +49,26 @@ const tableVehicles = async (req, res) => {
   try {
     // Consulta los contratos asociados al cliente
     // A.INIVAL1='0' AND
+    // const query = `
+    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO 
+    //   FROM ${SCHEMA_BD}.PO_VEHICULO A 
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN 
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID 
+    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA 
+    //   LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH 
+    //   WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC
+    // `;
+
     const query = `
       SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO 
-      FROM ${SCHEMA_BD}.PO_VEHICULO A 
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN 
+      FROM ${SCHEMA_BD}.PO_VEHICULO A
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID 
       LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA 
-      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH 
-      WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC
-    `;
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+      ON A.SECOPE = tad.ID_OPE
+      WHERE tad.ID_OPE IS NULL AND A.SECOPE NOT IN (211, 238, 109, 162) ORDER BY A.ID DESC
+    `
     const result = await cn.query(query);
 
     const cleanedResult = result.map((row) => {
@@ -303,7 +314,7 @@ const listModelGen = async (req, res) => {
 
   const cn = await connection(globalDbUser, globalPassword);
   try {
-    const sql = `SELECT DISTINCT(IDMODGEN), DESMODGEN FROM SPEED400AT.PO_MODELO ORDER BY IDMODGEN ASC`;
+    const sql = `SELECT DISTINCT(IDMODGEN), DESMODGEN FROM ${SCHEMA_BD}.PO_MODELO ORDER BY IDMODGEN ASC`;
     const result = await cn.query(sql);
 
     const cleanedResult = result.map((row) => ({
@@ -342,8 +353,8 @@ const listYearByModelGen = async (req, res) => {
   const cn = await connection(globalDbUser, globalPassword);
   try {
     const sql = `
-      SELECT DISTINCT(ANO) FROM SPEED400AT.PO_VEHICULO V
-      LEFT JOIN SPEED400AT.PO_MODELO MO
+      SELECT DISTINCT(ANO) FROM ${SCHEMA_BD}.PO_VEHICULO V
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
       ON MO.ID = V.IDMOD
       WHERE ANO != '0' AND MO.IDMODGEN = ?
       ORDER BY ANO DESC

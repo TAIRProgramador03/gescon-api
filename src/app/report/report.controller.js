@@ -246,7 +246,7 @@ const contVehicleLeasings = async (req, res) => {
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB C
       ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'P'
 
@@ -344,7 +344,7 @@ const contVehicleLeasings = async (req, res) => {
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
       ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'H')
       WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0)  
@@ -450,7 +450,7 @@ const contVehicleLeasings = async (req, res) => {
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB C
       ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'P'
 
@@ -548,7 +548,7 @@ const contVehicleLeasings = async (req, res) => {
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
       ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN SPEED400AT.TBL_ASIGNACION_DET AD
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'H')
       WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0) 
@@ -1121,8 +1121,8 @@ const contComparationDays = async (req, res) => {
       SUBSTR(L.FECHA_FIN, 7, 2)
       )
       ) AS DIFERENCIA_DIAS
-      FROM SPEED400AT.TBLCONTRATO_CAB C
-      LEFT JOIN SPEED400AT.TBL_LEASING_CAB L
+      FROM ${SCHEMA_BD}.TBLCONTRATO_CAB C
+      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB L
       ON C.ID = L.ID_CONTRATO
       WHERE C.ID = ? AND L.ID = ?
     `;
@@ -1179,7 +1179,7 @@ const contTotalPriceByModel = async (req, res) => {
         SELECT 
               td.ID_CON_CAB,
               SUM(td.PRECIO_VEH * td.CANTIDAD) AS COSTO
-          FROM SPEED400AT.TBLCONTRATO_DET td
+          FROM ${SCHEMA_BD}.TBLCONTRATO_DET td
           GROUP BY td.ID_CON_CAB 
       ) cc
       JOIN (
@@ -1187,12 +1187,12 @@ const contTotalPriceByModel = async (req, res) => {
               l.ID_CONTRATO,
               m.IDMODGEN,
               m.DESCRIPCION
-          FROM SPEED400AT.TBL_LEASING_CAB l
-          JOIN SPEED400AT.TBL_LEASING_DET dl 
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB l
+          JOIN ${SCHEMA_BD}.TBL_LEASING_DET dl 
               ON dl.ID_LEA_CAB = l.ID
-          JOIN SPEED400AT.PO_VEHICULO v 
+          JOIN ${SCHEMA_BD}.PO_VEHICULO v 
               ON v.ID = dl.ID_VEH
-          JOIN SPEED400AT.PO_MODELO m 
+          JOIN ${SCHEMA_BD}.PO_MODELO m 
               ON m.ID = v.IDMOD
           WHERE m.IDMODGEN = ? 
       ) mc 
@@ -1201,7 +1201,7 @@ const contTotalPriceByModel = async (req, res) => {
         SELECT 
               ID_CONTRATO,
               YEAR(DATE(SUBSTR(l.FECHA_INI, 1, 4) || '-' || SUBSTR(l.FECHA_INI, 5, 2) || '-' || SUBSTR(l.FECHA_INI, 7, 2)) - 2 MONTHS) AS ANIO
-          FROM SPEED400AT.TBL_LEASING_CAB l 
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB l 
           WHERE YEAR(DATE(SUBSTR(l.FECHA_INI, 1, 4) || '-' || SUBSTR(l.FECHA_INI, 5, 2) || '-' || SUBSTR(l.FECHA_INI, 7, 2)) - 2 MONTHS) IN (${params})
       ) ac 
       ON ac.ID_CONTRATO  = cc.ID_CON_CAB 
