@@ -4,14 +4,14 @@ const {
   transformType,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
-const { SCHEMA_BD, IP_LOCAL } = require("../../shared/conf.js");
+const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listDocumentByNroContract = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -25,7 +25,7 @@ const listDocumentByNroContract = async (req, res) => {
       message: "Los parametros contratoId y clienteId son obligatorio",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -58,10 +58,10 @@ const listDocumentByNroContract = async (req, res) => {
 };
 
 const detailDocument = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -75,7 +75,7 @@ const detailDocument = async (req, res) => {
       message: "El parametro documentoId es obligatorio",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -139,10 +139,10 @@ const detailDocument = async (req, res) => {
 };
 
 const detailVehByDocu = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -156,7 +156,7 @@ const detailVehByDocu = async (req, res) => {
       message: "Los parametros documentoId y tipoTerr son obligatorios",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sqlLeasing = `
@@ -215,10 +215,10 @@ const detailVehByDocu = async (req, res) => {
 };
 
 const insertDocument = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -251,7 +251,7 @@ const insertDocument = async (req, res) => {
   const claseDocu = "H";
   const fechaFormatoDB = convertirFecha(fechaFirma);
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     console.log("Valores para queryCabecera:", [

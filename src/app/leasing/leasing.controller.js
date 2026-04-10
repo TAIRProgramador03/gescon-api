@@ -7,20 +7,20 @@ const {
   transformType,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
-const { SCHEMA_BD, IP_LOCAL } = require("../../shared/conf.js");
+const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const result = await cn.query(
@@ -49,10 +49,10 @@ const listLeasing = async (req, res) => {
 };
 
 const listAllLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -60,7 +60,7 @@ const listAllLeasing = async (req, res) => {
 
   const { bank, clientId, contractId, typeContract } = req.query;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let sql = `
@@ -128,10 +128,10 @@ const listAllLeasing = async (req, res) => {
 };
 
 const listLeasingOfClient = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -147,7 +147,7 @@ const listLeasingOfClient = async (req, res) => {
     });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const query = `
@@ -186,10 +186,10 @@ const listLeasingOfClient = async (req, res) => {
 };
 
 const listLeasingByContract = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -197,7 +197,7 @@ const listLeasingByContract = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -239,10 +239,10 @@ const listLeasingByContract = async (req, res) => {
 };
 
 const listLeasingByDocument = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -256,7 +256,7 @@ const listLeasingByDocument = async (req, res) => {
       message: "El parametro documentoId son obligatorio",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -288,10 +288,10 @@ const listLeasingByDocument = async (req, res) => {
 };
 
 const listLeasingGeneral = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -299,7 +299,7 @@ const listLeasingGeneral = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let initWhere = "";
@@ -391,10 +391,10 @@ const listLeasingGeneral = async (req, res) => {
 };
 
 const detailLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -409,7 +409,7 @@ const detailLeasing = async (req, res) => {
         "Los parametros leasingId, nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     // const sql = `
@@ -479,10 +479,10 @@ const detailLeasing = async (req, res) => {
 };
 
 const detailVehByLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -496,7 +496,7 @@ const detailVehByLeasing = async (req, res) => {
       message: "El parametro leasingId es obligatorio",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -543,10 +543,10 @@ const detailVehByLeasing = async (req, res) => {
 };
 
 const detailAssignByLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -561,7 +561,7 @@ const detailAssignByLeasing = async (req, res) => {
         "Los parametros nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -615,10 +615,10 @@ const detailAssignByLeasing = async (req, res) => {
 };
 
 const insertLeasing = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -647,7 +647,7 @@ const insertLeasing = async (req, res) => {
   const oldKey = archivoPdf;
   const newKey = oldKey.replace(/^temp\//, "");
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const queryCabecera = `

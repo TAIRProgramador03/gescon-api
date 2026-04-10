@@ -31,7 +31,9 @@ app.use(
       `http://${IP_LOCAL}:3000`,
       `http://cdn.datatables.net`,
       `http://192.168.5.25`,
-      `http://192.168.5.25:3000`
+      `http://192.168.5.25:3000`,
+      `http://${IP_LOCAL}:5173`,
+      `http://locahost:5173`,
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),

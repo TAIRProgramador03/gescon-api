@@ -3,16 +3,16 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listClient = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -47,10 +47,10 @@ const listClient = async (req, res) => {
 };
 
 const tableClient = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -64,7 +64,7 @@ const tableClient = async (req, res) => {
       .json({ success: false, message: "El idCli es obligatorio" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -112,16 +112,16 @@ const tableClient = async (req, res) => {
 };
 
 const tableClientLea = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     // Consulta los contratos asociados al cliente

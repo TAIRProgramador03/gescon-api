@@ -3,16 +3,16 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listModels = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const result = await cn.query(

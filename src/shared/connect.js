@@ -1,13 +1,13 @@
 const odbc = require("odbc");
-const { dbConfig } = require("./conf.js");
+const { dbConfig, DB_USER, DB_PASSWORD } = require("./conf.js");
 
 let pool = null;
 
-const conDb = async (dbUser, dbPassword) => {
+const conDb = async () => {
   try {
     if (!pool) {
       pool = await odbc.pool({
-        connectionString: `DSN=${dbConfig.DSN};UID=${dbUser};PWD=${dbPassword};System=${dbConfig.system};CCSID=1208;UNICODE=UCS-2`,
+        connectionString: `DSN=${dbConfig.DSN};UID=${DB_USER};PWD=${DB_PASSWORD};System=${dbConfig.system};CCSID=1208;UNICODE=UCS-2`,
         initialSize: 10,
         maxSize: 40,
         incrementSize: 5

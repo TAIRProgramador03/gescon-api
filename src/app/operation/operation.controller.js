@@ -10,10 +10,10 @@ const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listOperations = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -27,7 +27,7 @@ const listOperations = async (req, res) => {
       .json({ success: false, message: "El idCli es obligatorio" });
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -66,10 +66,10 @@ const listOperations = async (req, res) => {
 };
 
 const listAssingByContract = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -83,7 +83,7 @@ const listAssingByContract = async (req, res) => {
       message: "El parametro idCliente es obligatorio",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     // let sql = `
@@ -321,10 +321,10 @@ const listAssingByContract = async (req, res) => {
 };
 
 const insertOperation = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -332,7 +332,7 @@ const insertOperation = async (req, res) => {
 
   const { idCliente, valorRepe, detalles } = req.body;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   let fechita = new Date().toISOString().split("T")[0];
   let converFecha = convertirFecha(fechita);
@@ -454,10 +454,10 @@ const insertOperation = async (req, res) => {
 };
 
 const valideAssign = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -498,7 +498,7 @@ const valideAssign = async (req, res) => {
     console.log(d.idTerreno);
   }
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     for (let key in agrupados) {

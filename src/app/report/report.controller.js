@@ -2,10 +2,10 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const contVehicleFeet = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -13,7 +13,7 @@ const contVehicleFeet = async (req, res) => {
 
   const { clienteId, status } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let sql = `
@@ -133,10 +133,10 @@ const contVehicleFeet = async (req, res) => {
 };
 
 const contVehicleLeasings = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -149,7 +149,7 @@ const contVehicleLeasings = async (req, res) => {
   let length = parseInt(req.query.length) || 10;
   const search = req.query.search || "";
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let sql = `
@@ -607,10 +607,10 @@ const contVehicleLeasings = async (req, res) => {
 };
 
 const contLeasings = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -618,7 +618,7 @@ const contLeasings = async (req, res) => {
 
   const { clienteId } = req.query;
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sqlVencidos = `
@@ -690,10 +690,10 @@ const contLeasings = async (req, res) => {
 };
 
 const listVehicleLeasingExpire = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -711,7 +711,7 @@ const listVehicleLeasingExpire = async (req, res) => {
   let length = parseInt(req.query.length) || 10;
   const search = req.query.search || "";
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let sentences;
@@ -843,10 +843,10 @@ const listVehicleLeasingExpire = async (req, res) => {
 };
 
 const listVehicleLeasingToExpire = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -864,7 +864,7 @@ const listVehicleLeasingToExpire = async (req, res) => {
   let length = parseInt(req.query.length) || 10;
   const search = req.query.search || "";
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     let sentences;
@@ -996,10 +996,10 @@ const listVehicleLeasingToExpire = async (req, res) => {
 };
 
 const contVehiculeByClient = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -1013,7 +1013,7 @@ const contVehiculeByClient = async (req, res) => {
       : [clientesId]
     : [];
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const valueQuery = listClient.map(() => "?");
@@ -1056,10 +1056,10 @@ const contVehiculeByClient = async (req, res) => {
 };
 
 const contComparationDays = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -1073,7 +1073,7 @@ const contComparationDays = async (req, res) => {
       message: "Los parametros contractId y leasingId son obligatorios",
     });
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const sql = `
@@ -1148,10 +1148,10 @@ const contComparationDays = async (req, res) => {
 };
 
 const contTotalPriceByModel = async (req, res) => {
-  const { globalDbUser, globalPassword } = req.user;
+  const { id: idUser } = req.user;
 
   // Validación de token y sus datos
-  if (!globalDbUser || !globalPassword) {
+  if (!idUser) {
     return res
       .status(401)
       .json({ success: false, message: "Token inválido o no proporcionado" });
@@ -1164,7 +1164,7 @@ const contTotalPriceByModel = async (req, res) => {
   if (!modelId)
     return res.status(400).json("El parametro modelId es obligatorio");
 
-  const cn = await connection(globalDbUser, globalPassword);
+  const cn = await connection();
 
   try {
     const params = listYears.map(() => "?");
