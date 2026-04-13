@@ -18,6 +18,7 @@ const operationRoutes = require("./src/app/operation/operation.routes.js");
 const fileRoutes = require("./src/app/file/file.routes.js");
 const modelRoutes = require("./src/app/model/model.routes.js");
 const reportRoutes = require("./src/app/report/report.routes.js")
+const userRoutes = require("./src/app/user/user.routes.js")
 
 const app = express();
 const port = 3000;
@@ -56,6 +57,7 @@ app.use(operationRoutes);
 app.use(fileRoutes);
 app.use(modelRoutes);
 app.use(reportRoutes);
+app.use(userRoutes);
 
 // Iniciar servidor IP_LOCAL/
 app.listen(port, () => {
