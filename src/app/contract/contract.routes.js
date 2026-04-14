@@ -10,6 +10,7 @@ const {
   detailVehByCont,
   getContractById,
   updateContract,
+  verifyContractsTemp,
 } = require("./contract.controller.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
@@ -23,5 +24,6 @@ Router.get("/placasPorContrato", authenticateToken, detailVehByCont)
 Router.post("/insertarContrato", authenticateToken, insertContract);
 Router.put("/actualizarContrato/:id", authenticateToken, updateContract);
 Router.get("/contratoPorId/:id", authenticateToken, getContractById)
+Router.get("/verificarContratosTemp", authenticateToken, verifyContractsTemp)
 
 module.exports = Router;

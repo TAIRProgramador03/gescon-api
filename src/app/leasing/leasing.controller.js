@@ -63,31 +63,52 @@ const listAllLeasing = async (req, res) => {
   const cn = await connection();
 
   try {
-    let sql = `
-      SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    `;
-
+    // let sql = `
+    //   SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON
+    //   FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+    // `;
+    let filtros = "";
     const params = [];
 
     if (bank) {
-      sql += " WHERE L.BANCO = ?";
+      filtros += " WHERE L.BANCO = ?";
       params.push(bank);
 
       if (clientId) {
-        sql += " AND L.ID_CLIENTE = ?";
+        filtros += " AND L.ID_CLIENTE = ?";
         params.push(clientId);
 
         if (contractId) {
           if (typeContract == "P") {
-            sql += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'P'`;
+            filtros += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'P'`;
           } else if (typeContract == "H") {
-            sql += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'H'`;
+            filtros += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'H'`;
           }
           params.push(contractId);
         }
       }
     }
+
+    let sql = `
+      SELECT * FROM (
+        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+        ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+        WHERE L.TIPCON = 'P'
+        UNION ALL
+        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
+        ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
+        WHERE L.TIPCON = 'H'
+      ) L
+      ${filtros}
+      ORDER BY L.ID ASC
+    `;
+
+    console.log(filtros);
+    console.log(params);
 
     const result = await cn.query(sql, params);
 
@@ -113,6 +134,7 @@ const listAllLeasing = async (req, res) => {
         P: "Contrato",
         H: "Documento",
       }),
+      nroContrato: row.NRO_CONTRATO.trim(),
     }));
 
     return res.status(200).json(cleanedResult);
@@ -507,7 +529,7 @@ const detailVehByLeasing = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
       ON V.IDMAR = M.ID
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-      ON V.IDOPE = O.ID
+      ON V.SECOPE = O.ID
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
       ON L.PLACA = A.PLACA
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
@@ -576,7 +598,7 @@ const detailAssignByLeasing = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
       ON V.IDMAR = M.ID
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-      ON V.IDOPE = O.ID
+      ON V.SECOPE = O.ID
       WHERE  AD.LEASING = ? AND  AC.ID_CLIENTE = ? AND AD.ID_CONTRATO = ? AND CLASE_CONTRATO = ?
     `;
 

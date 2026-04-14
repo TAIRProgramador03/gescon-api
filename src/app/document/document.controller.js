@@ -181,7 +181,7 @@ const detailVehByDocu = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
       ON V.IDMAR = M.ID
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-      ON V.IDOPE = O.ID
+      ON V.SECOPE = O.ID
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
       ON L.PLACA = A.PLACA
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC

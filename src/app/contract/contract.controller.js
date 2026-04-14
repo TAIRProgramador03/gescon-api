@@ -5,7 +5,7 @@ const {
   obtenerUltimoId,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
-const {moveFile, fileExists} = require("../../shared/service/aws-s3.js")
+const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
 
 const contractNro = async (req, res) => {
   const { id: idUser } = req.user;
@@ -86,8 +86,8 @@ const contractNro = async (req, res) => {
 //   try {
 //     // Consulta los contratos asociados al cliente
 //     const query = `
-//       SELECT * FROM ((SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE ID_CLIENTE= ? ) 
-//       UNION ALL (SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE ID_CLIENTE= ? )) AS CONTRATOS 
+//       SELECT * FROM ((SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE ID_CLIENTE= ? )
+//       UNION ALL (SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE ID_CLIENTE= ? )) AS CONTRATOS
 //       ORDER BY DESCRIPCION ASC
 //     `;
 //     const result = await cn.query(query, [idCli, idCli]);
@@ -335,7 +335,7 @@ const detailContract = async (req, res) => {
     `;
 
     const sqlContrato = `
-      SELECT DESCRIPCION, FECHA_FIRMA, DURACION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
+      SELECT NRO_CONTRATO, DESCRIPCION, FECHA_FIRMA, DURACION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
       WHERE ID_CLIENTE = ? 
       ${contratoId ? `AND ID = ?` : ""}
     `;
@@ -541,6 +541,11 @@ const detailContract = async (req, res) => {
     res.json({
       success: true,
       data: {
+        isTemp: contrato
+          ? contrato.NRO_CONTRATO.trim().toUpperCase().includes("CPEN")
+            ? true
+            : false
+          : false,
         descripcion: contrato ? contrato.DESCRIPCION.trim() : "",
         fechaFirma: contrato ? contrato.FECHA_FIRMA : "",
         duracion: contrato ? contrato.DURACION.trim() : "",
@@ -828,7 +833,7 @@ const insertContract = async (req, res) => {
       claseContra,
     ]);
 
-    await moveFile(oldKey, newKey)
+    await moveFile(oldKey, newKey);
 
     const idContratoCab = result.insertId || (await obtenerUltimoId(cn));
 
@@ -853,7 +858,7 @@ const insertContract = async (req, res) => {
           detalle.kmAdicional,
           detalle.compraVeh,
           detalle.precioVeh,
-          detalle.condicion
+          detalle.condicion,
         ]);
       }
     } else {
@@ -994,8 +999,8 @@ const updateContract = async (req, res) => {
       contractId,
     ]);
 
-    const isExist = await fileExists(`${oldKey}`)
-    if(!isExist) await moveFile(oldKey, newKey);
+    const isExist = await fileExists(`${oldKey}`);
+    if (!isExist) await moveFile(oldKey, newKey);
 
     const idContractCab = contractId;
 
@@ -1032,11 +1037,11 @@ const updateContract = async (req, res) => {
             ON D.ID_CON_CAB = C.ID
             WHERE C.ID = ? AND D.ID NOT IN (${paramsDet.join(",")})
           `;
-    
-    const resultValidDelete = await cn.query(
-      queryValidDelete,
-      [idContractCab, ...detailUpdate.map((det) => det.idDet),]
-    );
+
+    const resultValidDelete = await cn.query(queryValidDelete, [
+      idContractCab,
+      ...detailUpdate.map((det) => det.idDet),
+    ]);
 
     if (resultValidDelete.length > 0) {
       resultValidDelete.forEach((row) => {
@@ -1076,7 +1081,7 @@ const updateContract = async (req, res) => {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
-    for(const detalle of detailNew) {
+    for (const detalle of detailNew) {
       console.log(detailNew);
       await cn.query(queryNewDetalle, [
         idContractCab,
@@ -1157,9 +1162,9 @@ const getContractById = async (req, res) => {
     const sqlDetail = `
       SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_DET D
       WHERE D.ID_CON_CAB = ?
-    `
+    `;
 
-    const resultDet = await cn.query(sqlDetail, [contractId])
+    const resultDet = await cn.query(sqlDetail, [contractId]);
 
     if (result.length == 0)
       return res.status(404).json({
@@ -1181,7 +1186,7 @@ const getContractById = async (req, res) => {
       kmAdicional: row.KM_ADI,
       compraVeh: row.PRECIO_VEH,
       precioVeh: row.PRECIO_VENTA,
-      condicion: row.CONDICION
+      condicion: row.CONDICION,
     }));
 
     const contractData = {
@@ -1215,6 +1220,59 @@ const getContractById = async (req, res) => {
   }
 };
 
+const verifyContractsTemp = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const cn = await connection();
+
+  try {
+    const sql = `
+      SELECT 
+        COUNT(*) AS TOTAL_TEMPORALES, 
+        cl.IDCLI,
+        cl.CLINOM AS CLIENTE
+      FROM ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+      LEFT JOIN (
+          SELECT DISTINCT A.IDCLI, B.CLINOM 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+              ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+      ) cl
+      ON tc.ID_CLIENTE = cl.IDCLI
+      WHERE NRO_CONTRATO LIKE '%CPEN-%'
+      GROUP BY cl.IDCLI, cl.CLINOM
+      ORDER BY cl.CLINOM
+    `;
+
+    const result = await cn.query(sql);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total: result[0].TOTAL_TEMPORALES,
+        clientes: result.map((row) => row.CLIENTE.trim()),
+      },
+    });
+  } catch (error) {
+    console.error("Error al verificar contratos temporales", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al verificar contratos temporales",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   contractNro,
   contractNroAdi,
@@ -1226,4 +1284,5 @@ module.exports = {
   insertContract,
   updateContract,
   getContractById,
+  verifyContractsTemp,
 };
