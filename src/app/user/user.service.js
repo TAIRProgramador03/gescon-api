@@ -81,7 +81,7 @@ const putUser = async (id, data) => {
       WHERE ID = ?
     `;
 
-    await cn.query(sql, [id, data.roleId]);
+    await cn.query(sql, [data.roleId, id]);
 
     await cn.commit();
 
