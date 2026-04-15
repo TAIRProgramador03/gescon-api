@@ -6,6 +6,7 @@ const {
   putPermissionsByRole,
   getUserById,
   putUser,
+  getNewUsers,
 } = require("./user.service.js");
 
 const listUsers = async (req, res) => {
@@ -29,6 +30,24 @@ const listUsers = async (req, res) => {
     );
   } catch (error) {
     console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const listNewUsers = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  if (!idUser)
+    return res
+      .status(401)
+      .json({ success: false, message: "Acción no permitida" });
+
+  try {
+    const users = await getNewUsers();
+
+    return res.status(200).json(users);
+  } catch (error) {
+    console.log(error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -84,7 +103,7 @@ const updateUser = async (req, res) => {
 
   try {
     const update = await putUser(id, body);
-    
+
     return res.status(200).json(update);
   } catch (error) {
     console.error(error);
@@ -197,6 +216,7 @@ const updatePermissionsByRole = async (req, res) => {
 
 module.exports = {
   listUsers,
+  listNewUsers,
   findUserById,
   updateUser,
   listRoles,

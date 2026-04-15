@@ -68,6 +68,37 @@ const getUserById = async (id) => {
   }
 };
 
+const getNewUsers = async () => {
+  const cn = await connection();
+  try {
+    const sql = `
+      SELECT pu.ID, TRIM(pu.USUARIO) as USUARIO, TRIM(pu.COD_EMP) as COD_EMP, pu.IDPERFIL
+      FROM ${SCHEMA_BD}.PO_USUARIOS pu
+      WHERE NOT EXISTS (
+          SELECT 1
+          FROM ${SCHEMA_BD}.T_US_GC tug
+          WHERE tug."ID" = pu."ID" 
+            AND tug.USU = pu.USUARIO 
+            AND tug.COD_EMP = PU.COD_EMP 
+      )
+    `;
+
+    const result = await cn.query(sql);
+
+    return result.map((row) => ({
+      id: row.ID,
+      usuario: row.USUARIO,
+      codEmp: row.COD_EMP,
+      rolId: row.IDPERFIL
+    }));
+  } catch (error) {
+    console.error(error);
+    throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 const putUser = async (id, data) => {
   const pool = await connection();
   const cn = await pool.connect();
@@ -89,8 +120,8 @@ const putUser = async (id, data) => {
   } catch (error) {
     await cn.rollback();
 
-    console.error(error)
-    throw new Error(`Ocurrio algo al actualizar usuario: ${error}`)
+    console.error(error);
+    throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
   } finally {
     if (cn) await cn.close();
   }
@@ -215,6 +246,7 @@ const putPermissionsByRole = async (id, permissions) => {
 module.exports = {
   getUsers,
   getUserById,
+  getNewUsers,
   putUser,
   getRoles,
   getPermissionsByUser,
