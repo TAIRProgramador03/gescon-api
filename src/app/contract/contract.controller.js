@@ -335,7 +335,7 @@ const detailContract = async (req, res) => {
     `;
 
     const sqlContrato = `
-      SELECT NRO_CONTRATO, DESCRIPCION, FECHA_FIRMA, DURACION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
+      SELECT NRO_CONTRATO, DESCRIPCION, FECHA_FIRMA, DURACION, ARCHIVO_PDF FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
       WHERE ID_CLIENTE = ? 
       ${contratoId ? `AND ID = ?` : ""}
     `;
@@ -558,6 +558,7 @@ const detailContract = async (req, res) => {
         cantidadDocumentos: documento.TOTAL_DOCUMENTOS,
         cantidadLeasing: leasing.TOTAL_LEASINGS,
         cantidadAsignados: totalVehAssign.TOTAL_ASIGNADOS,
+        archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : ""
       },
     });
   } catch (error) {
@@ -861,11 +862,6 @@ const insertContract = async (req, res) => {
           detalle.condicion,
         ]);
       }
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "El contrato no puede quedar sin ningun modelo detallado",
-      });
     }
 
     // await cn.commit();

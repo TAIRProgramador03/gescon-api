@@ -295,7 +295,7 @@ const insertDocument = async (req, res) => {
       vehCiu,
       Especial,
       story,
-      nombreArchivo,
+      newKey,
       claseDocu,
       motivo,
     ]);
@@ -316,7 +316,7 @@ const insertDocument = async (req, res) => {
       vehCiu,
       Especial,
       story,
-      nombreArchivo,
+      newKey,
       claseDocu,
       motivo,
     ]);

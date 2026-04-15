@@ -686,7 +686,7 @@ const insertLeasing = async (req, res) => {
       fechaIniDB,
       fechaFinDB,
       periGracia,
-      nombreArchivo,
+      newKey,
       funcionNumerica(idContrato),
       funcionParteVar(idContrato),
       funcionNumerica(validAsoc),

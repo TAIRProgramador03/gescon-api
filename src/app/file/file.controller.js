@@ -2,28 +2,17 @@ const { s3, getFileUrl, fileExists } = require("../../shared/service/aws-s3");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const uploadFile = async (req, res) => {
-  // const file = req.file;
-
-  // if (!file) {
-  //   return res.json({
-  //     success: false,
-  //     message: "No se recibió ningún archivo",
-  //   });
-  // }
-
   const tipo = req.body.documentType?.replace(/\/+$/, "") || "files";
-  const nombreSeguro = req.file.originalname.replace(/\s+/g, "-");
+  const nombreSeguro =
+    req.file.originalname
+      .replace(/\s+/g, "-") // espacios → guiones
+      .replace(/\.pdf$/i, "") // quitar extensión
+      .replace(/\./g, "-") // puntos intermedios → guiones
+      .replace(/[^a-zA-Z0-9\-]/g, "-") // caracteres raros → guiones
+      .replace(/-+/g, "-") // múltiples guiones → uno
+      .replace(/^-|-$/g, "") + // quitar guiones extremos
+    ".pdf";
   const key = `temp/${tipo}/${Date.now()}-${nombreSeguro}`;
-  // const destinoFinal = path.join(process.cwd(), "public/pdf", tipo);
-  // fs.mkdirSync(destinoFinal, { recursive: true });
-  // const rutaFinal = path.join(destinoFinal, file.originalname);
-  // fs.renameSync(file.path, rutaFinal);
-
-  // res.json({
-  //   success: true,
-  //   message: "Archivo subido correctamente",
-  //   ruta: rutaFinal,
-  // });
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -66,7 +55,7 @@ const previewFile = async (req, res) => {
   if (!isExist) {
     return res.status(404).json({
       success: false,
-      message: "Archivo no encontrado"
+      message: "Archivo no encontrado",
     });
   }
 
@@ -78,5 +67,5 @@ const previewFile = async (req, res) => {
 module.exports = {
   uploadFile,
   validateFile,
-  previewFile
+  previewFile,
 };
