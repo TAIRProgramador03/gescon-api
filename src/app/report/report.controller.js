@@ -583,8 +583,8 @@ const contVehicleLeasings = async (req, res) => {
       fechaFinLea: row.FECHA_FIN_LEA.trim(),
       añosLeasing: row.ANOS_LEA,
       diferenciaDias: row.DIFERENCIA_DIAS,
-      fechaIniActa: row.FECHA_ACTA_INI.trim(),
-      fechaFinActa: row.FECHA_ACTA_FIN.trim(),
+      fechaIniActa: row.FECHA_ACTA_INI,
+      fechaFinActa: row.FECHA_ACTA_FIN,
     }));
 
     const totalElements = resultTotal[0].TOTAL;
