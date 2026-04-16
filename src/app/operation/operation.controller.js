@@ -101,7 +101,7 @@ const listAssingByContract = async (req, res) => {
     // `;
 
     let filtrosA = "";
-    let filtrosB = ""
+    let filtrosB = "";
     let params = [];
 
     // filtro obligatorio
@@ -129,7 +129,7 @@ const listAssingByContract = async (req, res) => {
     }
 
     if (status) {
-      if(status == "A") {
+      if (status == "A") {
         filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
         filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
       } else if (status == "I") {
@@ -305,7 +305,7 @@ const listAssingByContract = async (req, res) => {
       fechaFinCon: row.FECHA_FIN_CONTRATO,
       tarifa: row.TARIFA,
       moneda: row.MONEDA,
-      archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : ""
+      archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
     }));
 
     return res.status(200).json(convertResult);
@@ -347,7 +347,7 @@ const insertOperation = async (req, res) => {
     const result = await cn.query(queryCabecera, [
       idCliente,
       converFecha,
-      globalDbUser,
+      "analista",
     ]);
 
     const idAsignaCab = result.insertId || (await obtenerUltimoIdAsigna(cn));
@@ -415,7 +415,7 @@ const insertOperation = async (req, res) => {
           detalle.leasing,
           funcionParteVar(detalle.idContrato),
           newKey,
-          detalle.condicion
+          detalle.condicion,
         ]);
 
         await moveFile(oldKey, newKey);
@@ -592,10 +592,35 @@ const valideAssign = async (req, res) => {
   }
 };
 
+const updateAssign = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    await cn.beginTransaction();
+
+    await cn.commit();
+  } catch (error) {
+    await cn.rollback();
+    console.error(error);
+    return res.status(500).json("Error al actualizar las placas: ", error)
+  } finally {
+    if (cn) await cn.close();
+  }
+};
 
 module.exports = {
   listOperations,
   listAssingByContract,
   insertOperation,
-  valideAssign
+  valideAssign,
 };

@@ -475,7 +475,8 @@ const listPlateTraceability = async (req, res) => {
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
           CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-          AD.ARCHIVO_PDF AS ARCHIVO_PDF
+          AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+          AD.CONDICION AS CONDICION
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
         ON AD.ID_ASIGNACION = AC.ID
@@ -539,7 +540,8 @@ const listPlateTraceability = async (req, res) => {
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
           CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-          AD.ARCHIVO_PDF AS ARCHIVO_PDF
+          AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+          AD.CONDICION AS CONDICION
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
         ON AD.ID_ASIGNACION = AC.ID
@@ -662,6 +664,7 @@ const listPlateTraceability = async (req, res) => {
       const result = await cn.query(sqlDoc, [...params]);
 
       const convertResult = result.map((row) => ({
+        idAssing: row.ID,
         cliente: row.CLIENTE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
@@ -691,6 +694,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
+        condicion: row.CONDICION ? row.CONDICION : ""
       }));
 
       return res.status(200).json(convertResult);
@@ -698,6 +702,7 @@ const listPlateTraceability = async (req, res) => {
       const result = await cn.query(sql, [...params, ...params]);
 
       const convertResult = result.map((row) => ({
+        idAssing: row.ID,
         cliente: row.CLIENTE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
@@ -727,6 +732,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
+        condicion: row.CONDICION ? row.CONDICION : ""
       }));
 
       return res.status(200).json(convertResult);
@@ -734,6 +740,7 @@ const listPlateTraceability = async (req, res) => {
       const result = await cn.query(sql, [...params, ...params]);
 
       const convertResult = result.map((row) => ({
+        idAssing: row.ID,
         cliente: row.CLIENTE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
@@ -763,6 +770,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
+        condicion: row.CONDICION ? row.CONDICION : ""
       }));
 
       return res.status(200).json(convertResult);
