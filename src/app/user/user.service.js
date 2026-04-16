@@ -33,6 +33,91 @@ const getUsers = async () => {
   }
 };
 
+const getUserByField = async (field, value) => {
+  const cn = await connection();
+  try {
+    const fieldMap = {
+      id: "U.ID",
+      usuario: "U.USU",
+      codEmp: "U.COD_EMP",
+    };
+
+    const column = fieldMap[field];
+
+    if (!column) {
+      throw new Error("Campo de busqueda no permitido.");
+    }
+
+    const sql = `
+      SELECT U.*, R.DESCRIPCION, R.DESCRIPCION2 FROM ${SCHEMA_BD}.T_US_GC U
+      LEFT JOIN ${SCHEMA_BD}.T_RL_GC R ON U.ID_RL = R.ID
+      WHERE ${column} = ?
+    `;
+
+    const result = await cn.query(sql, [value]);
+
+    if (!result[0]) return null;
+
+    return {
+      id: result[0].ID,
+      usuario: result[0].USU.trim(),
+      codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
+      clave: result[0].CLV ? result[0].CLV.trim() : "",
+      idRol: result[0].ID_RL,
+      rol: {
+        id: result[0].ID_RL,
+        name: result[0].DESCRIPCION.trim(),
+        descripcion: result[0].DESCRIPCION2
+          ? result[0].DESCRIPCION2.trim()
+          : "",
+      },
+    };
+  } catch (error) {
+    console.error(error);
+    throw new Error(`Ocurrio algo al obtener usuario: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const getUserGesoperByField = async (field, value) => {
+  const cn = await connection();
+  try {
+    const fieldMap = {
+      id: "U.ID",
+      usuario: "U.USUARIO",
+      codEmp: "U.COD_EMP",
+    };
+
+    const column = fieldMap[field];
+
+    if (!column) {
+      throw new Error("Campo de busqueda no permitido.");
+    }
+
+    const sql = `
+      SELECT * FROM SPEED400AT.PO_USUARIOS U
+      WHERE ${column} = ?
+    `;
+
+    const result = await cn.query(sql, [value]);
+
+    if (!result[0]) return null;
+
+    return {
+      id: result[0].ID,
+      usuario: result[0].USUARIO.trim(),
+      codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
+      idRol: result[0].IDPERFIL,
+    };
+  } catch (error) {
+    console.error(error);
+    throw new Error(`Ocurrio algo al obtener usuario de gesoper: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 const getUserById = async (id) => {
   const cn = await connection();
   try {
@@ -89,11 +174,63 @@ const getNewUsers = async () => {
       id: row.ID,
       usuario: row.USUARIO,
       codEmp: row.COD_EMP,
-      rolId: row.IDPERFIL
+      rolId: row.IDPERFIL,
     }));
   } catch (error) {
     console.error(error);
     throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const postUser = async (data) => {
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    await cn.beginTransaction();
+
+    const sql = `
+      INSERT INTO ${SCHEMA_BD}.T_US_GC (USU, COD_EMP, CLV, ID_RL)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    await cn.query(sql, [data.usuario, data.codEmp, data.clave, data.rol]);
+
+    await cn.commit();
+
+    return { success: true };
+  } catch (error) {
+    await cn.rollback();
+
+    throw new Error(`Ocurrio algo al crear usuario: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const postUserGesoper = async (data) => {
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    await cn.beginTransaction();
+
+    const sql = `
+      INSERT INTO ${SCHEMA_BD}.PO_USUARIOS (USUARIO, COD_EMP, IDPERFIL)
+      VALUES (?, ?, ?)
+    `;
+
+    await cn.query(sql, [data.usuario, data.codEmp, data.perfil]);
+
+    await cn.commit();
+
+    return { success: true };
+  } catch (error) {
+    await cn.rollback();
+
+    throw new Error(`Ocurrio algo al crear usuario en el gesoper: ${error}`);
   } finally {
     if (cn) await cn.close();
   }
@@ -147,6 +284,27 @@ const getRoles = async () => {
   } catch (error) {
     console.error(error);
     throw new Error(`Ocurrio algo al consultar lista de roles: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const getRolesGesoper = async () => {
+  const cn = await connection();
+  try {
+    const sql = `
+      SELECT * FROM ${SCHEMA_BD}.PO_USUARIOPERFIL
+    `;
+
+    const result = await cn.query(sql);
+
+    return result.map((row) => ({
+      id: row.ID,
+      name: row.DESCRIPCION.trim(),
+    }));
+  } catch (error) {
+    console.error(error);
+    throw new Error(`Ocurrio algo al consultar lista de roles del gesoper: ${error}`);
   } finally {
     if (cn) await cn.close();
   }
@@ -245,10 +403,15 @@ const putPermissionsByRole = async (id, permissions) => {
 
 module.exports = {
   getUsers,
+  getUserByField,
+  getUserGesoperByField,
   getUserById,
   getNewUsers,
+  postUser,
+  postUserGesoper,
   putUser,
   getRoles,
+  getRolesGesoper,
   getPermissionsByUser,
   getPermissionsByRole,
   putPermissionsByRole,
