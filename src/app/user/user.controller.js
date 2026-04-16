@@ -119,10 +119,10 @@ const createUser = async (req, res) => {
           message: "El usuario ingresado ya se encuentra registrado dentro del GesOper",
         });
 
-      // await postUserGesoper(body);
+      await postUserGesoper(body);
     }
 
-    // const create = await postUser(body);
+    const create = await postUser(body);
 
     return res.status(201).json({success: true});
   } catch (error) {
