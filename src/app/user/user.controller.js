@@ -12,6 +12,8 @@ const {
   postUserGesoper,
   getRolesGesoper,
   getUserGesoperByField,
+  getPermissions,
+  postRole,
 } = require("./user.service.js");
 
 /* USUARIOS */
@@ -101,7 +103,6 @@ const createUser = async (req, res) => {
   const body = req.body;
 
   try {
-
     const findUsername = await getUserByField("usuario", body.usuario);
 
     if (findUsername)
@@ -111,12 +112,16 @@ const createUser = async (req, res) => {
       });
 
     if (body.inGesoper) {
-      const findUsernameGesoper = await getUserGesoperByField("usuario", body.usuario);
+      const findUsernameGesoper = await getUserGesoperByField(
+        "usuario",
+        body.usuario,
+      );
 
       if (findUsernameGesoper)
         return res.status(409).json({
           success: false,
-          message: "El usuario ingresado ya se encuentra registrado dentro del GesOper",
+          message:
+            "El usuario ingresado ya se encuentra registrado dentro del GesOper",
         });
 
       await postUserGesoper(body);
@@ -124,7 +129,7 @@ const createUser = async (req, res) => {
 
     const create = await postUser(body);
 
-    return res.status(201).json({success: true});
+    return res.status(201).json(create);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: error.message });
@@ -195,7 +200,45 @@ const listRolesGesoper = async (req, res) => {
   }
 };
 
+const createRole = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  if (!idUser)
+    return res
+      .status(401)
+      .json({ success: false, message: "Acción no permitida" });
+
+  const body = req.body;
+
+  try {
+    const create = await postRole(body);
+
+    return res.status(201).json(create);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* PERMISOS */
+
+const listPermissions = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  if (!idUser)
+    return res
+      .status(401)
+      .json({ success: false, message: "Acción no permitida" });
+
+  try {
+    const permissions = await getPermissions();
+
+    return res.status(200).json(permissions);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 const listPermissionsByUser = async (req, res) => {
   const { id: idUser } = req.user;
@@ -291,6 +334,8 @@ module.exports = {
   updateUser,
   listRoles,
   listRolesGesoper,
+  createRole,
+  listPermissions,
   listPermissionsByUser,
   listPermissionsByRole,
   updatePermissionsByRole,

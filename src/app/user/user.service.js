@@ -304,13 +304,84 @@ const getRolesGesoper = async () => {
     }));
   } catch (error) {
     console.error(error);
-    throw new Error(`Ocurrio algo al consultar lista de roles del gesoper: ${error}`);
+    throw new Error(
+      `Ocurrio algo al consultar lista de roles del gesoper: ${error}`,
+    );
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const postRole = async (data) => {
+  const pool = await connection();
+  const cn = await pool.connect();
+  try {
+    await cn.beginTransaction();
+
+    const resultId = await cn.query(`
+      SELECT COALESCE(MAX(ID), 0) + 1 AS ID
+      FROM ${SCHEMA_BD}.T_RL_GC
+    `);
+
+    const roleId = resultId[0].ID;
+
+    console.log("ID OBTENIDO");
+
+    const sqlRole = `
+      INSERT INTO ${SCHEMA_BD}.T_RL_GC (ID, DESCRIPCION, DESCRIPCION2)
+      VALUES (?, ?, ?)
+    `;
+
+    await cn.query(sqlRole, [roleId, data.name, data.description]);
+
+    console.log("ROLE INSERTADO");
+
+    const sqlPermissions = `
+      INSERT INTO ${SCHEMA_BD}.T_RL_PS_GC (ID_RL, ID_PS)
+      VALUES (?, ?)
+    `;
+
+    if (data.permissions.length > 0) {
+      for (const perm of data.permissions) {
+        await cn.query(sqlPermissions, [roleId, perm]);
+      }
+    }
+
+    console.log("PERMISOS INSERTADOS");
+
+    await cn.commit();
+
+    return { success: true };
+  } catch (error) {
+    await cn.rollback();
+    throw new Error(`Ocurrio algo al insertar un rol: ${error}`);
   } finally {
     if (cn) await cn.close();
   }
 };
 
 /* PERMISOS */
+
+const getPermissions = async () => {
+  const cn = await connection();
+  try {
+    const sql = `
+      SELECT ID, TRIM(DESCRIPCION) AS DESCRIPCION
+      FROM ${SCHEMA_BD}.T_PS_GC
+    `;
+
+    const result = await cn.query(sql);
+
+    return result.map((row) => ({
+      id: row.ID,
+      name: row.DESCRIPCION,
+    }));
+  } catch (error) {
+    throw new Error(`Ocurrio algo al consultar lista de permisos: ${error}`);
+  } finally {
+    if (cn) await cn.close();
+  }
+};
 
 const getPermissionsByUser = async (id) => {
   const cn = await connection();
@@ -412,6 +483,8 @@ module.exports = {
   putUser,
   getRoles,
   getRolesGesoper,
+  postRole,
+  getPermissions,
   getPermissionsByUser,
   getPermissionsByRole,
   putPermissionsByRole,
