@@ -605,14 +605,73 @@ const updateAssign = async (req, res) => {
   const pool = await connection();
   const cn = await pool.connect();
 
-  try {
-    await cn.beginTransaction();
+  const id = Number(req.params.id);
 
-    await cn.commit();
+  if(isNaN(id)) {
+    return res.status(400).json({success: false, message: "El parametro id debe ser numerico"});
+  }
+
+  const {condicion, terreno, archivoPdf} = req.body;
+
+  try {
+    // await cn.beginTransaction();
+
+    const sqlFind = `
+      SELECT CONDICION, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
+      WHERE ID = ?
+    `
+
+    const findAssign = await cn.query(sqlFind, [id]);
+
+    if(!findAssign[0]) return res.status(404).json({success: false, message: "No se encontro la asignación"})
+
+    const fields = [];
+    const params = [];
+
+    if(condicion !== undefined) {
+      fields.push(`CONDICION = ?`)
+      params.push(condicion)
+    }
+
+    if(terreno !== undefined) {
+      fields.push(`TP_TERRENO = ?`)
+      params.push(terreno)
+    }
+
+    if(archivoPdf) {
+      fields.push(`ARCHIVO_PDF = ?`)
+
+      let keyFile = archivoPdf;
+
+      if(archivoPdf.startsWith('temp/')) {
+        keyFile = archivoPdf.replace(/^temp\//, "");
+
+        await moveFile(archivoPdf, keyFile);
+      }
+
+      params.push(keyFile)
+    }
+
+    if(fields.length === 0) return res.status(400).json({success: false, message: "No se detectaron campos para modificar"})
+
+    console.log(fields.join(", "));
+    console.log(params);
+
+    const sqlUpd = `
+      UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+      SET ${fields.join(", ")}
+      WHERE ID = ?
+    `
+
+    await cn.query(sqlUpd, [...params, id]);
+
+    // await cn.commit();
+
+    return res.status(200).json({success: true, message: "Actualización realizada"});
   } catch (error) {
-    await cn.rollback();
+    // await cn.rollback();
     console.error(error);
-    return res.status(500).json("Error al actualizar las placas: ", error)
+    return res.status(500).json({success: false, message: `Error al actualizar las placas: ${error}` })
   } finally {
     if (cn) await cn.close();
   }
@@ -623,4 +682,5 @@ module.exports = {
   listAssingByContract,
   insertOperation,
   valideAssign,
+  updateAssign
 };
