@@ -66,7 +66,7 @@ const tableVehicles = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID 
       LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA 
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-      ON A.SECOPE = tad.ID_OPE
+      ON A.ID = tad.ID_VEH
       WHERE tad.ID_OPE IS NULL AND A.SECOPE NOT IN (211, 238, 109, 162) ORDER BY A.ID DESC
     `
     const result = await cn.query(query);
