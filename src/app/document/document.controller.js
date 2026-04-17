@@ -125,7 +125,7 @@ const detailDocument = async (req, res) => {
       descripcion: findDocument.DESCRIPCION
         ? findDocument.DESCRIPCION.trim()
         : "",
-      cantLea: findDocument.CANT_LEA
+      cantLea: findDocument.CANT_LEA,
     });
   } catch (error) {
     console.error("Error al obtener detalle de documento", error);
@@ -165,13 +165,16 @@ const detailVehByDocu = async (req, res) => {
       WHERE ID_CONTRATO = ? AND TIPCON = 'H'
     `;
 
-    const resultLea = await cn.query(sqlLeasing, [documentoId])
+    const resultLea = await cn.query(sqlLeasing, [documentoId]);
 
-    if(resultLea.length == 0) return res.status(404).json({success: false, message: "Sin placas contratadas"});
+    if (resultLea.length == 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "Sin placas contratadas" });
 
-    const cleanLea = resultLea.map((row) => row.ID)
+    const cleanLea = resultLea.map((row) => row.ID);
 
-    const placeHolders = resultLea.map(() => '?').join(",")
+    const placeHolders = resultLea.map(() => "?").join(",");
 
     const sqlDetLea = `
       SELECT L.MODELO, L.PLACA, L.CANTIDAD, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, A.FECHA_FIN, LC.NRO_LEASING
@@ -189,10 +192,16 @@ const detailVehByDocu = async (req, res) => {
       WHERE ID_LEA_CAB IN (${placeHolders}) AND TIPO_TERRENO = ?
     `;
 
-    const resultDet = await cn.query(sqlDetLea, [...cleanLea, tipoTerr.toUpperCase()])
+    const resultDet = await cn.query(sqlDetLea, [
+      ...cleanLea,
+      tipoTerr.toUpperCase(),
+    ]);
 
-    if(resultDet.length == 0) return res.status(404).json({success: false, message: "Sin placas encontradas"});
-    
+    if (resultDet.length == 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "Sin placas encontradas" });
+
     const cleanedResult = resultDet.map((row) => ({
       modelo: row.MODELO.trim() ?? "",
       placa: row.PLACA.trim() ?? "",
@@ -202,15 +211,18 @@ const detailVehByDocu = async (req, res) => {
       marca: row.MARCA.trim() ?? "",
       operacion: row.OPERACION.trim() ?? "",
       fechaFin: row.FECHA_FIN ? row.FECHA_FIN.trim() : "",
-      nroLeasing: row.NRO_LEASING.trim() ?? ""
-    }))
+      nroLeasing: row.NRO_LEASING.trim() ?? "",
+    }));
 
-    return res.status(200).json(cleanedResult)
+    return res.status(200).json(cleanedResult);
   } catch (error) {
-    console.error(error)
-    return res.status(500).json({success: false, message: "Error al obtener placas por documento"})
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener placas por documento",
+    });
   } finally {
-    if(cn) await cn.close();
+    if (cn) await cn.close();
   }
 };
 
@@ -321,7 +333,7 @@ const insertDocument = async (req, res) => {
       motivo,
     ]);
 
-    await moveFile(oldKey, newKey)
+    await moveFile(oldKey, newKey);
 
     const idDocumentoCab = result.insertId || (await obtenerUltimoIdDoc(cn));
 
@@ -379,9 +391,90 @@ const insertDocument = async (req, res) => {
   }
 };
 
+const getDocumentById = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id))
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+
+  const pool = await connection();
+  const cn = await pool.connect();
+  try {
+    const sql = `
+      SELECT TC.ID AS ID_DOC, TC.DURACION AS DURAC_DOC, TC.*, TD.ID AS ID_DET, TD.DURACION AS DURAC_DET, TD.* FROM SPEED400AT.TBLDOCUMENTO_CAB TC
+      LEFT JOIN SPEED400AT.TBLDOCUMENTO_DET TD 
+      ON TC.ID = TD.ID_CON_CAB 
+      WHERE TC.ID = ?
+    `;
+
+    const result = await cn.query(sql, [id]);
+
+    if (result.length === 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "No se encontró el documento" });
+
+    return res.status(200).json({
+      id: result[0].ID_DOC,
+      idCliente: result[0].ID_CLIENTE,
+      idPadre: result[0].ID_PADRE,
+      tipoDoc: result[0].TIPO_DOC,
+      nroDoc: result[0].NRO_DOC.trim(),
+      cantidad: result[0].CANT_VEHI,
+      fechaFirma: convertirFecha(result[0].FECHA_FIRMA.trim()),
+      duracion: result[0].DURAC_DOC.trim(),
+      kmAdicional: result[0].KM_ADI,
+      kmTotal: result[0].KM_TOTAL,
+      vehSup: result[0].VEH_SUP,
+      vehSev: result[0].VEH_SEV,
+      vehSoc: result[0].VEH_SOC,
+      vehCiu: result[0].VEH_CIU,
+      tipoEsp: result[0].TIPO_ESPE,
+      archivoPdf: result[0].ARCHIVO_PDF.trim(),
+      story: result[0].DESCRIPCION.trim(),
+      motivo: result[0].MOTIVO.trim(),
+      detalles: result.map(row => ({
+        id: row.ID_DET,
+        idContratoCab: row.ID_CON_CAB,
+        secCon: row.SEC_CON,
+        modelo: row.MODELO.trim(),
+        tipoTerreno: row.TIPO_TERRENO,
+        tarifa: row.TARIFA,
+        cpk: row.CPK,
+        rm: row.RM,
+        cantidad: row.CANTIDAD,
+        duracion: row.DURAC_DET.trim(),
+        compraVeh: row.PRECIO_VEH,
+        precioVeh: row.PRECIO_VENTA,
+        kmAdicional: row.KM_ADI,
+        condicion: row.CONDICION.trim()
+      }))
+    });
+  } catch (error) {
+    console.error("Error al obtener documento por id", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener documento por id" });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   insertDocument,
   listDocumentByNroContract,
   detailVehByDocu,
   detailDocument,
+  getDocumentById
 };

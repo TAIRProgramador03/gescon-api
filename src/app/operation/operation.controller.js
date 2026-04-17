@@ -390,8 +390,14 @@ const insertOperation = async (req, res) => {
       for (let i = 0; i < detalles.length; i++) {
         const detalle = detalles[i];
 
-        const oldKey = detalle.archivoPdf;
-        const newKey = oldKey.replace(/^temp\//, "");
+        let newKey = null;
+
+        if (detalle.archivoPdf) {
+          const oldKey = detalle.archivoPdf;
+          newKey = oldKey.replace(/^temp\//, "");
+
+          await moveFile(oldKey, newKey);
+        }
 
         // Si valorRepe es true, toma las fechas del primer detalle y reutilízalas
         if (valorRepe === true || valorRepe === "true") {
@@ -417,8 +423,6 @@ const insertOperation = async (req, res) => {
           newKey,
           detalle.condicion,
         ]);
-
-        await moveFile(oldKey, newKey);
       }
     }
 
@@ -607,11 +611,13 @@ const updateAssign = async (req, res) => {
 
   const id = Number(req.params.id);
 
-  if(isNaN(id)) {
-    return res.status(400).json({success: false, message: "El parametro id debe ser numerico"});
+  if (isNaN(id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
   }
 
-  const {condicion, terreno, archivoPdf} = req.body;
+  const { condicion, terreno, archivoPdf } = req.body;
 
   try {
     // await cn.beginTransaction();
@@ -619,40 +625,49 @@ const updateAssign = async (req, res) => {
     const sqlFind = `
       SELECT CONDICION, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
       WHERE ID = ?
-    `
+    `;
 
     const findAssign = await cn.query(sqlFind, [id]);
 
-    if(!findAssign[0]) return res.status(404).json({success: false, message: "No se encontro la asignación"})
+    if (!findAssign[0])
+      return res
+        .status(404)
+        .json({ success: false, message: "No se encontro la asignación" });
 
     const fields = [];
     const params = [];
 
-    if(condicion !== undefined) {
-      fields.push(`CONDICION = ?`)
-      params.push(condicion)
+    if (condicion !== undefined) {
+      fields.push(`CONDICION = ?`);
+      params.push(condicion);
     }
 
-    if(terreno !== undefined) {
-      fields.push(`TP_TERRENO = ?`)
-      params.push(terreno)
+    if (terreno !== undefined) {
+      fields.push(`TP_TERRENO = ?`);
+      params.push(terreno);
     }
 
-    if(archivoPdf) {
-      fields.push(`ARCHIVO_PDF = ?`)
+    if (archivoPdf) {
+      fields.push(`ARCHIVO_PDF = ?`);
 
       let keyFile = archivoPdf;
 
-      if(archivoPdf.startsWith('temp/')) {
+      if (archivoPdf.startsWith("temp/")) {
         keyFile = archivoPdf.replace(/^temp\//, "");
 
         await moveFile(archivoPdf, keyFile);
       }
 
-      params.push(keyFile)
+      params.push(keyFile);
     }
 
-    if(fields.length === 0) return res.status(400).json({success: false, message: "No se detectaron campos para modificar"})
+    if (fields.length === 0)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "No se detectaron campos para modificar",
+        });
 
     console.log(fields.join(", "));
     console.log(params);
@@ -661,17 +676,24 @@ const updateAssign = async (req, res) => {
       UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
       SET ${fields.join(", ")}
       WHERE ID = ?
-    `
+    `;
 
     await cn.query(sqlUpd, [...params, id]);
 
     // await cn.commit();
 
-    return res.status(200).json({success: true, message: "Actualización realizada"});
+    return res
+      .status(200)
+      .json({ success: true, message: "Actualización realizada" });
   } catch (error) {
     // await cn.rollback();
     console.error(error);
-    return res.status(500).json({success: false, message: `Error al actualizar las placas: ${error}` })
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: `Error al actualizar las placas: ${error}`,
+      });
   } finally {
     if (cn) await cn.close();
   }
@@ -682,5 +704,5 @@ module.exports = {
   listAssingByContract,
   insertOperation,
   valideAssign,
-  updateAssign
+  updateAssign,
 };
