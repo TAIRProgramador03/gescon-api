@@ -89,23 +89,79 @@ const listAllLeasing = async (req, res) => {
       }
     }
 
+    // let sql = `
+    //   SELECT * FROM (
+    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+    //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+    //     LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+    //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+    //     WHERE L.TIPCON = 'P'
+    //     UNION ALL
+    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+    //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+    //     LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
+    //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
+    //     WHERE L.TIPCON = 'H'
+    //   ) L
+    //   ${filtros}
+    //   ORDER BY L.ID ASC
+    // `;
+
     let sql = `
       SELECT * FROM (
-        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
         ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+        LEFT JOIN (
+		      SELECT DISTINCT A.IDCLI, B.CLINOM 
+		      FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+		      INNER JOIN ${SCHEMA_BD}.TCLIE B 
+		      ON A.IDCLI = B.CLICVE 
+		      WHERE A.ID <> 86 
+		      AND B.CLINOM <> '*** ANULADO ***'
+        ) CL
+        ON CL.IDCLI = L.ID_CLIENTE 
+        LEFT JOIN (
+          SELECT DISTINCT A.IDCLI, B.CLINOM 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+        ) CLA
+        ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
         WHERE L.TIPCON = 'P'
+
         UNION ALL
-        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+
+        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
         LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
         ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
+        LEFT JOIN (
+          SELECT DISTINCT A.IDCLI, B.CLINOM 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+        ) CL
+        ON CL.IDCLI = L.ID_CLIENTE 
+        LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM 
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+            INNER JOIN ${SCHEMA_BD}.TCLIE B 
+                ON A.IDCLI = B.CLICVE 
+            WHERE A.ID <> 86 
+              AND B.CLINOM <> '*** ANULADO ***'
+        ) CLA
+        ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
         WHERE L.TIPCON = 'H'
       ) L
       ${filtros}
       ORDER BY L.ID ASC
-    `;
+    `
 
     console.log(filtros);
     console.log(params);
@@ -135,6 +191,8 @@ const listAllLeasing = async (req, res) => {
         H: "Documento",
       }),
       nroContrato: row.NRO_CONTRATO.trim(),
+      cliente: row.CLIENTE.trim(),
+      clienteOrigen: row.CLIENTE_ORIGEN ? row.CLIENTE_ORIGEN.trim() : ""
     }));
 
     return res.status(200).json(cleanedResult);

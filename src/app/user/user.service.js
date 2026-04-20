@@ -96,7 +96,7 @@ const getUserGesoperByField = async (field, value) => {
     }
 
     const sql = `
-      SELECT * FROM SPEED400AT.PO_USUARIOS U
+      SELECT * FROM ${SCHEMA_BD}.PO_USUARIOS U
       WHERE ${column} = ?
     `;
 

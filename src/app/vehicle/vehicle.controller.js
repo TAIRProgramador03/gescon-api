@@ -314,7 +314,11 @@ const listModelGen = async (req, res) => {
 
   const cn = await connection();
   try {
-    const sql = `SELECT DISTINCT(IDMODGEN), DESMODGEN FROM ${SCHEMA_BD}.PO_MODELO ORDER BY IDMODGEN ASC`;
+    const sql = `
+      SELECT DISTINCT UPPER(PM.DESMODGEN) AS DESMODGEN, PM.IDMODGEN 
+      FROM SPEED400AT.PO_MODELO PM 
+      ORDER BY DESMODGEN
+    `;
     const result = await cn.query(sql);
 
     const cleanedResult = result.map((row) => ({
@@ -353,15 +357,17 @@ const listYearByModelGen = async (req, res) => {
   const cn = await connection();
   try {
     const sql = `
-      SELECT DISTINCT(ANO) FROM ${SCHEMA_BD}.PO_VEHICULO V
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-      ON MO.ID = V.IDMOD
-      WHERE ANO != '0' AND MO.IDMODGEN = ?
-      ORDER BY ANO DESC
+      SELECT DISTINCT CAST(SUBSTRING(TC.FECHA_FIRMA, 1, 4) AS INT) AS ANIOS FROM SPEED400AT.TBLCONTRATO_DET td 
+      JOIN SPEED400AT.TBLCONTRATO_CAB tc 
+      ON TC.ID = TD.ID_CON_CAB 
+      LEFT JOIN SPEED400AT.PO_MODELO pm 
+      ON TD.MODELO = PM.ID
+      WHERE PM.IDMODGEN = ?
+      ORDER BY ANIOS
     `;
     const result = await cn.query(sql, [modelId]);
 
-    const cleanedResult = result.map((row) => row.ANO);
+    const cleanedResult = result.map((row) => row.ANIOS);
 
     return res.status(200).json(cleanedResult);
   } catch (error) {

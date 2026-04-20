@@ -49,10 +49,10 @@ const login = async (req, res) => {
     // RETORNAR PERMISOS DE USUARIO
     const sqlPs = `
       SELECT P.DESCRIPCION
-      FROM SPEED400AT.T_US_GC U
-      JOIN SPEED400AT.T_RL_GC R ON U.ID_RL = R.ID
-      JOIN SPEED400AT.T_RL_PS_GC RP ON R.ID = RP.ID_RL
-      JOIN SPEED400AT.T_PS_GC P ON RP.ID_PS = P.ID
+      FROM ${SCHEMA_BD}.T_US_GC U
+      JOIN ${SCHEMA_BD}.T_RL_GC R ON U.ID_RL = R.ID
+      JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON R.ID = RP.ID_RL
+      JOIN ${SCHEMA_BD}.T_PS_GC P ON RP.ID_PS = P.ID
       WHERE U.USU = ?
     `
 
