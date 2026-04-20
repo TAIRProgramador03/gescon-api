@@ -99,7 +99,7 @@ const detailDocument = async (req, res) => {
     return res.status(200).json({
       id: findDocument.ID,
       firma: findDocument.FECHA_FIRMA.trim(),
-      duracion: findDocument.DURACION,
+      duracion: findDocument.DURACION.trim(),
       tipoDocumento: transformType(findDocument.TIPO_DOC, {
         1: "Adendas",
         2: "Carta",
@@ -126,6 +126,7 @@ const detailDocument = async (req, res) => {
         ? findDocument.DESCRIPCION.trim()
         : "",
       cantLea: findDocument.CANT_LEA,
+      nroDocumento: findDocument.NRO_DOC.trim()
     });
   } catch (error) {
     console.error("Error al obtener detalle de documento", error);
