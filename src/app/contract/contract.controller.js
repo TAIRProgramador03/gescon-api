@@ -558,7 +558,7 @@ const detailContract = async (req, res) => {
         cantidadDocumentos: documento.TOTAL_DOCUMENTOS,
         cantidadLeasing: leasing.TOTAL_LEASINGS,
         cantidadAsignados: totalVehAssign.TOTAL_ASIGNADOS,
-        archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : ""
+        archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : "",
       },
     });
   } catch (error) {
@@ -924,7 +924,7 @@ const updateContract = async (req, res) => {
   const fechaFormatoDB = convertirFecha(fechaFirma);
 
   const oldKey = archivoPdf;
-  const newKey = oldKey.replace(/^temp\//, "");
+  let newKey = oldKey;
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -974,6 +974,16 @@ const updateContract = async (req, res) => {
               WHERE ID = ?
           `;
 
+    if (oldKey.startsWith("temp/")) {
+      newKey = oldKey.replace(/^temp\//, "");
+
+      const isExistInTemp = await fileExists(oldKey);
+
+      if (isExistInTemp) {
+        await moveFile(oldKey, newKey);
+      }
+    }
+
     await cn.query(queryCabecera, [
       idCliente,
       nroContrato,
@@ -995,9 +1005,6 @@ const updateContract = async (req, res) => {
       contractId,
     ]);
 
-    const isExist = await fileExists(`${oldKey}`);
-    if (!isExist) await moveFile(oldKey, newKey);
-
     const idContractCab = contractId;
 
     // SECCION DE DETALLES
@@ -1008,7 +1015,6 @@ const updateContract = async (req, res) => {
 
     if (detalles && detalles.length > 0) {
       for (const detalle of detalles) {
-        console.log(detalle);
         if (!detalle.idDet) {
           // ASIGNAMOS LA LISTA DE DETALLES PARA CREAR NUEVOS
           detailNew.push(detalle);
@@ -1017,11 +1023,6 @@ const updateContract = async (req, res) => {
           detailUpdate.push(detalle);
         }
       }
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "El contrato no puede quedar sin ningun modelo detallado",
-      });
     }
 
     // VALIDAMOS Y ASIGNAMOS LA LISTA DE DETALLES A ELIMINAR
@@ -1078,7 +1079,6 @@ const updateContract = async (req, res) => {
           `;
 
     for (const detalle of detailNew) {
-      console.log(detailNew);
       await cn.query(queryNewDetalle, [
         idContractCab,
         detalle.secCon,

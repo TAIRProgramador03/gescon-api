@@ -5,7 +5,7 @@ const {
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
-const { moveFile } = require("../../shared/service/aws-s3.js");
+const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
 
 const listDocumentByNroContract = async (req, res) => {
   const { id: idUser } = req.user;
@@ -391,6 +391,240 @@ const insertDocument = async (req, res) => {
   }
 };
 
+const updateDocument = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id))
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+
+  const {
+    idCliente,
+    idContrato,
+    tipoContrato,
+    nroContrato,
+    vehiculo,
+    duracion,
+    kmAdicional,
+    kmTotal,
+    vehSup,
+    vehSev,
+    vehSoc,
+    vehCiu,
+    fechaFirma,
+    Especial,
+    motivo,
+    story,
+    detalles,
+    archivoPdf,
+  } = req.body;
+
+  const oldKey = archivoPdf;
+  let newKey = oldKey;
+
+  const claseDocu = "H";
+  const fechaFormatoDB = convertirFecha(fechaFirma);
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    // VALIDAR QUE EL ID EXISTA Y TRAIGA UN DOCUMENTO
+    const sql = `
+      SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC
+      WHERE TC.ID = ?
+    `;
+
+    const findDocument = await cn.query(sql, [id]);
+
+    if (findDocument.length == 0)
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el documento solicitado",
+      });
+
+    // VALIDAR QUE NO SE DUPLIQUE UN NUMERO DE CONTRATO EN CASO SE PASE UNO NUEVO
+    if (
+      findDocument[0].NRO_DOC.trim().toUpperCase() != nroContrato.toUpperCase()
+    ) {
+      const sqlSearchContract = `SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE UPPER(NRO_DOC) = ?`;
+
+      const findNroContract = await cn.query(sqlSearchContract, [
+        nroContrato.toUpperCase(),
+      ]);
+
+      if (findNroContract.length > 0)
+        return res.status(409).json({
+          success: false,
+          message: "El N° documento ya se encuentra registrado",
+        });
+    }
+
+    const queryCabecera = `
+              UPDATE ${SCHEMA_BD}.TBLDOCUMENTO_CAB  
+              SET TIPO_DOC = ?, NRO_DOC = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_ESPE = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, MOTIVO = ?
+              WHERE ID = ?
+          `;
+
+    if (oldKey.startsWith("temp/")) {
+      newKey = oldKey.replace(/^temp\//, "");
+
+      const isExistInTemp = await fileExists(oldKey);
+
+      if (isExistInTemp) {
+        await moveFile(oldKey, newKey);
+      }
+    }
+
+    const result = await cn.query(queryCabecera, [
+      tipoContrato,
+      nroContrato,
+      vehiculo,
+      fechaFormatoDB,
+      duracion,
+      kmAdicional,
+      kmTotal,
+      vehSup,
+      vehSev,
+      vehSoc,
+      vehCiu,
+      Especial,
+      story,
+      newKey,
+      motivo,
+      id,
+    ]);
+
+    const idDocumentoCab = id;
+
+    // SECCION DE DETALLES
+
+    const detailDelete = [];
+    const detailUpdate = [];
+    const detailNew = [];
+
+    if (detalles && detalles.length > 0) {
+      for (const detalle of detalles) {
+        if (!detalle.idDet) {
+          // ASIGNAMOS LA LISTA DE DETALLES PARA CREAR NUEVOS
+          detailNew.push(detalle);
+        } else {
+          // ASIGNAMOS LA LISTA DE DETALLES PARA ACTUALIZAR
+          detailUpdate.push(detalle);
+        }
+      }
+    }
+
+    const paramsDet = detailUpdate.map(() => "?");
+
+    const queryValidDelete = `
+            SELECT D.ID FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET D
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
+            ON D.ID_CON_CAB = C.ID
+            WHERE C.ID = ? AND D.ID NOT IN (${paramsDet.join(",")})
+          `;
+
+    const resultValidDelete = await cn.query(queryValidDelete, [
+      idDocumentoCab,
+      ...detailUpdate.map((det) => det.idDet),
+    ]);
+
+    if (resultValidDelete.length > 0) {
+      resultValidDelete.forEach((row) => {
+        detailDelete.push(row.ID);
+      });
+    }
+
+    const queryUpdDetalle = `
+      UPDATE ${SCHEMA_BD}.TBLDOCUMENTO_DET
+      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?
+      WHERE ID = ?
+    `;
+
+    if (detalles && detalles.length > 0) {
+      for (const detalle of detalles) {
+        await cn.query(queryUpdDetalle, [
+          detalle.secCon,
+          detalle.modelo,
+          detalle.tipoTerreno,
+          detalle.tarifa,
+          detalle.cpk,
+          detalle.rm,
+          detalle.cantidad,
+          detalle.duracion,
+          detalle.kmAdicional,
+          detalle.compraVeh,
+          detalle.precioVeh,
+          detalle.condicion,
+          detalle.idDet,
+        ]);
+      }
+    }
+
+    const queryNewDetalle = `
+              INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_DET
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+    for (const detalle of detailNew) {
+      await cn.query(queryNewDetalle, [
+        idDocumentoCab,
+        detalle.secCon,
+        detalle.modelo,
+        detalle.tipoTerreno,
+        detalle.tarifa,
+        detalle.cpk,
+        detalle.rm,
+        detalle.cantidad,
+        detalle.duracion,
+        detalle.compraVeh,
+        detalle.precioVeh,
+        detalle.kmAdicional,
+        detalle.condicion,
+      ]);
+    }
+
+    // ELIMINAMOS LOS DETALLES
+
+    if (detailDelete.length > 0) {
+      const paramsDel = detailDelete.map(() => "?");
+
+      const queryDelDetalle = `
+        DELETE FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET
+        WHERE ID IN (${paramsDel.join(",")})
+      `;
+
+      await cn.query(queryDelDetalle, detailDelete);
+    }
+
+    await cn.commit();
+
+    res.json({ success: true });
+  } catch (error) {
+    await cn.rollback();
+
+    console.error("Error al insertar documento:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error al insertar documento" });
+  } finally {
+    if (cn) {
+      await cn.close();
+    }
+  }
+};
+
 const getDocumentById = async (req, res) => {
   const { id: idUser } = req.user;
 
@@ -412,28 +646,35 @@ const getDocumentById = async (req, res) => {
   const cn = await pool.connect();
   try {
     const sql = `
-      SELECT TC.ID AS ID_DOC, TC.DURACION AS DURAC_DOC, TC.*, TD.ID AS ID_DET, TD.DURACION AS DURAC_DET, TD.* FROM SPEED400AT.TBLDOCUMENTO_CAB TC
-      LEFT JOIN SPEED400AT.TBLDOCUMENTO_DET TD 
-      ON TC.ID = TD.ID_CON_CAB 
+      SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC
       WHERE TC.ID = ?
     `;
 
     const result = await cn.query(sql, [id]);
 
-    if (result.length === 0)
+    if (!result[0])
       return res
         .status(404)
         .json({ success: false, message: "No se encontró el documento" });
 
+    const sqlDetail = `
+      SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET TD
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC 
+      ON TD.ID_CON_CAB = TC.ID
+      WHERE TC.ID = ?
+    `
+
+    const resultDetail = await cn.query(sqlDetail, [id]);
+
     return res.status(200).json({
-      id: result[0].ID_DOC,
+      id: result[0].ID,
       idCliente: result[0].ID_CLIENTE,
       idPadre: result[0].ID_PADRE,
       tipoDoc: result[0].TIPO_DOC,
       nroDoc: result[0].NRO_DOC.trim(),
       cantidad: result[0].CANT_VEHI,
       fechaFirma: convertirFecha(result[0].FECHA_FIRMA.trim()),
-      duracion: result[0].DURAC_DOC.trim(),
+      duracion: result[0].DURACION.trim(),
       kmAdicional: result[0].KM_ADI,
       kmTotal: result[0].KM_TOTAL,
       vehSup: result[0].VEH_SUP,
@@ -444,8 +685,8 @@ const getDocumentById = async (req, res) => {
       archivoPdf: result[0].ARCHIVO_PDF.trim(),
       story: result[0].DESCRIPCION.trim(),
       motivo: result[0].MOTIVO.trim(),
-      detalles: result.map(row => ({
-        id: row.ID_DET,
+      detalles: resultDetail.map((row) => ({
+        id: row.ID,
         idContratoCab: row.ID_CON_CAB,
         secCon: row.SEC_CON,
         modelo: row.MODELO.trim(),
@@ -454,12 +695,12 @@ const getDocumentById = async (req, res) => {
         cpk: row.CPK,
         rm: row.RM,
         cantidad: row.CANTIDAD,
-        duracion: row.DURAC_DET.trim(),
+        duracion: row.DURACION.trim(),
         compraVeh: row.PRECIO_VEH,
         precioVeh: row.PRECIO_VENTA,
         kmAdicional: row.KM_ADI,
-        condicion: row.CONDICION.trim()
-      }))
+        condicion: row.CONDICION.trim(),
+      })),
     });
   } catch (error) {
     console.error("Error al obtener documento por id", error);
@@ -476,5 +717,6 @@ module.exports = {
   listDocumentByNroContract,
   detailVehByDocu,
   detailDocument,
-  getDocumentById
+  getDocumentById,
+  updateDocument,
 };
