@@ -91,15 +91,15 @@ const listAllLeasing = async (req, res) => {
 
     // let sql = `
     //   SELECT * FROM (
-    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO
     //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    //     LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+    //     LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
     //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
     //     WHERE L.TIPCON = 'P'
     //     UNION ALL
-    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO 
+    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO
     //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    //     LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
+    //     LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc
     //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
     //     WHERE L.TIPCON = 'H'
     //   ) L
@@ -161,7 +161,7 @@ const listAllLeasing = async (req, res) => {
       ) L
       ${filtros}
       ORDER BY L.ID ASC
-    `
+    `;
 
     console.log(filtros);
     console.log(params);
@@ -192,7 +192,7 @@ const listAllLeasing = async (req, res) => {
       }),
       nroContrato: row.NRO_CONTRATO.trim(),
       cliente: row.CLIENTE.trim(),
-      clienteOrigen: row.CLIENTE_ORIGEN ? row.CLIENTE_ORIGEN.trim() : ""
+      clienteOrigen: row.CLIENTE_ORIGEN ? row.CLIENTE_ORIGEN.trim() : "",
     }));
 
     return res.status(200).json(cleanedResult);
@@ -580,7 +580,7 @@ const detailVehByLeasing = async (req, res) => {
 
   try {
     const sql = `
-      SELECT L.MODELO, L.PLACA, L.CANTIDAD, L.TIPO_TERRENO, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, A.FECHA_FIN, LC.NRO_LEASING
+      SELECT L.MODELO, L.PLACA, L.CANTIDAD, L.TIPO_TERRENO, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, A.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET L
       LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
       ON L.ID_VEH = V.ID
@@ -606,8 +606,15 @@ const detailVehByLeasing = async (req, res) => {
       color: row.COLOR.trim() ?? "",
       marca: row.MARCA.trim() ?? "",
       operacion: row.OPERACION.trim() ?? "",
-      fechaFin: row.FECHA_FIN ? row.FECHA_FIN.trim() : "",
+      condicion: transformType(row.CONDICION.trim(), {
+        0: "Titular",
+        1: "Retén",
+        2: "Logística",
+        3: "Pendiente",
+      }),
       nroLeasing: row.NRO_LEASING.trim() ?? "",
+      fechaIni: `${row.FECHA_INI}`,
+      fechaFin: `${row.FECHA_FIN}`,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -645,7 +652,7 @@ const detailAssignByLeasing = async (req, res) => {
 
   try {
     const sql = `
-      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.LEASING
+      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD 
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
       ON AC.ID = AD.ID_ASIGNACION
@@ -657,6 +664,10 @@ const detailAssignByLeasing = async (req, res) => {
       ON V.IDMAR = M.ID
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
       ON V.SECOPE = O.ID
+      LEFT JOIN (        
+      	SELECT DISTINCT NRO_LEASING, FECHA_INI, FECHA_FIN FROM ${SCHEMA_BD}.TBL_LEASING_CAB
+      ) LC
+      ON LC.NRO_LEASING = AD.LEASING
       WHERE  AD.LEASING = ? AND  AC.ID_CLIENTE = ? AND AD.ID_CONTRATO = ? AND CLASE_CONTRATO = ?
     `;
 
@@ -680,7 +691,15 @@ const detailAssignByLeasing = async (req, res) => {
       color: row.COLOR.trim() ?? "",
       marca: row.MARCA.trim() ?? "",
       operacion: row.OPERACION.trim() ?? "",
-      nroLeasing: row.LEASING.trim() ?? "",
+      condicion: transformType(row.CONDICION.trim(), {
+        0: "Titular",
+        1: "Retén",
+        2: "Logística",
+        3: "Pendiente",
+      }),
+      nroLeasing: row.NRO_LEASING.trim() ?? "",
+      fechaIni: `${row.FECHA_INI}`,
+      fechaFin: `${row.FECHA_FIN}`,
     }));
 
     return res.status(200).json(cleanedResult);

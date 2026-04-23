@@ -4,6 +4,7 @@ const {
   convertirFecha,
   funcionNumerica,
   funcionParteVar,
+  transformType,
 } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
@@ -21,22 +22,24 @@ const listOperations = async (req, res) => {
 
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  if (!idCli) {
-    return res
-      .status(400)
-      .json({ success: false, message: "El idCli es obligatorio" });
-  }
+  // if (!idCli) {
+  //   return res
+  //     .status(400)
+  //     .json({ success: false, message: "El idCli es obligatorio" });
+  // }
 
   const cn = await connection();
 
   try {
+    const filterCli = idCli ? `AND IDCLI = ?` : "";
+
     // Consulta los contratos asociados al cliente
     const query = `
       SELECT ID, DESCRIPCION 
       FROM ${SCHEMA_BD}.PO_OPERACIONES 
-      WHERE SITUACION='S' AND IDCLI = ?
+      WHERE SITUACION='S' ${filterCli}
     `;
-    const result = await cn.query(query, [idCli]);
+    const result = await cn.query(query, idCli ? [idCli] : []);
 
     const cleanedResult = result.map((row) => {
       return {
@@ -308,7 +311,7 @@ const listAssingByContract = async (req, res) => {
       tarifa: row.TARIFA,
       moneda: row.MONEDA,
       archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-      condicion: row.CONDICION ? row.CONDICION : ""
+      condicion: row.CONDICION ? row.CONDICION : "",
     }));
 
     return res.status(200).json(convertResult);
@@ -665,12 +668,10 @@ const updateAssign = async (req, res) => {
     }
 
     if (fields.length === 0)
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "No se detectaron campos para modificar",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "No se detectaron campos para modificar",
+      });
 
     console.log(fields.join(", "));
     console.log(params);
@@ -691,12 +692,399 @@ const updateAssign = async (req, res) => {
   } catch (error) {
     // await cn.rollback();
     console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: `Error al actualizar las placas: ${error}`,
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const listVehPending = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
     return res
-      .status(500)
-      .json({
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { idCli, idOpe } = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    let filtros = "";
+    const params = [];
+
+    if (idCli) {
+      filtros += "AND TAC.ID_CLIENTE = ?";
+      params.push(idCli);
+    }
+
+    if (idOpe) {
+      filtros += "AND TAD.ID_OPE = ?";
+      params.push(idOpe);
+    }
+
+    const sql = `
+      SELECT 
+        TAD.ID, 
+        TAD.ID_VEH, 
+        TAD.PLACA,
+        TAD.ID_CONTRATO,
+        TAD.CLASE_CONTRATO,
+        TAD.TARIFA,
+        TAD.CONDICION,
+        TAD.ID_OPE AS ID_OPE_ASIGN,
+        PA.SECOPE AS ID_OPE_ACTUAL,
+        PO.DESCRIPCION AS OPE_ASIGN, 
+        PO3.DESCRIPCION AS OPE_ACTUAL,
+        PA.DESDE AS FECHA_REF
+      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+      JOIN (
+        SELECT 
+          IDVEH,
+          SECOPE,
+          IDOPE,
+          DESDE,
+          ROW_NUMBER() OVER (
+            PARTITION BY IDVEH 
+            ORDER BY ID DESC
+          ) AS RN
+        FROM ${SCHEMA_BD}.PO_ASIGNACION
+      ) PA 
+      ON TAD.ID_VEH = PA.IDVEH
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+      ON PO.ID = TAD.ID_OPE 
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
+      ON PO3.ID = PA.SECOPE
+      JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC 
+      ON TAD.ID_ASIGNACION = TAC.ID
+      WHERE PA.RN = 1 AND TAD.ID_OPE <> PA.SECOPE ${filtros}
+      ORDER BY TAD.ID ASC
+    `;
+
+    const result = await cn.query(sql, params);
+
+    const cleanedResult = result.map((row) => ({
+      idAsign: row.ID,
+      idVeh: row.ID_VEH,
+      placa: row.PLACA.trim(),
+      idOpeAsign: row.ID_OPE_ASIGN,
+      opeAsign: row.OPE_ASIGN.trim(),
+      idOpeActual: row.ID_OPE_ACTUAL,
+      opeActual: row.OPE_ACTUAL.trim(),
+      fechaRef: row.FECHA_REF,
+      idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
+      tarifa: row.TARIFA,
+      condicion: row.CONDICION.trim(),
+    }));
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: `Error al obtener las placas pendientes de reasignación: ${error}`,
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const changeOperation = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+  }
+
+  const {
+    beforeOperation,
+    operation,
+    date,
+    file,
+    condition,
+    contract,
+    tariff,
+  } = req.body;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  const convertDate = convertirFecha(date);
+  const validFile = file ? file.replace(/^temp\//, "") : null;
+
+  try {
+    const sqlFind = `
+      SELECT ID_CONTRATO, CONDICION, CLASE_CONTRATO, TARIFA, ARCHIVO_PDF FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+      WHERE TAD.ID = ?
+      FETCH FIRST 1 ROW ONLY
+    `;
+
+    const findAssign = await cn.query(sqlFind, [id]);
+
+    if (!findAssign[0] || findAssign.length === 0)
+      return res.status(404).json({
         success: false,
-        message: `Error al actualizar las placas: ${error}`,
+        message: "No se encontro la asignación en el sistema",
       });
+
+    const sqlChangeOpe = `
+      UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+      SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?
+      WHERE ID = ?
+    `;
+
+    const sqlInsertReassign = `
+      INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, FECHA_REASIGNACION, ID_ASIGNACION)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const oldAssign = {
+      id,
+      idContrato: findAssign[0].ID_CONTRATO,
+      tipo: findAssign[0].CLASE_CONTRATO.trim(),
+      condicion: findAssign[0].CONDICION.trim(),
+      tarifa: findAssign[0].TARIFA,
+      archivo: findAssign[0].ARCHIVO_PDF.trim(),
+    };
+
+    const newAssing = {
+      id,
+      idContrato: Number(contract.split("_")[1]),
+      tipo: contract.split("_")[0],
+      condicion: condition,
+      tarifa: Number(tariff),
+      archivo: validFile,
+    };
+
+    console.log("ANTES ==> ", oldAssign);
+
+    console.log("DESPUES ==> ", newAssing);
+
+    // await cn.beginTransaction();
+
+    await cn.query(sqlChangeOpe, [
+      operation,
+      newAssing.idContrato,
+      newAssing.condicion,
+      newAssing.tipo,
+      newAssing.tarifa,
+      newAssing.archivo,
+      id,
+    ]);
+
+    await cn.query(sqlInsertReassign, [
+      beforeOperation,
+      operation,
+      oldAssign.idContrato,
+      newAssing.idContrato,
+      oldAssign.tarifa,
+      newAssing.tarifa,
+      oldAssign.condicion,
+      newAssing.condicion,
+      oldAssign.archivo,
+      newAssing.archivo,
+      oldAssign.tipo,
+      newAssing.tipo,
+      convertDate,
+      id,
+    ]);
+
+    if (file && validFile) {
+      await moveFile(file, validFile);
+    }
+
+    await cn.commit();
+
+    return res
+      .status(201)
+      .json({ success: true, message: "Vehiculo traspasado correctamente" });
+  } catch (error) {
+    // await cn.rollback();
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: `Error al cambiar la operación: ${error}`,
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const listReassign = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+  }
+
+  const pool = await connection();
+  const cn = await pool.connect();
+  try {
+    const sql = `
+      SELECT TR.ID, PO.DESCRIPCION AS OPERACION_ANTERIOR, PO2.DESCRIPCION AS OPERACION_NUEVA, TR.FECHA_REASIGNACION, TR.ARCHIVO
+      FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+      ON PO.ID = TR.ID_OPE 
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO2
+      ON PO2.ID = TR.SEC_OPE
+      WHERE TR.ID_ASIGNACION = ?
+      ORDER BY TR.ID ASC
+    `;
+
+    const result = await cn.query(sql, [id]);
+
+    const cleanedResult = result.map((row) => ({
+      id: row.ID,
+      opeAnterior: row.OPERACION_ANTERIOR.trim(),
+      opeNueva: row.OPERACION_NUEVA.trim(),
+      fecha: row.FECHA_REASIGNACION.trim(),
+      archivo: row.ARCHIVO.trim(),
+    }));
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: `Error al listar las reasignaciones: ${error}`,
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const getReassignById = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+  }
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      SELECT 
+        PO.DESCRIPCION AS OPERACION_ANTERIOR,
+        PO2.DESCRIPCION AS OPERACION_NUEVA,
+        COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO_ANTERIOR,
+        COALESCE(TC2.NRO_CONTRATO, TD2.NRO_DOC) AS CONTRATO_NUEVO,
+        TR.TARIFA AS TARIFA_ANTIGUA,
+        TR.SEC_TARIFA AS TARIFA_NUEVA,
+        TR.CONDICION AS CONDICION_ANTIGUA,
+        TR.SEC_CONDICION AS CONDICION_NUEVA,
+        TR.TIPO_CONTRATO AS TIPO_ANTERIOR,
+        TR.SEC_TIPO_CONTRATO AS TIPO_NUEVO,
+        TR.FECHA_REASIGNACION,
+        TR.ARCHIVO AS ARCHIVO_ANTERIOR,
+        TR.SEC_ARCHIVO AS ARCHIVO_NUEVO
+      FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+        ON PO.ID = TR.ID_OPE 
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO2
+        ON PO2.ID = TR.SEC_OPE
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+        ON TR.ID_CONTRATO = TC.ID 
+        AND TR.TIPO_CONTRATO = 'P'
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC2
+        ON TR.SEC_CONTRATO = TC2.ID 
+        AND TR.SEC_TIPO_CONTRATO = 'P'
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
+        ON TR.ID_CONTRATO = TD.ID 
+        AND TR.TIPO_CONTRATO = 'H'
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
+        ON TR.SEC_CONTRATO = TD2.ID 
+        AND TR.SEC_TIPO_CONTRATO = 'H'
+      WHERE TR.ID = ?
+    `;
+
+    const result = await cn.query(sql, [id]);
+
+    if (!result[0] || result.length === 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "No se encontro la reasignación" });
+
+    return res.status(200).json({
+      fecha: result[0].FECHA_REASIGNACION.trim(),
+      anterior: {
+        operacion: result[0].OPERACION_ANTERIOR.trim(),
+        contrato: result[0].CONTRATO_ANTERIOR.trim(),
+        tarifa: result[0].TARIFA_ANTIGUA,
+        condicion: transformType(result[0].CONDICION_ANTIGUA.trim(), {
+          0: "Titular",
+          1: "Retén",
+          2: "Logística",
+          3: "Pendiente",
+        }),
+        tipo: result[0].TIPO_ANTERIOR.trim(),
+        archivo: result[0].ARCHIVO_ANTERIOR.trim(),
+      },
+      nuevo: {
+        operacion: result[0].OPERACION_NUEVA.trim(),
+        contrato: result[0].CONTRATO_NUEVO.trim(),
+        tarifa: result[0].TARIFA_NUEVA,
+        condicion: transformType(result[0].CONDICION_NUEVA.trim(), {
+          0: "Titular",
+          1: "Retén",
+          2: "Logística",
+          3: "Pendiente",
+        }),
+        tipo: result[0].TIPO_NUEVO.trim(),
+        archivo: result[0].ARCHIVO_NUEVO.trim(),
+      },
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: `Error al obtener la reasignación por id: ${error}`,
+    });
   } finally {
     if (cn) await cn.close();
   }
@@ -708,4 +1096,8 @@ module.exports = {
   insertOperation,
   valideAssign,
   updateAssign,
+  listVehPending,
+  changeOperation,
+  listReassign,
+  getReassignById
 };
