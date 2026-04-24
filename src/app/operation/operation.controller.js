@@ -862,7 +862,7 @@ const changeOperation = async (req, res) => {
       tipo: findAssign[0].CLASE_CONTRATO.trim(),
       condicion: findAssign[0].CONDICION.trim(),
       tarifa: findAssign[0].TARIFA,
-      archivo: findAssign[0].ARCHIVO_PDF.trim(),
+      archivo: findAssign[0].ARCHIVO_PDF,
     };
 
     const newAssing = {
@@ -966,10 +966,10 @@ const listReassign = async (req, res) => {
 
     const cleanedResult = result.map((row) => ({
       id: row.ID,
-      opeAnterior: row.OPERACION_ANTERIOR.trim(),
-      opeNueva: row.OPERACION_NUEVA.trim(),
-      fecha: row.FECHA_REASIGNACION.trim(),
-      archivo: row.ARCHIVO.trim(),
+      opeAnterior: row.OPERACION_ANTERIOR,
+      opeNueva: row.OPERACION_NUEVA,
+      fecha: row.FECHA_REASIGNACION,
+      archivo: row.ARCHIVO,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -1062,7 +1062,7 @@ const getReassignById = async (req, res) => {
           3: "Pendiente",
         }),
         tipo: result[0].TIPO_ANTERIOR.trim(),
-        archivo: result[0].ARCHIVO_ANTERIOR.trim(),
+        archivo: result[0].ARCHIVO_ANTERIOR,
       },
       nuevo: {
         operacion: result[0].OPERACION_NUEVA.trim(),
@@ -1075,7 +1075,7 @@ const getReassignById = async (req, res) => {
           3: "Pendiente",
         }),
         tipo: result[0].TIPO_NUEVO.trim(),
-        archivo: result[0].ARCHIVO_NUEVO.trim(),
+        archivo: result[0].ARCHIVO_NUEVO,
       },
     });
   } catch (error) {
