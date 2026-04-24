@@ -144,11 +144,6 @@ const contVehicleLeasings = async (req, res) => {
 
   const { clienteId } = req.query;
 
-  const draw = parseInt(req.query.draw);
-  let start = parseInt(req.query.start) || 0;
-  let length = parseInt(req.query.length) || 10;
-  const search = req.query.search || "";
-
   const cn = await connection();
 
   try {
@@ -347,227 +342,17 @@ const contVehicleLeasings = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
       WHERE LC.TIPCON = 'H')
-      WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0)  
-      ${clienteId ? `AND CLIENTE = ?` : ""}
+      ${clienteId ? `WHERE CLIENTE = ?` : ""}
       ORDER BY ID
-      OFFSET ? ROWS
-      FETCH NEXT ? ROWS ONLY
     `;
 
     const params = [];
 
-    let sqlCount = `
-    SELECT COUNT(ID) AS TOTAL FROM (
-      SELECT 
-        LD.ID,
-        LD.PLACA,
-        LD.MODELO,
-        LC.NRO_LEASING,
-        LC.ID_CLIENTE AS CLIENTE,
-        LC.TIPCON AS TIPO_CON,
-        DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-          SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-          SUBSTR(C.FECHA_FIRMA, 7, 2)
-        ) AS FECHA_INI_CON,
-        ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-          CAST(C.DURACION AS INTEGER)
-        ) AS FECHA_FIN_CON,
-        CAST(ROUND((DAYS(
-        ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-          CAST(C.DURACION AS INTEGER)
-        )
-        ) -
-        DAYS (
-        DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-          SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-          SUBSTR(C.FECHA_FIRMA, 7, 2)
-        )
-        )) / 365.25, 0) AS INTEGER) AS ANOS_CONTRATO,
-        DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_INI, 7, 2)
-        ) AS FECHA_INI_LEA,
-        DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_FIN, 7, 2)
-        ) AS FECHA_FIN_LEA,
-        CAST(ROUND((DAYS(
-          DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_FIN, 7, 2)
-        )
-        ) -
-        DAYS (
-        DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_INI, 7, 2)
-        )
-        )) / 365.25, 0) AS INTEGER) AS ANOS_LEA,
-        DAYS(
-          ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-            CAST(C.DURACION AS INTEGER)
-          )
-        ) - DAYS (
-          DATE(
-            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-            SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-            SUBSTR(LC.FECHA_FIN, 7, 2)
-          )
-        ) AS DIFERENCIA_DIAS,
-        DATE(
-        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
-            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
-            SUBSTR(AD.FECHA_INI, 7, 2)
-        ) AS FECHA_ACTA_INI,
-        DATE(
-        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
-            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
-            SUBSTR(AD.FECHA_FIN, 7, 2)
-        ) AS FECHA_ACTA_FIN
-      FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
-      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-      ON LD.ID_LEA_CAB = LC.ID
-      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB C
-      ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-      ON LD.PLACA = AD.PLACA
-      WHERE LC.TIPCON = 'P'
-
-      UNION ALL
-
-      SELECT 
-        LD.ID,
-        LD.PLACA,
-        LD.MODELO,
-        LC.NRO_LEASING,
-        LC.ID_CLIENTE AS CLIENTE,
-        LC.TIPCON AS TIPO_CON,
-        DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-          SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-          SUBSTR(C.FECHA_FIRMA, 7, 2)
-        ) AS FECHA_INI_CON,
-        ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-          CAST(C.DURACION AS INTEGER)
-        ) AS FECHA_FIN_CON,
-        CAST(ROUND((DAYS(
-        ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-          CAST(C.DURACION AS INTEGER)
-        )
-        ) -
-        DAYS (
-        DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-          SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-          SUBSTR(C.FECHA_FIRMA, 7, 2)
-        )
-        )) / 365.25, 0) AS INTEGER) AS ANOS_CONTRATO,
-        DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_INI, 7, 2)
-        ) AS FECHA_INI_LEA,
-        DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_FIN, 7, 2)
-        ) AS FECHA_FIN_LEA,
-        CAST(ROUND((DAYS(
-          DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_FIN, 7, 2)
-        )
-        ) -
-        DAYS (
-        DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
-          SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
-          SUBSTR(LC.FECHA_INI, 7, 2)
-        )
-        )) / 365.25, 0) AS INTEGER) AS ANOS_LEA,
-        DAYS(
-          ADD_MONTHS(
-          DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
-            SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
-            SUBSTR(C.FECHA_FIRMA, 7, 2)
-          ),
-            CAST(C.DURACION AS INTEGER)
-          )
-        ) - DAYS (
-          DATE(
-            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
-            SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
-            SUBSTR(LC.FECHA_FIN, 7, 2)
-          )
-        ) AS DIFERENCIA_DIAS,
-        DATE(
-        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
-            SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
-            SUBSTR(AD.FECHA_INI, 7, 2)
-        ) AS FECHA_ACTA_INI,
-        DATE(
-        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
-            SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
-            SUBSTR(AD.FECHA_FIN, 7, 2)
-        ) AS FECHA_ACTA_FIN
-      FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
-      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-      ON LD.ID_LEA_CAB = LC.ID
-      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
-      ON LC.ID_CONTRATO = C.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-      ON LD.PLACA = AD.PLACA
-      WHERE LC.TIPCON = 'H')
-      WHERE (LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0) 
-      ${clienteId ? `AND CLIENTE = ?` : ""}
-    `;
-
-    const paramsTotal = [];
-
     if (clienteId) {
-      params.push(search, search, clienteId, start, length);
-      paramsTotal.push(search, search, clienteId);
-    } else {
-      params.push(search, search, start, length);
-      paramsTotal.push(search, search);
+      params.push(clienteId);
     }
 
     const result = await cn.query(sql, params);
-
-    const resultTotal = await cn.query(sqlCount, paramsTotal);
 
     const cleanedResult = result.map((row) => ({
       id: row.ID,
@@ -576,25 +361,18 @@ const contVehicleLeasings = async (req, res) => {
       nroLeasing: row.NRO_LEASING.trim(),
       cliente: row.CLIENTE,
       tipoCont: row.TIPO_CON.trim(),
-      fechaIniCont: row.FECHA_INI_CON.trim(),
-      fechaFinCont: row.FECHA_FIN_CON.trim(),
+      fechaIniCont: row.FECHA_INI_CON ? row.FECHA_INI_CON.trim() : "",
+      fechaFinCont: row.FECHA_FIN_CON ? row.FECHA_FIN_CON.trim() : "",
       añosContrato: row.ANOS_CONTRATO,
       fechaIniLea: row.FECHA_INI_LEA.trim(),
       fechaFinLea: row.FECHA_FIN_LEA.trim(),
       añosLeasing: row.ANOS_LEA,
       diferenciaDias: row.DIFERENCIA_DIAS,
-      fechaIniActa: row.FECHA_ACTA_INI,
-      fechaFinActa: row.FECHA_ACTA_FIN,
+      fechaIniActa: row.FECHA_ACTA_INI ?? "",
+      fechaFinActa: row.FECHA_ACTA_FIN ?? "",
     }));
 
-    const totalElements = resultTotal[0].TOTAL;
-
-    return res.status(200).json({
-      draw: draw,
-      recordsTotal: totalElements,
-      recordsFiltered: totalElements,
-      data: cleanedResult,
-    });
+    return res.status(200).json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener reporte de leasings", error);
     return res.status(500).json({
@@ -706,11 +484,6 @@ const listVehicleLeasingExpire = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
 
-  const draw = parseInt(req.query.draw);
-  let start = parseInt(req.query.start) || 0;
-  let length = parseInt(req.query.length) || 10;
-  const search = req.query.search || "";
-
   const cn = await connection();
 
   try {
@@ -763,54 +536,17 @@ const listVehicleLeasingExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
-      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
+      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY ID
-      OFFSET ? ROWS
-      FETCH NEXT ? ROWS ONLY
     `;
 
     const params = [];
 
-    const sqlTotal = `
-      SELECT COUNT(*) AS TOTAL
-      FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
-        FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
-        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-        ON LD.ID_LEA_CAB = LC.ID
-        LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
-        ON LD.ID_VEH = V.ID
-        LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
-        ON V.IDMAR = M.ID
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
-              ORDER BY CLINOM ASC
-        ) C ON LC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
-              ORDER BY CLINOM ASC
-        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
-      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
-    `;
-
-    const paramsTotal = [];
-
     if (clienteId) {
       params.push(clienteId);
-      paramsTotal.push(clienteId);
     }
 
-    params.push(search, search, search, start, length);
-    paramsTotal.push(search, search, search);
-
     const result = await cn.query(sql, params);
-    const resultTotal = await cn.query(sqlTotal, paramsTotal);
 
     const cleanedResult = result.map((row) => ({
       placa: row.PLACA.trim(),
@@ -820,17 +556,12 @@ const listVehicleLeasingExpire = async (req, res) => {
       fechaIni: row.FECHA_INI.trim(),
       fechaFin: row.FECHA_FIN.trim(),
       cliente: row.CLIENTE.trim(),
-      clienteAsoc: row.CLIENTE_ASOCIADO ? row.CLIENTE_ASOCIADO.trim() : row.CLIENTE.trim(),
+      clienteAsoc: row.CLIENTE_ASOCIADO
+        ? row.CLIENTE_ASOCIADO.trim()
+        : row.CLIENTE.trim(),
     }));
 
-    const totalElements = resultTotal[0].TOTAL;
-
-    return res.status(200).json({
-      draw: draw,
-      recordsTotal: totalElements,
-      recordsFiltered: totalElements,
-      data: cleanedResult,
-    });
+    return res.status(200).json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener vehiculos por grafico", error);
     return res.status(500).json({
@@ -858,11 +589,6 @@ const listVehicleLeasingToExpire = async (req, res) => {
     return res
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
-
-  const draw = parseInt(req.query.draw);
-  let start = parseInt(req.query.start) || 0;
-  let length = parseInt(req.query.length) || 10;
-  const search = req.query.search || "";
 
   const cn = await connection();
 
@@ -916,54 +642,17 @@ const listVehicleLeasingToExpire = async (req, res) => {
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
               ORDER BY CLINOM ASC
         ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
-      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
+      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY ID
-      OFFSET ? ROWS
-      FETCH NEXT ? ROWS ONLY
     `;
 
     const params = [];
 
-    const sqlTotal = `
-      SELECT COUNT(*) AS TOTAL
-      FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
-        FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
-        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-        ON LD.ID_LEA_CAB = LC.ID
-        LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
-        ON LD.ID_VEH = V.ID
-        LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
-        ON V.IDMAR = M.ID
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
-              ORDER BY CLINOM ASC
-        ) C ON LC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
-              ORDER BY CLINOM ASC
-        ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
-      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""} AND (LOCATE_IN_STRING(UPPER(CLIENTE), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(PLACA), UPPER(?)) > 0 OR LOCATE_IN_STRING(UPPER(NRO_LEASING), UPPER(?)) > 0)
-    `;
-
-    const paramsTotal = [];
-
     if (clienteId) {
       params.push(clienteId);
-      paramsTotal.push(clienteId);
     }
 
-    params.push(search, search, search, start, length);
-    paramsTotal.push(search, search, search);
-
     const result = await cn.query(sql, params);
-    const resultTotal = await cn.query(sqlTotal, paramsTotal);
 
     const cleanedResult = result.map((row) => ({
       placa: row.PLACA.trim(),
@@ -973,17 +662,12 @@ const listVehicleLeasingToExpire = async (req, res) => {
       fechaIni: row.FECHA_INI.trim(),
       fechaFin: row.FECHA_FIN.trim(),
       cliente: row.CLIENTE.trim(),
-      clienteAsoc: row.CLIENTE_ASOCIADO ? row.CLIENTE_ASOCIADO.trim() : row.CLIENTE.trim(),
+      clienteAsoc: row.CLIENTE_ASOCIADO
+        ? row.CLIENTE_ASOCIADO.trim()
+        : row.CLIENTE.trim(),
     }));
 
-    const totalElements = resultTotal[0].TOTAL;
-
-    return res.status(200).json({
-      draw: draw,
-      recordsTotal: totalElements,
-      recordsFiltered: totalElements,
-      data: cleanedResult,
-    });
+    return res.status(200).json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener vehiculos por grafico", error);
     return res.status(500).json({
@@ -1160,18 +844,26 @@ const contTotalPriceByModel = async (req, res) => {
   const { modelId, fromYear, toYear } = req.query;
 
   if (!modelId || !fromYear)
-    return res.status(400).json("Los parametros modelId y fromYear son obligatorios");
+    return res
+      .status(400)
+      .json("Los parametros modelId y fromYear son obligatorios");
 
   const pool = await connection();
   const cn = await pool.connect();
 
   try {
-    const convertFromYear = `${fromYear}0101`
-    let convertToYear = `${new Date().getFullYear() + 1}0101`
+    const convertFromYear = `${fromYear}0101`;
+    let convertToYear = `${new Date().getFullYear() + 1}0101`;
 
-    if(toYear) {
-      if(Number(fromYear) > Number(toYear)) return res.status(400).json({success: false, message: "La fecha inicial debe ser menor a la fecha final"})
-      convertToYear = `${toYear}0101`
+    if (toYear) {
+      if (Number(fromYear) > Number(toYear))
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "La fecha inicial debe ser menor a la fecha final",
+          });
+      convertToYear = `${toYear}0101`;
     }
 
     const sql = `
@@ -1185,7 +877,11 @@ const contTotalPriceByModel = async (req, res) => {
       ORDER BY TOTAL DESC
     `;
 
-    const result = await cn.query(sql, [modelId, convertFromYear, convertToYear]);
+    const result = await cn.query(sql, [
+      modelId,
+      convertFromYear,
+      convertToYear,
+    ]);
 
     const sqlTotal = `
       SELECT SUM(TOTAL) AS TOTAL FROM (
@@ -1197,9 +893,13 @@ const contTotalPriceByModel = async (req, res) => {
         WHERE PM.IDMODGEN = ? AND TC.FECHA_FIRMA >= ? AND TC.FECHA_FIRMA < ?
         GROUP BY PM.DESCRIPCION
       )
-    `
+    `;
 
-    const resultTotal = await cn.query(sqlTotal, [modelId, convertFromYear, convertToYear]);
+    const resultTotal = await cn.query(sqlTotal, [
+      modelId,
+      convertFromYear,
+      convertToYear,
+    ]);
 
     const cleanedResult = result.map((row) => ({
       MODELO: row.MODELO.trim(),
@@ -1208,7 +908,7 @@ const contTotalPriceByModel = async (req, res) => {
 
     return res.status(200).json({
       TOTAL: resultTotal[0].TOTAL ? resultTotal[0].TOTAL : 0,
-      LIST: cleanedResult
+      LIST: cleanedResult,
     });
   } catch (error) {
     console.error("Error al obtener costos por modelos", error);
