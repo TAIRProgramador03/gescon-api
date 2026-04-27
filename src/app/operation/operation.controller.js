@@ -9,7 +9,7 @@ const {
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile, s3 } = require("../../shared/service/aws-s3.js");
-const fs = require("fs");
+const fs = require("fs/promises");
 const path = require("path");
 const mime = require("mime-types");
 const ExcelJS = require("exceljs");
@@ -1095,6 +1095,126 @@ const getReassignById = async (req, res) => {
   }
 };
 
+// const uploalMasiveRecords = async (req, res) => {
+//   const { id: idUser } = req.user;
+
+//   if (!idUser) {
+//     return res
+//       .status(401)
+//       .json({ success: false, message: "Token inválido o no proporcionado" });
+//   }
+
+//   const pool = await connection();
+//   const cn = await pool.connect();
+
+//   try {
+//     if (!req.file)
+//       return res
+//         .status(400)
+//         .json({ message: "No se recibio ningún archivo de importación" });
+
+//     const wb = new ExcelJS.Workbook();
+//     await wb.xlsx.load(req.file.buffer);
+
+//     const ws = wb.getWorksheet(1);
+
+//     const rowSelects = [];
+//     const startRow = 5;
+
+//     const sql = `
+//       SELECT ID, PLACA
+//       FROM SPEED400AT.TBL_ASIGNACION_DET
+//       WHERE PLACA = ? AND ARCHIVO_PDF IS NULL
+//       FETCH FIRST 1 ROW ONLY
+//     `;
+
+//     for (let i = startRow; i <= ws.rowCount; i++) {
+//       const cellPlate = ws.getCell(i, 7); // G
+//       const cellFile = ws.getCell(i, 16); // P
+
+//       const plate = cellPlate.value;
+//       let fileValue = cellFile.value;
+
+//       if (plate && fileValue) {
+//         const findPlate = await cn.query(sql, [`${plate}`.trim()]);
+
+//         if (!findPlate[0] || findPlate.length === 0) {
+//           continue;
+//         }
+
+//         // 🔹 obtener valor real del archivo
+//         let fileRoute =
+//           typeof fileValue === "object" ? fileValue.text : fileValue;
+
+//         if (!fileRoute || fileRoute === "-") continue;
+
+//         fileRoute = String(fileRoute).trim();
+
+//         // 🔹 decodificar (%20 → espacio, etc)
+//         fileRoute = decodeURIComponent(fileRoute);
+
+//         // 🔹 normalizar slashes
+//         fileRoute = fileRoute.replace(/\\\\/g, "\\");
+//         fileRoute = fileRoute.replace(/\//g, "\\");
+
+//         // 🔹 agregar E:\ si no es ruta absoluta
+//         if (!path.isAbsolute(fileRoute)) {
+//           fileRoute = path.join("E:\\", fileRoute);
+//         }
+
+//         rowSelects.push({
+//           id: findPlate[0].ID,
+//           plate: String(plate).trim(),
+//           file: fileRoute,
+//         });
+//       }
+//     }
+
+//     const notUpload = [];
+
+//     const sqlUpd = `
+//       UPDATE SPEED400AT.TBL_ASIGNACION_DET
+//       SET ARCHIVO_PDF = ?
+//       WHERE ID = ?
+//     `
+
+//     for (const row of rowSelects) {
+//       const findFile = fs.existsSync(row.file);
+
+//       if (!findFile) {
+//         notUpload.push(row);
+//         continue;
+//       }
+
+//       const fileBuffer = fs.readFileSync(row.file);
+//       const fileName = path.basename(row.file);
+//       const contentType = mime.lookup(row.file) || "application/octet-stream";
+
+//       const key = `acta/${row.id}-${fileName}`;
+
+//       const params = {
+//         Bucket: process.env.AWS_BUCKET_NAME,
+//         Key: key,
+//         Body: fileBuffer,
+//         ContentType: contentType,
+//       };
+
+//       await s3.send(new PutObjectCommand(params));
+
+//       await cn.query(sqlUpd, [key, row.id]);
+//     }
+
+//     if(rowSelects.length === notUpload.length) return res.status(200).json({success: true, message: "No se importo ningun archivo", notUpload});
+
+//     return res.status(200).json({success: true, message: "Importación realizada con exito", notUpload});
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: "Error al importar datos" });
+//   } finally {
+//     if (cn) await cn.close();
+//   }
+// };
+
 const uploalMasiveRecords = async (req, res) => {
   const { id: idUser } = req.user;
 
@@ -1108,18 +1228,16 @@ const uploalMasiveRecords = async (req, res) => {
   const cn = await pool.connect();
 
   try {
-    if (!req.file)
-      return res
-        .status(400)
-        .json({ message: "No se recibio ningún archivo de importación" });
+    const carpeta = path.join(
+      "G:",
+      "SOUTHERN-ACTAS-LEASING",
+      "ACTAS DE ENTREGA - SOUTHERN",
+      "SPCC",
+    );
 
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(req.file.buffer);
+    const archivos = await fs.readdir(carpeta, { withFileTypes: true });
 
-    const ws = wb.getWorksheet(1);
-
-    const rowSelects = [];
-    const startRow = 5;
+    const files = [];
 
     const sql = `
       SELECT ID, PLACA
@@ -1128,43 +1246,24 @@ const uploalMasiveRecords = async (req, res) => {
       FETCH FIRST 1 ROW ONLY
     `;
 
-    for (let i = startRow; i <= ws.rowCount; i++) {
-      const cellPlate = ws.getCell(i, 7); // G
-      const cellFile = ws.getCell(i, 16); // P
+    for (const item of archivos) {
+      if (item.isFile()) {
+        let fileRoute = path.join(carpeta, item.name);
 
-      const plate = cellPlate.value;
-      let fileValue = cellFile.value;
+        const plate = fileRoute.trim().split(" ")[4];
 
-      if (plate && fileValue) {
-        const findPlate = await cn.query(sql, [`${plate}`.trim()]);
+        console.log(plate);
 
-        if (!findPlate[0] || findPlate.length === 0) {
-          continue;
-        }
+        const findPlate = await cn.query(sql, [plate.trim()]);
 
-        // 🔹 obtener valor real del archivo
-        let fileRoute =
-          typeof fileValue === "object" ? fileValue.text : fileValue;
+        if (!findPlate[0] || findPlate.length === 0) continue;
 
-        if (!fileRoute || fileRoute === "-") continue;
+        fileRoute = fileRoute.replace(/\\\\/g, "\\"); // doble → simple
+        fileRoute = fileRoute.replace(/\//g, "\\"); // por si viene con /
 
-        fileRoute = String(fileRoute).trim();
-
-        // 🔹 decodificar (%20 → espacio, etc)
-        fileRoute = decodeURIComponent(fileRoute);
-
-        // 🔹 normalizar slashes
-        fileRoute = fileRoute.replace(/\\\\/g, "\\");
-        fileRoute = fileRoute.replace(/\//g, "\\");
-
-        // 🔹 agregar E:\ si no es ruta absoluta
-        if (!path.isAbsolute(fileRoute)) {
-          fileRoute = path.join("E:\\", fileRoute);
-        }
-
-        rowSelects.push({
+        files.push({
           id: findPlate[0].ID,
-          plate: String(plate).trim(),
+          plate,
           file: fileRoute,
         });
       }
@@ -1176,9 +1275,9 @@ const uploalMasiveRecords = async (req, res) => {
       UPDATE SPEED400AT.TBL_ASIGNACION_DET
       SET ARCHIVO_PDF = ?
       WHERE ID = ?
-    `
+    `;
 
-    for (const row of rowSelects) {
+    for (const row of files) {
       const findFile = fs.existsSync(row.file);
 
       if (!findFile) {
@@ -1204,9 +1303,18 @@ const uploalMasiveRecords = async (req, res) => {
       await cn.query(sqlUpd, [key, row.id]);
     }
 
-    if(rowSelects.length === notUpload.length) return res.status(200).json({success: true, message: "No se importo ningun archivo", notUpload});
+    if (rowSelects.length === notUpload.length)
+      return res.status(200).json({
+        success: true,
+        message: "No se importo ningun archivo",
+        notUpload,
+      });
 
-    return res.status(200).json({success: true, message: "Importación realizada con exito", notUpload});
+    return res.status(200).json({
+      success: true,
+      message: "Importación realizada con exito",
+      notUpload,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Error al importar datos" });
