@@ -35,6 +35,8 @@ app.use(
       `http://192.168.5.25:3000`,
       `http://${IP_LOCAL}:5173`,
       `http://locahost:5173`,
+      `http://${IP_LOCAL}:8080`,
+      `http://locahost:8080`,
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),

@@ -163,9 +163,6 @@ const listAllLeasing = async (req, res) => {
       ORDER BY L.ID ASC
     `;
 
-    console.log(filtros);
-    console.log(params);
-
     const result = await cn.query(sql, params);
 
     const cleanedResult = result.map((row) => ({
