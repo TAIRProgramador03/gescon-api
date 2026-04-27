@@ -32,6 +32,7 @@ const upload = multer({
 
 Router.post(
   "/subirArchivo",
+  authenticateToken,
   (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {
