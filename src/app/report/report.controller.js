@@ -142,11 +142,30 @@ const contVehicleLeasings = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const { clienteId } = req.query;
+  const { clienteId, all } = req.query;
 
   const cn = await connection();
 
   try {
+    let sentences = ``;
+    const params = [];
+
+    if (clienteId) {
+      if (all == "true") {
+        sentences += `WHERE CLIENTE = ?`;
+      } else if (all == "false") {
+        sentences += `WHERE CLIENTE = ? AND SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
+      } else if (!all) {
+        sentences += `WHERE CLIENTE = ?`;
+      }
+
+      params.push(clienteId);
+    } else {
+      if(all && all == "false") {
+        sentences += `WHERE SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
+      }
+    }
+
     let sql = `
       SELECT * FROM (
       SELECT 
@@ -235,7 +254,9 @@ const contVehicleLeasings = async (req, res) => {
         	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
             SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_FIN, 7, 2)
-        ) AS FECHA_ACTA_FIN
+        ) AS FECHA_ACTA_FIN,
+        PV.SECOPE,
+        AD.ID_OPE
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
@@ -243,7 +264,9 @@ const contVehicleLeasings = async (req, res) => {
       ON LC.ID_CONTRATO = C.ID
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
-      WHERE LC.TIPCON = 'P'
+      LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+      ON LD.PLACA = PV.NUMPLA
+      WHERE LC.TIPCON = 'P' AND AD.ID IS NOT NULL
 
       UNION ALL
 
@@ -333,7 +356,9 @@ const contVehicleLeasings = async (req, res) => {
         	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
             SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_FIN, 7, 2)
-        ) AS FECHA_ACTA_FIN
+        ) AS FECHA_ACTA_FIN,
+        PV.SECOPE,
+        AD.ID_OPE
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
@@ -341,16 +366,12 @@ const contVehicleLeasings = async (req, res) => {
       ON LC.ID_CONTRATO = C.ID
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       ON LD.PLACA = AD.PLACA
-      WHERE LC.TIPCON = 'H')
-      ${clienteId ? `WHERE CLIENTE = ?` : ""}
+      LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+      ON LD.PLACA = PV.NUMPLA
+      WHERE LC.TIPCON = 'H' AND AD.ID IS NOT NULL)
+      ${sentences}
       ORDER BY ID
     `;
-
-    const params = [];
-
-    if (clienteId) {
-      params.push(clienteId);
-    }
 
     const result = await cn.query(sql, params);
 
@@ -370,6 +391,8 @@ const contVehicleLeasings = async (req, res) => {
       diferenciaDias: row.DIFERENCIA_DIAS,
       fechaIniActa: row.FECHA_ACTA_INI ?? "",
       fechaFinActa: row.FECHA_ACTA_FIN ?? "",
+      idOpe: row.ID_OPE,
+      secOpe: row.SECOPE,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -857,12 +880,10 @@ const contTotalPriceByModel = async (req, res) => {
 
     if (toYear) {
       if (Number(fromYear) > Number(toYear))
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "La fecha inicial debe ser menor a la fecha final",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "La fecha inicial debe ser menor a la fecha final",
+        });
       convertToYear = `${toYear}0101`;
     }
 
