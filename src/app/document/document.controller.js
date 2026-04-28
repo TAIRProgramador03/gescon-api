@@ -126,7 +126,7 @@ const detailDocument = async (req, res) => {
         ? findDocument.DESCRIPCION.trim()
         : "",
       cantLea: findDocument.CANT_LEA,
-      nroDocumento: findDocument.NRO_DOC.trim()
+      nroDocumento: findDocument.NRO_DOC.trim(),
     });
   } catch (error) {
     console.error("Error al obtener detalle de documento", error);
@@ -526,24 +526,26 @@ const updateDocument = async (req, res) => {
       }
     }
 
-    const paramsDet = detailUpdate.map(() => "?");
+    if (detailUpdate.length > 0) {
+      const paramsDet = detailUpdate.map(() => "?");
 
-    const queryValidDelete = `
+      const queryValidDelete = `
             SELECT D.ID FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET D
             LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB C
             ON D.ID_CON_CAB = C.ID
             WHERE C.ID = ? AND D.ID NOT IN (${paramsDet.join(",")})
           `;
 
-    const resultValidDelete = await cn.query(queryValidDelete, [
-      idDocumentoCab,
-      ...detailUpdate.map((det) => det.idDet),
-    ]);
+      const resultValidDelete = await cn.query(queryValidDelete, [
+        idDocumentoCab,
+        ...detailUpdate.map((det) => det.idDet),
+      ]);
 
-    if (resultValidDelete.length > 0) {
-      resultValidDelete.forEach((row) => {
-        detailDelete.push(row.ID);
-      });
+      if (resultValidDelete.length > 0) {
+        resultValidDelete.forEach((row) => {
+          detailDelete.push(row.ID);
+        });
+      }
     }
 
     const queryUpdDetalle = `
@@ -659,11 +661,11 @@ const getDocumentById = async (req, res) => {
         .json({ success: false, message: "No se encontró el documento" });
 
     const sqlDetail = `
-      SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET TD
+      SELECT TD.* FROM ${SCHEMA_BD}.TBLDOCUMENTO_DET TD
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC 
       ON TD.ID_CON_CAB = TC.ID
       WHERE TC.ID = ?
-    `
+    `;
 
     const resultDetail = await cn.query(sqlDetail, [id]);
 
