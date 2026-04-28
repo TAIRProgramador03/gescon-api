@@ -628,7 +628,7 @@ const updateAssign = async (req, res) => {
       .json({ success: false, message: "El parametro id debe ser numerico" });
   }
 
-  const { condicion, terreno, archivoPdf } = req.body;
+  const { fechaInicio, fechaFin, condicion, terreno, archivoPdf } = req.body;
 
   try {
     // await cn.beginTransaction();
@@ -644,6 +644,12 @@ const updateAssign = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "No se encontro la asignación" });
+
+    const sqlMovements = `
+      SELECT ID FROM ${SCHEMA_BD}.TBL_REASIGNACION WHERE ID_ASIGNACION = ? ORDER BY ID DESC FETCH FIRST 1 ROW ONLY
+    `;
+
+    const findMovement = await cn.query(sqlMovements, [id]);
 
     const fields = [];
     const params = [];
@@ -672,14 +678,14 @@ const updateAssign = async (req, res) => {
       params.push(keyFile);
     }
 
+    fields.push(`FECHA_INI = ?`, `FECHA_FIN = ?`);
+    params.push(convertirFecha(fechaInicio), convertirFecha(fechaFin));
+
     if (fields.length === 0)
       return res.status(400).json({
         success: false,
         message: "No se detectaron campos para modificar",
       });
-
-    console.log(fields.join(", "));
-    console.log(params);
 
     const sqlUpd = `
       UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
@@ -688,6 +694,37 @@ const updateAssign = async (req, res) => {
     `;
 
     await cn.query(sqlUpd, [...params, id]);
+
+    if (findMovement[0] && findMovement.length > 0) {
+      const findIdMov = findMovement[0].ID;
+      const fieldMov = [];
+      const paramsMov = [];
+
+      if (condicion !== undefined) {
+        fieldMov.push(`SEC_CONDICION = ?`);
+        paramsMov.push(condicion);
+      }
+
+      if (archivoPdf) {
+        fieldMov.push(`SEC_ARCHIVO = ?`);
+
+        let keyFile = archivoPdf;
+
+        if (archivoPdf.startsWith("temp/")) {
+          keyFile = archivoPdf.replace(/^temp\//, "");
+        }
+
+        paramsMov.push(keyFile);
+      }
+
+      const sqlUpdMovement = `
+        UPDATE ${SCHEMA_BD}.TBL_REASIGNACION
+        SET ${fieldMov.join(", ")}
+        WHERE ID = ?
+      `;
+
+      await cn.query(sqlUpdMovement, [...paramsMov, findIdMov]);
+    }
 
     // await cn.commit();
 
