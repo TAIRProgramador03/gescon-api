@@ -778,6 +778,7 @@ const listVehPending = async (req, res) => {
         TAD.ID_VEH, 
         TAD.PLACA,
         TAD.ID_CONTRATO,
+        COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO,
         TAD.CLASE_CONTRATO,
         TAD.TARIFA,
         TAD.CONDICION,
@@ -785,6 +786,7 @@ const listVehPending = async (req, res) => {
         PA.SECOPE AS ID_OPE_ACTUAL,
         PO.DESCRIPCION AS OPE_ASIGN, 
         PO3.DESCRIPCION AS OPE_ACTUAL,
+        PO3.IDCLI AS ID_CLIENTE_OPE,
         PA.DESDE AS FECHA_REF
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
       JOIN (
@@ -806,6 +808,10 @@ const listVehPending = async (req, res) => {
       ON PO3.ID = PA.SECOPE
       JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC 
       ON TAD.ID_ASIGNACION = TAC.ID
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
+      ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+      ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
       WHERE PA.RN = 1 AND TAD.ID_OPE <> PA.SECOPE ${filtros}
       ORDER BY TAD.ID ASC
     `;
@@ -820,8 +826,10 @@ const listVehPending = async (req, res) => {
       opeAsign: row.OPE_ASIGN.trim(),
       idOpeActual: row.ID_OPE_ACTUAL,
       opeActual: row.OPE_ACTUAL.trim(),
+      idClienteOpe: row.ID_CLIENTE_OPE.trim(),
       fechaRef: row.FECHA_REF,
       idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
+      nroContrato: row.CONTRATO.trim(),
       tarifa: row.TARIFA,
       condicion: row.CONDICION.trim(),
     }));
