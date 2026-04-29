@@ -14,5 +14,6 @@ module.exports = {
   IP_LOCAL,
   SCHEMA_BD,
   DB_USER,
-  DB_PASSWORD
+  DB_PASSWORD,
+  IP_ODBC_BD
 }

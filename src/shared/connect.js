@@ -1,5 +1,5 @@
 const odbc = require("odbc");
-const { dbConfig, DB_USER, DB_PASSWORD } = require("./conf.js");
+const { dbConfig, DB_USER, DB_PASSWORD, IP_ODBC_BD, SCHEMA_BD } = require("./conf.js");
 
 let pool = null;
 
@@ -7,7 +7,7 @@ const conDb = async () => {
   try {
     if (!pool) {
       pool = await odbc.pool({
-        connectionString: `DSN=${dbConfig.DSN};UID=${DB_USER};PWD=${DB_PASSWORD};System=${dbConfig.system};CCSID=1208;UNICODE=UCS-2`,
+        connectionString: `DRIVER={IBM i Access ODBC Driver};SYSTEM=${IP_ODBC_BD};UID=${DB_USER};PWD=${DB_PASSWORD};NAM=1;DBQ=${SCHEMA_BD};CCSID=1208;UNICODE=UCS-2;`,
         initialSize: 10,
         maxSize: 40,
         incrementSize: 5
