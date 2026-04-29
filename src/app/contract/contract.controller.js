@@ -681,13 +681,17 @@ const contContract = async (req, res) => {
   const cn = await connection();
 
   try {
-    let sql = `SELECT COUNT(DISTINCT A.ID) AS PADRE, SUM(CASE WHEN B.TIPO_DOC = 1 THEN 1 ELSE 0 END) AS TIPO_1, SUM(CASE WHEN B.TIPO_DOC = 2 THEN 1 ELSE 0 END) AS TIPO_2, SUM(CASE WHEN B.TIPO_DOC = 3 THEN 1 ELSE 0 END) AS TIPO_3 FROM ${SCHEMA_BD}.TBLCONTRATO_CAB A FULL OUTER JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB B ON A.ID=B.ID_PADRE`;
-    const params = [];
+    const filter = clienteId ? `WHERE ID_CLIENTE = ?` : ``
 
-    if (clienteId) {
-      sql += ` WHERE A.ID_CLIENTE = ?`;
-      params.push(clienteId);
-    }
+    let sql = `
+      SELECT 
+        (SELECT COUNT(*) FROM SPEED400AT.TBLCONTRATO_CAB ${filter}) AS CONTRATOS,
+        (SELECT COUNT(*) FROM SPEED400AT.TBLDOCUMENTO_CAB ${filter}) AS DOCUMENTOS,
+        (SELECT COUNT(*) FROM SPEED400AT.TBL_LEASING_CAB ${filter}) AS LEASINGS,
+        (SELECT COUNT(*) FROM SPEED400AT.TBL_ASIGNACION_DET TAD LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac ON TAD.ID_ASIGNACION = TAC.ID ${filter}) AS VEHICULOS
+      FROM sysibm.sysdummy1
+    `;
+    const params = clienteId ? [clienteId, clienteId, clienteId, clienteId] : [];
 
     const result = await cn.query(sql, params);
 
@@ -698,10 +702,10 @@ const contContract = async (req, res) => {
     res.json({
       success: true,
       data: {
-        PADRE: contra.PADRE,
-        TIPO_1: contra.TIPO_1,
-        TIPO_2: contra.TIPO_2,
-        TIPO_3: contra.TIPO_3,
+        PADRE: contra.CONTRATOS,
+        TIPO_1: contra.DOCUMENTOS,
+        TIPO_2: contra.LEASINGS,
+        TIPO_3: contra.VEHICULOS,
       },
     });
   } catch (error) {
@@ -1231,7 +1235,7 @@ const verifyContractsTemp = async (req, res) => {
   try {
     const sql = `
       SELECT 
-        COUNT(*) AS TOTAL_TEMPORALES, 
+        SUM(COUNT(*)) OVER() AS TOTAL_TEMPORALES, 
         cl.IDCLI,
         cl.CLINOM AS CLIENTE
       FROM ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
