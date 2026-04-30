@@ -872,6 +872,7 @@ const changeOperation = async (req, res) => {
     condition,
     contract,
     tariff,
+    observation
   } = req.body;
 
   const pool = await connection();
@@ -902,8 +903,8 @@ const changeOperation = async (req, res) => {
     `;
 
     const sqlInsertReassign = `
-      INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, FECHA_REASIGNACION, ID_ASIGNACION)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, FECHA_REASIGNACION,  OBSERVACION, ID_ASIGNACION)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const oldAssign = {
@@ -923,10 +924,6 @@ const changeOperation = async (req, res) => {
       tarifa: Number(tariff),
       archivo: validFile,
     };
-
-    console.log("ANTES ==> ", oldAssign);
-
-    console.log("DESPUES ==> ", newAssing);
 
     // await cn.beginTransaction();
 
@@ -954,6 +951,7 @@ const changeOperation = async (req, res) => {
       oldAssign.tipo,
       newAssing.tipo,
       convertDate,
+      observation,
       id,
     ]);
 
@@ -1071,7 +1069,8 @@ const getReassignById = async (req, res) => {
         TR.SEC_TIPO_CONTRATO AS TIPO_NUEVO,
         TR.FECHA_REASIGNACION,
         TR.ARCHIVO AS ARCHIVO_ANTERIOR,
-        TR.SEC_ARCHIVO AS ARCHIVO_NUEVO
+        TR.SEC_ARCHIVO AS ARCHIVO_NUEVO,
+        TR.OBSERVACION
       FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
       JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
         ON PO.ID = TR.ID_OPE 
@@ -1101,6 +1100,7 @@ const getReassignById = async (req, res) => {
 
     return res.status(200).json({
       fecha: result[0].FECHA_REASIGNACION.trim(),
+      observacion: result[0].OBSERVACION ? result[0].OBSERVACION.trim() : "",
       anterior: {
         operacion: result[0].OPERACION_ANTERIOR.trim(),
         contrato: result[0].CONTRATO_ANTERIOR.trim(),
