@@ -884,7 +884,7 @@ const contTotalPriceByModel = async (req, res) => {
           success: false,
           message: "La fecha inicial debe ser menor a la fecha final",
         });
-      convertToYear = `${toYear}0101`;
+      convertToYear = `${Number(toYear) + 1}0101`;
     }
 
     const sql = `

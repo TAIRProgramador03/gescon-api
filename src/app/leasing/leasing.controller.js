@@ -69,24 +69,35 @@ const listAllLeasing = async (req, res) => {
     // `;
     let filtros = "";
     const params = [];
+    const condiciones = [];
 
+    // 🟢 BANCO (independiente)
     if (bank) {
-      filtros += " WHERE L.BANCO = ?";
+      condiciones.push("L.BANCO = ?");
       params.push(bank);
+    }
 
-      if (clientId) {
-        filtros += " AND L.ID_CLIENTE = ?";
-        params.push(clientId);
+    // 🟢 CLIENTE (independiente)
+    if (clientId) {
+      condiciones.push("L.ID_CLIENTE = ?");
+      params.push(clientId);
+    }
 
-        if (contractId) {
-          if (typeContract == "P") {
-            filtros += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'P'`;
-          } else if (typeContract == "H") {
-            filtros += ` AND L.ID_CONTRATO = ? AND L.TIPCON = 'H'`;
-          }
-          params.push(contractId);
-        }
+    // 🔵 CONTRATO
+    if (contractId) {
+      condiciones.push("L.ID_CONTRATO = ?");
+      params.push(contractId);
+
+      if (typeContract === "P") {
+        condiciones.push("L.TIPCON = 'P'");
+      } else if (typeContract === "H") {
+        condiciones.push("L.TIPCON = 'H'");
       }
+    }
+
+    // 🔥 armar WHERE dinámico
+    if (condiciones.length > 0) {
+      filtros = " WHERE " + condiciones.join(" AND ");
     }
 
     // let sql = `
