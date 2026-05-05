@@ -489,9 +489,8 @@ const valideAssign = async (req, res) => {
   const agrupados = {};
   for (let d of detalles) {
     let clase = funcionParteVar(d.idContrato);
-    console.log(clase);
+
     let idContrato = funcionNumerica(d.idContrato);
-    console.log(idContrato);
 
     if (!clase || !idContrato) {
       return res.status(400).json({
@@ -510,7 +509,6 @@ const valideAssign = async (req, res) => {
     }
 
     agrupados[key].terrenos.push(d.idTerreno);
-    console.log(d.idTerreno);
   }
 
   const cn = await connection();
@@ -557,8 +555,6 @@ const valideAssign = async (req, res) => {
         if (t in contadorNuevo) contadorNuevo[t]++;
       });
 
-      console.log(contadorNuevo);
-
       let validaciones = [
         {
           tipo: "SUPERFICIE",
@@ -573,11 +569,8 @@ const valideAssign = async (req, res) => {
 
       for (let v of validaciones) {
         let nuevos = contadorNuevo[v.cod] || 0;
-        console.log(
-          `Tipo: ${v.tipo}, Actual: ${v.actual}, Nuevos: ${nuevos}, Máximo: ${v.maximo}`,
-        );
+
         if (v.actual + nuevos > v.maximo) {
-          console.log("Límite excedido para terreno tipo: " + v.tipo);
           return res.json({
             success: false,
             mensaje: `Límite excedido para terreno tipo ${v.tipo} en contrato ${clase}_${idContrato}. Permitido: ${v.maximo}, asignados: ${v.actual}, nuevos: ${nuevos}.`,
@@ -1296,8 +1289,6 @@ const uploalMasiveRecords = async (req, res) => {
         let fileRoute = path.join(carpeta, item.name);
 
         const plate = fileRoute.trim().split(" ")[4];
-
-        console.log(plate);
 
         const findPlate = await cn.query(sql, [plate.trim()]);
 

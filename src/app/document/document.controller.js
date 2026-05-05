@@ -267,51 +267,11 @@ const insertDocument = async (req, res) => {
   const cn = await connection();
 
   try {
-    console.log("Valores para queryCabecera:", [
-      idCliente,
-      idContrato,
-      tipoContrato,
-      nroContrato,
-      vehiculo,
-      fechaFormatoDB,
-      duracion,
-      kmAdicional,
-      kmTotal,
-      vehSup,
-      vehSev,
-      vehSoc,
-      vehCiu,
-      Especial,
-      motivo,
-      story,
-    ]);
-
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_CAB 
               (ID_CLIENTE, ID_PADRE, TIPO_DOC, NRO_DOC, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_ESPE, DESCRIPCION, ARCHIVO_PDF, CLASE, MOTIVO)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
-
-    console.log(queryCabecera, [
-      idCliente,
-      idContrato,
-      tipoContrato,
-      nroContrato,
-      vehiculo,
-      fechaFormatoDB,
-      duracion,
-      kmAdicional,
-      kmTotal,
-      vehSup,
-      vehSev,
-      vehSoc,
-      vehCiu,
-      Especial,
-      story,
-      newKey,
-      claseDocu,
-      motivo,
-    ]);
 
     const result = await cn.query(queryCabecera, [
       idCliente,
@@ -346,21 +306,6 @@ const insertDocument = async (req, res) => {
 
     if (detalles && detalles.length > 0) {
       for (const detalle of detalles) {
-        console.log("Valores para queryDetalle:", [
-          idDocumentoCab,
-          detalle.secCon,
-          detalle.modelo,
-          detalle.tipoTerreno,
-          detalle.tarifa,
-          detalle.cpk,
-          detalle.rm,
-          detalle.cantidad,
-          detalle.duracion,
-          detalle.compraVeh,
-          detalle.precioVeh,
-          detalle.kmAdicional,
-          detalle.condicion,
-        ]);
         await cn.query(queryDetalle, [
           idDocumentoCab,
           detalle.secCon,

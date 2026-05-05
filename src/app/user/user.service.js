@@ -325,16 +325,12 @@ const postRole = async (data) => {
 
     const roleId = resultId[0].ID;
 
-    console.log("ID OBTENIDO");
-
     const sqlRole = `
       INSERT INTO ${SCHEMA_BD}.T_RL_GC (ID, DESCRIPCION, DESCRIPCION2)
       VALUES (?, ?, ?)
     `;
 
     await cn.query(sqlRole, [roleId, data.name, data.description]);
-
-    console.log("ROLE INSERTADO");
 
     const sqlPermissions = `
       INSERT INTO ${SCHEMA_BD}.T_RL_PS_GC (ID_RL, ID_PS)
@@ -346,8 +342,6 @@ const postRole = async (data) => {
         await cn.query(sqlPermissions, [roleId, perm]);
       }
     }
-
-    console.log("PERMISOS INSERTADOS");
 
     await cn.commit();
 
