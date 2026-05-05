@@ -744,8 +744,6 @@ const depecratedVehicleExpires = async (req, res) => {
       where.push("A.ID_CLIENTE = ?");
     }
 
-    console.log(where);
-
     const sql = `
       SELECT 
         A.ANO,
@@ -864,6 +862,278 @@ const depecratedVehicleExpires = async (req, res) => {
     if (cn) await cn.close();
   }
 };
+
+const depecratedVehicleToExpires = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { label, clienteId } = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const where = [];
+
+    switch (label) {
+      case "Menor 30 dias":
+        where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 30");
+        break;
+      case "Entre 30 y 45 dias":
+        where.push("A.DIFERENCIA_DIAS > 30 AND A.DIFERENCIA_DIAS <= 45");
+        break;
+      case "Entre 45 y 60 dias":
+        where.push("A.DIFERENCIA_DIAS > 45 AND A.DIFERENCIA_DIAS <= 60");
+        break;
+      case "Entre 60 y 90 dias":
+        where.push("A.DIFERENCIA_DIAS > 60 AND A.DIFERENCIA_DIAS <= 90");
+        break;
+      case "Entre 90 y 120 dias":
+        where.push("A.DIFERENCIA_DIAS > 90 AND A.DIFERENCIA_DIAS <= 120");
+        break;
+      default:
+        where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 120");
+    }
+
+    if (clienteId) {
+      where.push("A.ID_CLIENTE = ?");
+    }
+
+    const sql = `
+      SELECT 
+        A.ANO,
+        SUM(A.PRECIO_BASE) AS PRECIO_BASE,
+          CAST(
+              SUM(
+                A.PRECIO_BASE * (
+                    1 - CASE 
+                        WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
+                        ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                    END
+                )
+              )
+          AS DECIMAL(10,2)) AS VALOR_DEPRECIADO,
+          CAST(
+              SUM(
+                A.PRECIO_BASE - (
+                  A.PRECIO_BASE * (
+                      1 - CASE 
+                            WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
+                            ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                        END
+                    )
+                )
+              )
+          AS DECIMAL(10,2)) AS PERDIDA_ACUMULADA,
+          CAST(
+              SUM(
+                (
+                    A.PRECIO_BASE * (
+                        1 - CASE 
+                            WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
+                            ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                        END
+                    )
+                )
+                -
+                (
+                    A.PRECIO_BASE * (
+                        1 - CASE 
+                            WHEN (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20 > 1 THEN 1
+                            ELSE (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20
+                        END
+                    )
+                )
+              )
+          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO
+      FROM (
+        SELECT 
+              TLD.ID,
+              PV.ANO,
+              DAYS(DATE(SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' || SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' || SUBSTR(TLC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS,
+              TLC.ID_CLIENTE,
+              CAST(COALESCE(AVG(COSTOS.COSTO_VEHICULO), 0) AS DECIMAL(10,2)) AS PRECIO_BASE
+          FROM ${SCHEMA_BD}.TBL_LEASING_DET TLD
+          INNER JOIN ${SCHEMA_BD}.TBL_LEASING_CAB TLC
+              ON TLD.ID_LEA_CAB = TLC.ID
+          INNER JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+              ON TLD.ID_VEH = PV.ID
+          LEFT JOIN (
+              SELECT 
+                  TC.ID AS ID_REF,
+                  TD.MODELO,
+                  TD.PRECIO_VEH AS COSTO_VEHICULO,
+                  'P' AS TIPO
+              FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+              INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_DET TD
+                  ON TC.ID = TD.ID_CON_CAB    
+
+              UNION ALL
+
+              SELECT 
+                  TDOC.ID AS ID_REF,
+                  TDD.MODELO,
+                  TDD.PRECIO_VEH AS COSTO_VEHICULO,
+                  'H' AS TIPO
+              FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDOC
+              INNER JOIN ${SCHEMA_BD}.TBLDOCUMENTO_DET TDD
+                  ON TDOC.ID = TDD.ID_CON_CAB
+          ) COSTOS
+              ON COSTOS.ID_REF = TLC.ID_CONTRATO
+              AND COSTOS.TIPO = TLC.TIPCON
+          WHERE PV.SECOPE NOT IN (211, 238, 109, 162)
+          GROUP BY TLD.ID, PV.ANO, TLC.FECHA_FIN, TLC.ID_CLIENTE
+      ) A
+      WHERE ${where.length ? where.join(" AND ") : "1=1"}
+      GROUP BY A.ANO
+      ORDER BY A.ANO
+    `;
+
+    const params = [];
+
+    if (clienteId) params.push(clienteId);
+
+    const result = await cn.query(sql, params);
+
+    const cleanedResult = result.map((row) => ({
+      anio: row.ANO,
+      precioBase: row.PRECIO_BASE,
+      valorDepreciado: row.VALOR_DEPRECIADO,
+      perdidaAcumulada: row.PERDIDA_ACUMULADA,
+      perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
+    }));
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(
+      "Error al obtener reporte de depreciación de vehiculos por vencer",
+      error,
+    );
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener reporte de depreciación de vehiculos por vencer",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const deprecatedVehicleById = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const id = Number(req.params.id);
+
+  if(isNaN(id)) return res.status(400).json({message: "El parametro id debe ser numérico"})
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      WITH RECURSIVE ANIOS (ANIO) AS (
+        SELECT MIN(PV.ANO)
+        FROM ${SCHEMA_BD}.PO_VEHICULO PV
+
+        UNION ALL
+
+        SELECT ANIO + 1
+        FROM ANIOS
+        WHERE ANIO < YEAR(CURRENT DATE)
+      )
+
+      SELECT 
+          A.ANIO,
+          CAST(SUM(
+              T.PRECIO_BASE * (1 - ((A.ANIO - T.ANO) * 0.20))
+          ) AS DECIMAL(15,2)) AS TOTAL_VALOR_DEPRECIADO
+      FROM (
+          SELECT 
+              TLD.ID AS ID_DET_LEA,
+              PV.ANO,
+
+              CAST(COALESCE(AVG(COSTOS.COSTO_VEHICULO), 0) AS DECIMAL(10, 2)) AS PRECIO_BASE
+
+          FROM ${SCHEMA_BD}.TBL_LEASING_DET TLD
+
+          INNER JOIN ${SCHEMA_BD}.TBL_LEASING_CAB TLC
+              ON TLD.ID_LEA_CAB = TLC.ID
+
+          INNER JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+              ON TLD.ID_VEH = PV.ID
+
+          LEFT JOIN (
+              SELECT 
+                  TC.ID AS ID_REF,
+                  TD.MODELO,
+                  TD.PRECIO_VEH AS COSTO_VEHICULO,
+                  'P' AS TIPO
+              FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+              INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_DET TD
+                  ON TC.ID = TD.ID_CON_CAB    
+
+              UNION ALL
+
+              SELECT 
+                  TDOC.ID AS ID_REF,
+                  TDD.MODELO,
+                  TDD.PRECIO_VEH AS COSTO_VEHICULO,
+                  'H' AS TIPO
+              FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDOC
+              INNER JOIN ${SCHEMA_BD}.TBLDOCUMENTO_DET TDD
+                  ON TDOC.ID = TDD.ID_CON_CAB
+          ) COSTOS
+              ON COSTOS.ID_REF = TLC.ID_CONTRATO
+              AND COSTOS.TIPO = TLC.TIPCON
+              AND COSTOS.MODELO = PV.IDMOD 
+
+          WHERE TLD.ID = ?
+
+          GROUP BY 
+              TLD.ID,
+              PV.ANO
+      ) T
+
+      INNER JOIN ANIOS A
+          ON A.ANIO >= T.ANO
+
+      GROUP BY A.ANIO
+      ORDER BY A.ANIO
+    `
+
+    const result = await cn.query(sql, [id])
+
+    const cleanedResult = result.map(row => ({
+      anio: row.ANIO,
+      total: row.TOTAL_VALOR_DEPRECIADO,
+    }))
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(
+      "Error al obtener reporte de depreciación de vehiculos por id",
+      error,
+    );
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener reporte de depreciación de vehiculos por id",
+    });
+  } finally {
+    if(cn) await cn.close();
+  }
+}
 
 const contVehiculeByClient = async (req, res) => {
   const { id: idUser } = req.user;
@@ -1114,4 +1384,6 @@ module.exports = {
   contComparationDays,
   contTotalPriceByModel,
   depecratedVehicleExpires,
+  depecratedVehicleToExpires,
+  deprecatedVehicleById
 };
