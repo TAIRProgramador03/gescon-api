@@ -694,6 +694,7 @@ const detailAssignByLeasing = async (req, res) => {
         1: "SOCAVON",
         2: "CIUDAD",
         3: "SEVERO",
+        4: "PENDIENTE",
       }),
       año: row.ANO,
       color: row.COLOR.trim() ?? "",

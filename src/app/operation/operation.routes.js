@@ -11,6 +11,7 @@ const {
   listReassign,
   getReassignById,
   uploalMasiveRecords,
+  listVehNoPending,
 } = require("./operation.controller.js");
 
 Router.get("/operacionesAsig", authenticateToken, listOperations);
@@ -19,6 +20,7 @@ Router.post("/insertaAsignacion", authenticateToken, insertOperation);
 Router.post("/validaContratoCantidad", authenticateToken, valideAssign);
 Router.put("/actualizarAsignacion/:id", authenticateToken, updateAssign);
 Router.get("/vehiculosPendientesReasginar", authenticateToken, listVehPending);
+Router.get("/vehiculosReasginar", authenticateToken, listVehNoPending);
 Router.post("/traspasarOperacion/:id", authenticateToken, changeOperation)
 Router.get("/historialMovimientos/:id", authenticateToken, listReassign)
 Router.get("/obtenerReasignacion/:id", authenticateToken, getReassignById)

@@ -775,6 +775,7 @@ const listVehPending = async (req, res) => {
         TAD.CLASE_CONTRATO,
         TAD.TARIFA,
         TAD.CONDICION,
+        TAD.TP_TERRENO,
         TAD.ID_OPE AS ID_OPE_ASIGN,
         PA.SECOPE AS ID_OPE_ACTUAL,
         PO.DESCRIPCION AS OPE_ASIGN, 
@@ -825,6 +826,120 @@ const listVehPending = async (req, res) => {
       nroContrato: row.CONTRATO.trim(),
       tarifa: row.TARIFA,
       condicion: row.CONDICION.trim(),
+      terreno: row.TP_TERRENO,
+    }));
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: `Error al obtener las placas pendientes de reasignación: ${error}`,
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
+const listVehNoPending = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { idCli, idOpe } = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    let filtros = "";
+    const params = [];
+
+    if (idCli) {
+      filtros += "AND TAC.ID_CLIENTE = ?";
+      params.push(idCli);
+    }
+
+    if (idOpe) {
+      filtros += "AND TAD.ID_OPE = ?";
+      params.push(idOpe);
+    }
+
+    const sql = `
+      SELECT 
+        TAD.ID, 
+        TAD.ID_VEH, 
+        TAD.PLACA,
+        TAD.ID_CONTRATO,
+        COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO,
+        COALESCE(TC.DURACION, TD.DURACION) AS PLAZO,
+        TAD.CLASE_CONTRATO,
+        TAD.TARIFA,
+        TAD.CONDICION,
+        TAD.TP_TERRENO,
+        TAD.ID_OPE AS ID_OPE_ASIGN,
+        PA.SECOPE AS ID_OPE_ACTUAL,
+        PO.DESCRIPCION AS OPE_ASIGN, 
+        PO3.DESCRIPCION AS OPE_ACTUAL,
+        PO3.IDCLI AS ID_CLIENTE_OPE,
+        PA.DESDE AS FECHA_REF,
+        TAD.FECHA_INI AS FECHA_INICIO,
+        TAD.FECHA_FIN AS FECHA_FIN,
+        TAD.ARCHIVO_PDF AS ACTA
+      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+      JOIN (
+        SELECT 
+          IDVEH,
+          SECOPE,
+          IDOPE,
+          DESDE,
+          ROW_NUMBER() OVER (
+            PARTITION BY IDVEH 
+            ORDER BY ID DESC
+          ) AS RN
+        FROM ${SCHEMA_BD}.PO_ASIGNACION
+      ) PA 
+      ON TAD.ID_VEH = PA.IDVEH
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+      ON PO.ID = TAD.ID_OPE 
+      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
+      ON PO3.ID = PA.SECOPE
+      JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC 
+      ON TAD.ID_ASIGNACION = TAC.ID
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
+      ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+      ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
+      WHERE PA.RN = 1 AND TAD.ID_OPE = PA.SECOPE ${filtros}
+      ORDER BY TAD.ID ASC
+    `;
+
+    const result = await cn.query(sql, params);
+
+    const cleanedResult = result.map((row) => ({
+      idAsign: row.ID,
+      idVeh: row.ID_VEH,
+      placa: row.PLACA.trim(),
+      idOpeAsign: row.ID_OPE_ASIGN,
+      opeAsign: row.OPE_ASIGN.trim(),
+      idOpeActual: row.ID_OPE_ACTUAL,
+      opeActual: row.OPE_ACTUAL.trim(),
+      idClienteOpe: row.ID_CLIENTE_OPE.trim(),
+      fechaRef: row.FECHA_REF,
+      idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
+      nroContrato: row.CONTRATO.trim(),
+      plazoContrato: row.PLAZO.trim(),
+      fechaInicio: row.FECHA_INICIO.trim(),
+      fechaFin: row.FECHA_FIN.trim(),
+      tarifa: row.TARIFA,
+      condicion: row.CONDICION.trim(),
+      terreno: row.TP_TERRENO,
+      acta: row.ACTA ? row.ACTA.trim() : null,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -859,13 +974,17 @@ const changeOperation = async (req, res) => {
 
   const {
     beforeOperation,
-    operation,
-    date,
-    file,
     condition,
     contract,
+    date,
+    dateFinish,
+    file,
+    isChecked,
+    operation,
+    observation,
     tariff,
-    observation
+    terrain,
+    timeLine,
   } = req.body;
 
   const pool = await connection();
@@ -876,7 +995,7 @@ const changeOperation = async (req, res) => {
 
   try {
     const sqlFind = `
-      SELECT ID_CONTRATO, CONDICION, CLASE_CONTRATO, TARIFA, ARCHIVO_PDF FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+      SELECT ID_CONTRATO, CONDICION, CLASE_CONTRATO, TARIFA, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
       WHERE TAD.ID = ?
       FETCH FIRST 1 ROW ONLY
     `;
@@ -889,70 +1008,140 @@ const changeOperation = async (req, res) => {
         message: "No se encontro la asignación en el sistema",
       });
 
-    const sqlChangeOpe = `
-      UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-      SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?
-      WHERE ID = ?
-    `;
-
-    const sqlInsertReassign = `
-      INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, FECHA_REASIGNACION,  OBSERVACION, ID_ASIGNACION)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    const oldAssign = {
-      id,
-      idContrato: findAssign[0].ID_CONTRATO,
-      tipo: findAssign[0].CLASE_CONTRATO.trim(),
-      condicion: findAssign[0].CONDICION.trim(),
-      tarifa: findAssign[0].TARIFA,
-      archivo: findAssign[0].ARCHIVO_PDF,
-    };
-
-    const newAssing = {
-      id,
-      idContrato: Number(contract.split("_")[1]),
-      tipo: contract.split("_")[0],
-      condicion: condition,
-      tarifa: Number(tariff),
-      archivo: validFile,
-    };
-
     // await cn.beginTransaction();
 
-    await cn.query(sqlChangeOpe, [
-      operation,
-      newAssing.idContrato,
-      newAssing.condicion,
-      newAssing.tipo,
-      newAssing.tarifa,
-      newAssing.archivo,
-      id,
-    ]);
+    if (isChecked) {
+      const sqlChangeOpe = `
+        UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?
+        WHERE ID = ?
+      `;
 
-    await cn.query(sqlInsertReassign, [
-      beforeOperation,
-      operation,
-      oldAssign.idContrato,
-      newAssing.idContrato,
-      oldAssign.tarifa,
-      newAssing.tarifa,
-      oldAssign.condicion,
-      newAssing.condicion,
-      oldAssign.archivo,
-      newAssing.archivo,
-      oldAssign.tipo,
-      newAssing.tipo,
-      convertDate,
-      observation,
-      id,
-    ]);
+      const sqlInsertReassign = `
+        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
 
-    if (file && validFile) {
-      await moveFile(file, validFile);
+      const oldAssign = {
+        id,
+        idContrato: findAssign[0].ID_CONTRATO,
+        tipo: findAssign[0].CLASE_CONTRATO.trim(),
+        condicion: findAssign[0].CONDICION.trim(),
+        tarifa: findAssign[0].TARIFA,
+        terreno: String(findAssign[0].TP_TERRENO),
+        archivo: findAssign[0].ARCHIVO_PDF,
+      };
+
+      const newAssing = {
+        id,
+        idContrato: Number(contract.split("_")[1]),
+        tipo: contract.split("_")[0],
+        condicion: condition,
+        tarifa: Number(tariff),
+        terreno: terrain,
+        archivo: findAssign[0].ARCHIVO_PDF,
+      };
+
+      await cn.query(sqlChangeOpe, [
+        operation,
+        newAssing.idContrato,
+        newAssing.condicion,
+        newAssing.tipo,
+        newAssing.tarifa,
+        newAssing.terreno,
+        convertDate,
+        convertirFecha(dateFinish),
+        id,
+      ]);
+
+      await cn.query(sqlInsertReassign, [
+        beforeOperation,
+        operation,
+        oldAssign.idContrato,
+        newAssing.idContrato,
+        oldAssign.tarifa,
+        newAssing.tarifa,
+        oldAssign.condicion,
+        newAssing.condicion,
+        oldAssign.archivo,
+        newAssing.archivo,
+        oldAssign.tipo,
+        newAssing.tipo,
+        oldAssign.terreno,
+        newAssing.terreno,
+        convertDate,
+        observation,
+        id,
+      ]);
+    } else {
+      const sqlChangeOpe = `
+        UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?
+        WHERE ID = ?
+      `;
+
+      const sqlInsertReassign = `
+        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      const oldAssign = {
+        id,
+        idContrato: findAssign[0].ID_CONTRATO,
+        tipo: findAssign[0].CLASE_CONTRATO.trim(),
+        condicion: findAssign[0].CONDICION.trim(),
+        tarifa: findAssign[0].TARIFA,
+        terreno: String(findAssign[0].TP_TERRENO),
+        archivo: findAssign[0].ARCHIVO_PDF,
+      };
+
+      const newAssing = {
+        id,
+        idContrato: Number(contract.split("_")[1]),
+        tipo: contract.split("_")[0],
+        condicion: condition,
+        tarifa: Number(tariff),
+        terreno: terrain,
+        archivo: validFile,
+      };
+
+      await cn.query(sqlChangeOpe, [
+        operation,
+        newAssing.idContrato,
+        newAssing.condicion,
+        newAssing.tipo,
+        newAssing.tarifa,
+        newAssing.archivo,
+        newAssing.terreno,
+        id,
+      ]);
+
+      await cn.query(sqlInsertReassign, [
+        beforeOperation,
+        operation,
+        oldAssign.idContrato,
+        newAssing.idContrato,
+        oldAssign.tarifa,
+        newAssing.tarifa,
+        oldAssign.condicion,
+        newAssing.condicion,
+        oldAssign.archivo,
+        newAssing.archivo,
+        oldAssign.tipo,
+        newAssing.tipo,
+        oldAssign.terreno,
+        newAssing.terreno,
+        convertDate,
+        observation,
+        id,
+      ]);
+
+      if (file && validFile) {
+        await moveFile(file, validFile);
+      }
     }
 
-    await cn.commit();
+    // await cn.commit();
 
     return res
       .status(201)
@@ -1058,6 +1247,8 @@ const getReassignById = async (req, res) => {
         TR.SEC_TARIFA AS TARIFA_NUEVA,
         TR.CONDICION AS CONDICION_ANTIGUA,
         TR.SEC_CONDICION AS CONDICION_NUEVA,
+        TR.TERRENO AS TERRENO_ANTIGUO,
+        TR.SEC_TERRENO TERRENO_NUEVO,
         TR.TIPO_CONTRATO AS TIPO_ANTERIOR,
         TR.SEC_TIPO_CONTRATO AS TIPO_NUEVO,
         TR.FECHA_REASIGNACION,
@@ -1104,6 +1295,13 @@ const getReassignById = async (req, res) => {
           2: "Logística",
           3: "Pendiente",
         }),
+        terreno: transformType(result[0].TERRENO_ANTIGUO.trim(), {
+          0: "Superficie",
+          1: "Socavón",
+          2: "Ciudad",
+          3: "Severo",
+          4: "Pendiente",
+        }),
         tipo: result[0].TIPO_ANTERIOR.trim(),
         archivo: result[0].ARCHIVO_ANTERIOR,
       },
@@ -1116,6 +1314,13 @@ const getReassignById = async (req, res) => {
           1: "Retén",
           2: "Logística",
           3: "Pendiente",
+        }),
+        terreno: transformType(result[0].TERRENO_NUEVO.trim(), {
+          0: "Superficie",
+          1: "Socavón",
+          2: "Ciudad",
+          3: "Severo",
+          4: "Pendiente",
         }),
         tipo: result[0].TIPO_NUEVO.trim(),
         archivo: result[0].ARCHIVO_NUEVO,
@@ -1366,6 +1571,7 @@ module.exports = {
   valideAssign,
   updateAssign,
   listVehPending,
+  listVehNoPending,
   changeOperation,
   listReassign,
   getReassignById,
