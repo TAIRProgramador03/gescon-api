@@ -1366,7 +1366,7 @@ const getReassignById = async (req, res) => {
 
 //     const sql = `
 //       SELECT ID, PLACA
-//       FROM SPEED400AT.TBL_ASIGNACION_DET
+//       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
 //       WHERE PLACA = ? AND ARCHIVO_PDF IS NULL
 //       FETCH FIRST 1 ROW ONLY
 //     `;
@@ -1416,7 +1416,7 @@ const getReassignById = async (req, res) => {
 //     const notUpload = [];
 
 //     const sqlUpd = `
-//       UPDATE SPEED400AT.TBL_ASIGNACION_DET
+//       UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
 //       SET ARCHIVO_PDF = ?
 //       WHERE ID = ?
 //     `
@@ -1484,7 +1484,7 @@ const uploalMasiveRecords = async (req, res) => {
 
     const sql = `
       SELECT ID, PLACA
-      FROM SPEED400AT.TBL_ASIGNACION_DET
+      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
       WHERE PLACA = ? AND ARCHIVO_PDF IS NULL 
       FETCH FIRST 1 ROW ONLY
     `;
@@ -1513,7 +1513,7 @@ const uploalMasiveRecords = async (req, res) => {
     const notUpload = [];
 
     const sqlUpd = `
-      UPDATE SPEED400AT.TBL_ASIGNACION_DET
+      UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
       SET ARCHIVO_PDF = ?
       WHERE ID = ?
     `;
