@@ -1,5 +1,5 @@
 const { SCHEMA_BD } = require("../../shared/conf.js");
-const { decodeString, convertirFecha } = require("../../shared/utils.js");
+const { decodeString, convertirFecha, transformType } = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 
 const listVehicles = async (req, res) => {
@@ -50,21 +50,21 @@ const tableVehicles = async (req, res) => {
     // Consulta los contratos asociados al cliente
     // A.INIVAL1='0' AND
     // const query = `
-    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO 
-    //   FROM ${SCHEMA_BD}.PO_VEHICULO A 
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN 
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID 
-    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA 
-    //   LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH 
+    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO
+    //   FROM ${SCHEMA_BD}.PO_VEHICULO A
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID
+    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA
+    //   LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH
     //   WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC
     // `;
 
     // const query = `
-    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO 
+    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO
     //   FROM ${SCHEMA_BD}.PO_VEHICULO A
     //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID 
-    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA 
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID
+    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA
     //   LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
     //   ON A.ID = tad.ID_VEH
     //   WHERE tad.ID_OPE IS NULL AND A.SECOPE NOT IN (211, 238, 109, 162) ORDER BY A.ID DESC
@@ -733,7 +733,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-        condicion: row.CONDICION ? row.CONDICION : ""
+        condicion: row.CONDICION ? row.CONDICION : "",
       }));
 
       return res.status(200).json(convertResult);
@@ -771,7 +771,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-        condicion: row.CONDICION ? row.CONDICION : ""
+        condicion: row.CONDICION ? row.CONDICION : "",
       }));
 
       return res.status(200).json(convertResult);
@@ -809,7 +809,7 @@ const listPlateTraceability = async (req, res) => {
         tarifa: row.TARIFA,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-        condicion: row.CONDICION ? row.CONDICION : ""
+        condicion: row.CONDICION ? row.CONDICION : "",
       }));
 
       return res.status(200).json(convertResult);
@@ -825,6 +825,106 @@ const listPlateTraceability = async (req, res) => {
   }
 };
 
+const listPlateByRegion = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const {region, clienteId} = req.query;
+
+  if(!region) return res.status(400).json({success: false, message: "El parametro region es obligatorio"})
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+
+    const sql = `
+      SELECT 
+        TAD.PLACA, 
+        PM.DESCRIPCION AS MARCA, 
+        PM2.DESCRIPCION AS MODELO, 
+        TAD.TP_TERRENO AS TERRENO, 
+        TAD.CONDICION AS CONDICION,
+        PV.ANO AS ANIO,
+        TAD.FECHA_INI AS FECHA_INICIO, 
+        TAD.FECHA_FIN AS FECHA_FIN,
+        PO.DESCRIPCION AS OPERACION,
+        CL.CLINOM AS CLIENTE
+      FROM SPEED400AT.TBL_ASIGNACION_DET TAD 
+      LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+        ON TAD.ID_OPE = PO.ID
+      LEFT JOIN SPEED400AT.TBL_UBICACION_OPE tuo 
+        ON TUO.ID_OPE = PO.ID
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac 
+        ON TAD.ID_ASIGNACION = TAC.ID
+      LEFT JOIN SPEED400AT.PO_VEHICULO pv 
+        ON TAD.ID_VEH = PV.ID
+      LEFT JOIN SPEED400AT.PO_MARCA pm 
+        ON PV.IDMAR = PM.ID
+      LEFT JOIN SPEED400AT.PO_MODELO pm2 
+        ON PV.IDMOD = PM2.ID
+      LEFT JOIN (
+        SELECT DISTINCT A.IDCLI, B.CLINOM 
+        FROM SPEED400AT.PO_OPERACIONES A 
+        INNER JOIN SPEED400AT.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+        WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+      ) CL
+        ON TAC.ID_CLIENTE = CL.IDCLI
+      WHERE TUO.DEPARTAMENTO = ? ${clienteId ? "AND TAC.ID_CLIENTE = ?" : ""}
+    `;
+
+    const params = [region.toUpperCase()]
+
+    if(clienteId) {
+      params.push(clienteId)
+    }
+
+    const result = await cn.query(sql, params)
+
+    const cleanedResult = result.map(row => ({
+      placa: row.PLACA.trim(),
+      marca: row.MARCA.trim(),
+      modelo: row.MODELO.trim(),
+      terreno: transformType(row.TERRENO, {
+        0: "Superficie",
+        1: "Socavón",
+        2: "Ciudad",
+        3: "Severo",
+        4: "Pendiente"
+      }),
+      condicion: transformType(row.CONDICION, {
+        0: "Titular",
+        1: "Retén",
+        2: "Logística",
+        3: "Pendiente"
+      }),
+      anio: row.ANIO,
+      fechaIni: row.FECHA_INICIO.trim(),
+      fechaFin: row.FECHA_FIN.trim(),
+      operacion: row.OPERACION.trim(),
+      cliente: row.CLIENTE.trim()
+    }))
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener vehiculos por region", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener vehiculos por region",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   listVehicles,
   tableVehicles,
@@ -834,4 +934,5 @@ module.exports = {
   listModelGen,
   listYearByModelGen,
   listPlateTraceability,
+  listPlateByRegion
 };

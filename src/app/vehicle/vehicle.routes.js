@@ -7,7 +7,8 @@ const {
   listVehiclesByContract,
   listModelGen,
   listYearByModelGen,
-  listPlateTraceability
+  listPlateTraceability,
+  listPlateByRegion
 } = require("./vehicle.controller.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
@@ -19,5 +20,6 @@ Router.get("/vehiculosPorContrato", authenticateToken, listVehiclesByContract)
 Router.get("/modedosGenericos", authenticateToken, listModelGen);
 Router.get("/aniosPorModelo", authenticateToken, listYearByModelGen);
 Router.get("/trazabilidadPlaca", authenticateToken, listPlateTraceability);
+Router.get("/vehiculosPorRegion", authenticateToken, listPlateByRegion);
 
 module.exports = Router;

@@ -1017,7 +1017,8 @@ const depecratedVehicleToExpires = async (req, res) => {
     );
     return res.status(500).json({
       success: false,
-      message: "Error al obtener reporte de depreciación de vehiculos por vencer",
+      message:
+        "Error al obtener reporte de depreciación de vehiculos por vencer",
     });
   } finally {
     if (cn) await cn.close();
@@ -1036,7 +1037,10 @@ const deprecatedVehicleById = async (req, res) => {
 
   const id = Number(req.params.id);
 
-  if(isNaN(id)) return res.status(400).json({message: "El parametro id debe ser numérico"})
+  if (isNaN(id))
+    return res
+      .status(400)
+      .json({ message: "El parametro id debe ser numérico" });
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -1111,14 +1115,14 @@ const deprecatedVehicleById = async (req, res) => {
 
       GROUP BY A.ANIO
       ORDER BY A.ANIO
-    `
+    `;
 
-    const result = await cn.query(sql, [id])
+    const result = await cn.query(sql, [id]);
 
-    const cleanedResult = result.map(row => ({
+    const cleanedResult = result.map((row) => ({
       anio: row.ANIO,
       total: row.TOTAL_VALOR_DEPRECIADO,
-    }))
+    }));
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -1131,9 +1135,9 @@ const deprecatedVehicleById = async (req, res) => {
       message: "Error al obtener reporte de depreciación de vehiculos por id",
     });
   } finally {
-    if(cn) await cn.close();
+    if (cn) await cn.close();
   }
-}
+};
 
 const contVehiculeByClient = async (req, res) => {
   const { id: idUser } = req.user;
@@ -1374,6 +1378,65 @@ const contTotalPriceByModel = async (req, res) => {
   }
 };
 
+const contTotalVehicleMap = async (req, res) => {
+  const { id: idUser } = req.user;
+
+  // Validación de token y sus datos
+  if (!idUser) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token inválido o no proporcionado" });
+  }
+
+  const { clienteId } = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sentences = clienteId ? "WHERE TAC.ID_CLIENTE = ?" : "";
+    const params = clienteId ? [clienteId] : [];
+
+    const sql = `
+      SELECT 
+        COALESCE(TUO.DEPARTAMENTO, 'NO IDENT') AS DEPARTAMENTO,
+        COUNT(*) AS TOTAL_PLACAS,
+        COUNT(DISTINCT PO.ID) AS TOTAL_OPERACIONES
+      FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+      LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+        ON TAD.ID_OPE = PO.ID
+      LEFT JOIN SPEED400AT.TBL_UBICACION_OPE TUO
+        ON PO.ID = TUO.ID_OPE 
+      LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB TAC
+        ON TAD.ID_ASIGNACION = TAC.ID
+      ${sentences}
+      GROUP BY COALESCE(TUO.DEPARTAMENTO, 'NO IDENT')
+      ORDER BY DEPARTAMENTO
+    `;
+
+    const result = await cn.query(sql, params);
+
+    const mapResult = result.reduce((acc, row) => {
+      acc[row.DEPARTAMENTO] = {
+        vehiculos: Number(row.TOTAL_PLACAS),
+        operaciones: Number(row.TOTAL_OPERACIONES),
+      };
+
+      return acc;
+    }, {});
+
+    return res.status(200).json(mapResult);
+  } catch (error) {
+    console.error("Error al obtener total de vehiculos para mapa", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener total de vehiculos para mapa",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   contVehicleFeet,
   contVehicleLeasings,
@@ -1385,5 +1448,6 @@ module.exports = {
   contTotalPriceByModel,
   depecratedVehicleExpires,
   depecratedVehicleToExpires,
-  deprecatedVehicleById
+  deprecatedVehicleById,
+  contTotalVehicleMap,
 };
