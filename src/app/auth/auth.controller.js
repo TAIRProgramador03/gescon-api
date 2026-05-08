@@ -21,7 +21,7 @@ const login = async (req, res) => {
 
     // VALIDAR SI EXISTE USUARIO
     const sql = `
-      SELECT * FROM ${SCHEMA_BD}.T_US_GC U
+      SELECT U.ID, U.USU, U.CLV, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
       JOIN ${SCHEMA_BD}.T_RL_GC R
       ON U.ID_RL = R.ID
       WHERE USU = ?

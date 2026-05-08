@@ -201,17 +201,12 @@ const listRolesGesoper = async (req, res) => {
 };
 
 const createRole = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
+  const { user } = req.user;
 
   const body = req.body;
 
   try {
-    const create = await postRole(body);
+    const create = await postRole(body, user);
 
     return res.status(201).json(create);
   } catch (error) {

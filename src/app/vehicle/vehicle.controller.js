@@ -474,8 +474,11 @@ const listPlateTraceability = async (req, res) => {
         filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
         filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
       } else if (status == "I") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
+        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
+        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
+      } else if (status == "P") {
+        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
       } else if (status == "V") {
         filtrosA += " AND V.ID_OPE = 109";
         filtrosB += " AND V.ID_OPE = 109";
@@ -508,7 +511,7 @@ const listPlateTraceability = async (req, res) => {
           CC.NRO_CONTRATO AS CONTRATO, 
           CC.DURACION AS PLAZO, 
           AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN, 
+          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -573,7 +576,7 @@ const listPlateTraceability = async (req, res) => {
           DC.NRO_DOC AS CONTRATO,
           DC.DURACION AS PLAZO, 
           AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN, 
+          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -649,7 +652,7 @@ const listPlateTraceability = async (req, res) => {
           DC.NRO_DOC AS CONTRATO,
           DC.DURACION AS PLAZO, 
           AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN, 
+          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -725,8 +728,8 @@ const listPlateTraceability = async (req, res) => {
         fechaIni: row.FECHA_ENTREGA
           ? convertirFecha(row.FECHA_ENTREGA.trim())
           : "Sin fecha",
-        fechaFin: row.FECHA_FIN
-          ? convertirFecha(row.FECHA_FIN.trim())
+        fechaFin: row.FECHA_DEVOLUCION
+          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
           : "Sin fecha",
         fechaIniCon: row.FECHA_INI_CONTRATO,
         fechaFinCon: row.FECHA_FIN_CONTRATO,
@@ -763,8 +766,8 @@ const listPlateTraceability = async (req, res) => {
         fechaIni: row.FECHA_ENTREGA
           ? convertirFecha(row.FECHA_ENTREGA.trim())
           : "Sin fecha",
-        fechaFin: row.FECHA_FIN
-          ? convertirFecha(row.FECHA_FIN.trim())
+        fechaFin: row.FECHA_DEVOLUCION
+          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
           : "Sin fecha",
         fechaIniCon: row.FECHA_INI_CONTRATO,
         fechaFinCon: row.FECHA_FIN_CONTRATO,
@@ -801,8 +804,8 @@ const listPlateTraceability = async (req, res) => {
         fechaIni: row.FECHA_ENTREGA
           ? convertirFecha(row.FECHA_ENTREGA.trim())
           : "Sin fecha",
-        fechaFin: row.FECHA_FIN
-          ? convertirFecha(row.FECHA_FIN.trim())
+        fechaFin: row.FECHA_DEVOLUCION
+          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
           : "Sin fecha",
         fechaIniCon: row.FECHA_INI_CONTRATO,
         fechaFinCon: row.FECHA_FIN_CONTRATO,

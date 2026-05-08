@@ -184,7 +184,7 @@ const getNewUsers = async () => {
   }
 };
 
-const postUser = async (data) => {
+const postUser = async (data, username) => {
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -192,11 +192,11 @@ const postUser = async (data) => {
     await cn.beginTransaction();
 
     const sql = `
-      INSERT INTO ${SCHEMA_BD}.T_US_GC (USU, COD_EMP, CLV, ID_RL)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO ${SCHEMA_BD}.T_US_GC (USU, COD_EMP, CLV, ID_RL, CREADO_POR, ACTUALIZADO_POR)
+      VALUES (?, ?, ?, ?, ?, ?)
     `;
 
-    await cn.query(sql, [data.usuario, data.codEmp, data.clave, data.rol]);
+    await cn.query(sql, [data.usuario, data.codEmp, data.clave, data.rol, username, username]);
 
     await cn.commit();
 
@@ -312,7 +312,7 @@ const getRolesGesoper = async () => {
   }
 };
 
-const postRole = async (data) => {
+const postRole = async (data, username) => {
   const pool = await connection();
   const cn = await pool.connect();
   try {
@@ -326,11 +326,11 @@ const postRole = async (data) => {
     const roleId = resultId[0].ID;
 
     const sqlRole = `
-      INSERT INTO ${SCHEMA_BD}.T_RL_GC (ID, DESCRIPCION, DESCRIPCION2)
-      VALUES (?, ?, ?)
+      INSERT INTO ${SCHEMA_BD}.T_RL_GC (ID, DESCRIPCION, DESCRIPCION2, CREADO_POR, ACTUALIZADO_POR)
+      VALUES (?, ?, ?, ?, ?)
     `;
 
-    await cn.query(sqlRole, [roleId, data.name, data.description]);
+    await cn.query(sqlRole, [roleId, data.name, data.description, username, username]);
 
     const sqlPermissions = `
       INSERT INTO ${SCHEMA_BD}.T_RL_PS_GC (ID_RL, ID_PS)

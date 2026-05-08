@@ -490,6 +490,92 @@ const contLeasings = async (req, res) => {
   }
 };
 
+const diferenceContractLeasing = async (req, res) => {
+  
+  const {clienteId} = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      SELECT 
+        TC.NRO_CONTRATO, 
+        DATE(
+          SUBSTR(TC.FECHA_FIRMA, 1, 4) || '-' ||
+          SUBSTR(TC.FECHA_FIRMA, 5, 2) || '-' ||
+          SUBSTR(TC.FECHA_FIRMA, 7, 2)
+        ) AS FECHA_FIRMA_CONTRATO, 
+        DATE(
+          SUBSTR(TC.FECHA_FIRMA, 1, 4) || '-' ||
+          SUBSTR(TC.FECHA_FIRMA, 5, 2) || '-' ||
+          SUBSTR(TC.FECHA_FIRMA, 7, 2)
+        ) + CAST(TC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+        CAST(TC.DURACION AS INTEGER) / 12 AS PLAZO_ANIOS_CONTRATO,
+        TLC.NRO_LEASING, 
+        DATE(
+          SUBSTR(TLC.FECHA_INI, 1, 4) || '-' ||
+          SUBSTR(TLC.FECHA_INI, 5, 2) || '-' ||
+          SUBSTR(TLC.FECHA_INI, 7, 2)
+        ) AS FECHA_INICIO_LEASING, 
+        DATE(
+          SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' ||
+          SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' ||
+          SUBSTR(TLC.FECHA_FIN, 7, 2)
+        ) AS FECHA_FIN_LEASING,
+        ROUND(
+          MONTHS_BETWEEN(
+              DATE(
+                SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' ||
+                SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' ||
+                SUBSTR(TLC.FECHA_FIN, 7, 2)
+              ),
+          
+              DATE(
+                SUBSTR(TLC.FECHA_INI, 1, 4) || '-' ||
+                SUBSTR(TLC.FECHA_INI, 5, 2) || '-' ||
+                SUBSTR(TLC.FECHA_INI, 7, 2)
+              )
+          ) / 12
+        ) AS PLAZO_ANIOS_LEASING
+      FROM SPEED400AT.TBLCONTRATO_CAB tc 
+      LEFT JOIN SPEED400AT.TBL_LEASING_CAB tlc 
+      ON TC.ID = TLC.ID_CONTRATO AND TLC.TIPCON LIKE '%P%'
+      WHERE TLC.TIPCON LIKE '%P%' ${clienteId ? "AND TC.ID_CLIENTE = ?" : ""}
+      ORDER BY TC.NRO_CONTRATO
+    `;
+
+    const result = await cn.query(sql, clienteId ? [clienteId] : []);
+
+    const cleanedResult = result.map(row => ({
+      nroContrato: row.NRO_CONTRATO.trim(),
+      fechaFirma: row.FECHA_FIRMA_CONTRATO,
+      fechaFinContrato: row.FECHA_FIN_CONTRATO,
+      aniosContrato: row.PLAZO_ANIOS_CONTRATO,
+      nroLeasing: row.NRO_LEASING.trim(),
+      fechaIniLeasing: row.FECHA_INICIO_LEASING,
+      fechaFinLeasing: row.FECHA_FIN_LEASING,
+      aniosLeasing: row.PLAZO_ANIOS_LEASING
+    }))
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error(
+      "Error al obtener reporte de diferencia entre contrato y lesing: ",
+      error,
+    );
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          "Error al obtener reporte de diferencia entre contrato y lesing",
+      });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 const listVehicleLeasingExpire = async (req, res) => {
   const { id: idUser } = req.user;
 
@@ -790,7 +876,54 @@ const depecratedVehicleExpires = async (req, res) => {
                     )
                 )
               )
-          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO
+          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO,
+                    CAST(
+              SUM(
+                (
+                    A.PRECIO_BASE * (
+                        1 - CASE 
+                            WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
+                            ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                        END
+                    )
+                )
+                -
+                (
+                    A.PRECIO_BASE * (
+                        1 - CASE 
+                            WHEN (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20 > 1 THEN 1
+                            ELSE (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20
+                        END
+                    )
+                )
+              )
+          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO,
+          CAST(
+            SUM(
+                A.PRECIO_BASE *
+                CASE
+                    WHEN (
+                        1 - (
+                            CASE
+                                WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1
+                                THEN 1
+                                ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                            END
+                        )
+                    ) <= 0
+                    THEN 0.20
+                    ELSE (
+                        1 - (
+                            CASE
+                                WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1
+                                THEN 1
+                                ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                            END
+                        )
+                    )
+                END
+            )
+          AS DECIMAL(10,2)) AS VALOR_PROYECTADO_VENTA
       FROM (
         SELECT 
               TLD.ID,
@@ -846,6 +979,7 @@ const depecratedVehicleExpires = async (req, res) => {
       valorDepreciado: row.VALOR_DEPRECIADO,
       perdidaAcumulada: row.PERDIDA_ACUMULADA,
       perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
+      ventaProyectada: row.VALOR_PROYECTADO_VENTA,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -951,7 +1085,33 @@ const depecratedVehicleToExpires = async (req, res) => {
                     )
                 )
               )
-          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO
+          AS DECIMAL(10,2)) AS PERDIDA_PROXIMO_ANIO,
+          CAST(
+            SUM(
+                A.PRECIO_BASE *
+                CASE
+                    WHEN (
+                        1 - (
+                            CASE
+                                WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1
+                                THEN 1
+                                ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                            END
+                        )
+                    ) <= 0
+                    THEN 0.20
+                    ELSE (
+                        1 - (
+                            CASE
+                                WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1
+                                THEN 1
+                                ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
+                            END
+                        )
+                    )
+                END
+            )
+          AS DECIMAL(10,2)) AS VALOR_PROYECTADO_VENTA
       FROM (
         SELECT 
               TLD.ID,
@@ -1007,6 +1167,7 @@ const depecratedVehicleToExpires = async (req, res) => {
       valorDepreciado: row.VALOR_DEPRECIADO,
       perdidaAcumulada: row.PERDIDA_ACUMULADA,
       perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
+      ventaProyectada: row.VALOR_PROYECTADO_VENTA,
     }));
 
     return res.status(200).json(cleanedResult);
@@ -1437,10 +1598,72 @@ const contTotalVehicleMap = async (req, res) => {
   }
 };
 
+const notifications = async (req, res) => {
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      SELECT
+      (
+          SELECT COUNT(*)
+          FROM SPEED400AT.TBLCONTRATO_CAB TC
+          WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
+      ) AS TOTAL_CONTRATOS,
+      (
+          SELECT COUNT(*)
+          FROM SPEED400AT.TBLDOCUMENTO_CAB TD
+          WHERE TD.NRO_DOC LIKE 'DPEN-%'
+      ) AS TOTAL_DOCUMENTOS,
+      (
+          SELECT COUNT(*)
+          FROM (
+              SELECT 
+                  TAD.ID
+              FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+
+              JOIN (
+                  SELECT 
+                      IDVEH,
+                      SECOPE,
+                      ROW_NUMBER() OVER (
+                          PARTITION BY IDVEH
+                          ORDER BY ID DESC
+                      ) AS RN
+                  FROM SPEED400AT.PO_ASIGNACION
+              ) PA
+                  ON TAD.ID_VEH = PA.IDVEH
+
+              WHERE PA.RN = 1
+              AND TAD.ID_OPE <> PA.SECOPE
+          ) X
+      ) AS TOTAL_REASIGNACIONES
+      FROM SYSIBM.SYSDUMMY1
+    `;
+
+    const result = await cn.query(sql);
+
+    return res.status(200).json({
+      totalContratos: result[0].TOTAL_CONTRATOS,
+      totalDocumentos: result[0].TOTAL_DOCUMENTOS,
+      totalReasignaciones: result[0].TOTAL_REASIGNACIONES,
+    });
+  } catch (error) {
+    console.error("Error al obtener lista de notificaciones: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener lista de notificaciones",
+    });
+  } finally {
+    if (cn) await cn.close();
+  }
+};
+
 module.exports = {
   contVehicleFeet,
   contVehicleLeasings,
   contLeasings,
+  diferenceContractLeasing,
   listVehicleLeasingExpire,
   listVehicleLeasingToExpire,
   contVehiculeByClient,
@@ -1450,4 +1673,5 @@ module.exports = {
   depecratedVehicleToExpires,
   deprecatedVehicleById,
   contTotalVehicleMap,
+  notifications,
 };
