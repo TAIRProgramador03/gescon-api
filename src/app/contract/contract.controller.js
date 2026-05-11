@@ -633,7 +633,7 @@ const contContract = async (req, res) => {
   const cn = await pool.connect();
 
   try {
-    const filter = clienteId ? `WHERE ID_CLIENTE = ?` : ``
+    const filter = clienteId ? `WHERE ID_CLIENTE = ?` : ``;
 
     let sql = `
       SELECT 
@@ -643,7 +643,9 @@ const contContract = async (req, res) => {
         (SELECT COUNT(*) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac ON TAD.ID_ASIGNACION = TAC.ID ${filter}) AS VEHICULOS
       FROM sysibm.sysdummy1
     `;
-    const params = clienteId ? [clienteId, clienteId, clienteId, clienteId] : [];
+    const params = clienteId
+      ? [clienteId, clienteId, clienteId, clienteId]
+      : [];
 
     const result = await cn.query(sql, params);
 
@@ -703,6 +705,8 @@ const contClient = async (req, res) => {
 };
 
 const insertContract = async (req, res) => {
+  const { user } = req.user;
+
   const {
     idCliente,
     nroContrato,
@@ -749,8 +753,8 @@ const insertContract = async (req, res) => {
 
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_CAB 
-              (ID_CLIENTE, NRO_CONTRATO, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_CONT, TIPO_CLI, MONEDA, DESCRIPCION, ARCHIVO_PDF, CLASE)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CLIENTE, NRO_CONTRATO, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_CONT, TIPO_CLI, MONEDA, DESCRIPCION, ARCHIVO_PDF, CLASE, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     const result = await cn.query(queryCabecera, [
@@ -771,6 +775,8 @@ const insertContract = async (req, res) => {
       story,
       newKey,
       claseContra,
+      user,
+      user,
     ]);
 
     await moveFile(oldKey, newKey);
@@ -779,8 +785,8 @@ const insertContract = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     if (detalles && detalles.length > 0) {
@@ -799,6 +805,8 @@ const insertContract = async (req, res) => {
           detalle.compraVeh,
           detalle.precioVeh,
           detalle.condicion,
+          user,
+          user,
         ]);
       }
     }
@@ -820,6 +828,8 @@ const insertContract = async (req, res) => {
 };
 
 const updateContract = async (req, res) => {
+  const { user } = req.user;
+
   const { id } = req.params;
 
   const contractId = Number(id);
@@ -900,7 +910,7 @@ const updateContract = async (req, res) => {
     // ACTUALIZAMOS LA CABECERA DEL CONTRATO
     const queryCabecera = `
               UPDATE ${SCHEMA_BD}.TBLCONTRATO_CAB 
-              SET ID_CLIENTE = ?, NRO_CONTRATO = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_CONT = ?, TIPO_CLI = ?, MONEDA = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, CLASE = ?
+              SET ID_CLIENTE = ?, NRO_CONTRATO = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_CONT = ?, TIPO_CLI = ?, MONEDA = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, CLASE = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
               WHERE ID = ?
           `;
 
@@ -932,6 +942,7 @@ const updateContract = async (req, res) => {
       story,
       newKey,
       claseContra,
+      user,
       contractId,
     ]);
 
@@ -978,7 +989,7 @@ const updateContract = async (req, res) => {
 
     const queryUpdDetalle = `
       UPDATE ${SCHEMA_BD}.TBLCONTRATO_DET 
-      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?
+      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
       WHERE ID = ?
     `;
 
@@ -997,6 +1008,7 @@ const updateContract = async (req, res) => {
         detalle.compraVeh,
         detalle.precioVeh,
         detalle.condicion,
+        user,
         detalle.idDet,
       ]);
     }
@@ -1004,8 +1016,8 @@ const updateContract = async (req, res) => {
     // CREAMOS LOS NUEVOS DETALLES
     const queryNewDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLCONTRATO_DET 
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, KM_ADI, PRECIO_VEH, PRECIO_VENTA, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     for (const detalle of detailNew) {
@@ -1023,6 +1035,8 @@ const updateContract = async (req, res) => {
         detalle.compraVeh,
         detalle.precioVeh,
         detalle.condicion,
+        user,
+        user
       ]);
     }
 

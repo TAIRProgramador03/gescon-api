@@ -204,6 +204,8 @@ const detailVehByDocu = async (req, res) => {
 };
 
 const insertDocument = async (req, res) => {
+  const { user } = req.user;
+
   const {
     idCliente,
     idContrato,
@@ -237,8 +239,8 @@ const insertDocument = async (req, res) => {
   try {
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_CAB 
-              (ID_CLIENTE, ID_PADRE, TIPO_DOC, NRO_DOC, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_ESPE, DESCRIPCION, ARCHIVO_PDF, CLASE, MOTIVO)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CLIENTE, ID_PADRE, TIPO_DOC, NRO_DOC, CANT_VEHI, FECHA_FIRMA, DURACION, KM_ADI, KM_TOTAL, VEH_SUP, VEH_SEV, VEH_SOC, VEH_CIU, TIPO_ESPE, DESCRIPCION, ARCHIVO_PDF, CLASE, MOTIVO, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     const result = await cn.query(queryCabecera, [
@@ -260,6 +262,8 @@ const insertDocument = async (req, res) => {
       newKey,
       claseDocu,
       motivo,
+      user,
+      user
     ]);
 
     await moveFile(oldKey, newKey);
@@ -268,8 +272,8 @@ const insertDocument = async (req, res) => {
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_DET
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     if (detalles && detalles.length > 0) {
@@ -288,6 +292,8 @@ const insertDocument = async (req, res) => {
           detalle.precioVeh,
           detalle.kmAdicional,
           detalle.condicion,
+          user,
+          user
         ]);
       }
     }
@@ -306,6 +312,8 @@ const insertDocument = async (req, res) => {
 };
 
 const updateDocument = async (req, res) => {
+  const { user } = req.user;
+
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -377,7 +385,7 @@ const updateDocument = async (req, res) => {
 
     const queryCabecera = `
               UPDATE ${SCHEMA_BD}.TBLDOCUMENTO_CAB  
-              SET TIPO_DOC = ?, NRO_DOC = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_ESPE = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, MOTIVO = ?
+              SET TIPO_DOC = ?, NRO_DOC = ?, CANT_VEHI = ?, FECHA_FIRMA = ?, DURACION = ?, KM_ADI = ?, KM_TOTAL = ?, VEH_SUP = ?, VEH_SEV = ?, VEH_SOC = ?, VEH_CIU = ?, TIPO_ESPE = ?, DESCRIPCION = ?, ARCHIVO_PDF = ?, MOTIVO = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
               WHERE ID = ?
           `;
 
@@ -407,6 +415,7 @@ const updateDocument = async (req, res) => {
       story,
       newKey,
       motivo,
+      user,
       id,
     ]);
 
@@ -454,7 +463,7 @@ const updateDocument = async (req, res) => {
 
     const queryUpdDetalle = `
       UPDATE ${SCHEMA_BD}.TBLDOCUMENTO_DET
-      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?
+      SET SEC_CON = ?, MODELO = ?, TIPO_TERRENO = ?, TARIFA = ?, CPK = ?, RM = ?, CANTIDAD = ?, DURACION = ?, KM_ADI = ?, PRECIO_VEH = ?, PRECIO_VENTA = ?, CONDICION = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
       WHERE ID = ?
     `;
 
@@ -473,6 +482,7 @@ const updateDocument = async (req, res) => {
           detalle.compraVeh,
           detalle.precioVeh,
           detalle.condicion,
+          user,
           detalle.idDet,
         ]);
       }
@@ -480,8 +490,8 @@ const updateDocument = async (req, res) => {
 
     const queryNewDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBLDOCUMENTO_DET
-              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_CON_CAB, SEC_CON, MODELO, TIPO_TERRENO, TARIFA, CPK, RM, CANTIDAD, DURACION, PRECIO_VEH, PRECIO_VENTA, KM_ADI, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     for (const detalle of detailNew) {
@@ -499,6 +509,8 @@ const updateDocument = async (req, res) => {
         detalle.precioVeh,
         detalle.kmAdicional,
         detalle.condicion,
+        user,
+        user
       ]);
     }
 
