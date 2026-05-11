@@ -236,7 +236,7 @@ const postUserGesoper = async (data) => {
   }
 };
 
-const putUser = async (id, data) => {
+const putUser = async (id, data, username) => {
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -245,11 +245,14 @@ const putUser = async (id, data) => {
 
     const sql = `
       UPDATE ${SCHEMA_BD}.T_US_GC
-      SET ID_RL = ?
+      SET 
+        ID_RL = ?,
+        ACTUALIZADO_EL = CURRENT TIMESTAMP,
+        ACTUALIZADO_POR = ?
       WHERE ID = ?
     `;
 
-    await cn.query(sql, [data.roleId, id]);
+    await cn.query(sql, [data.roleId, username, id]);
 
     await cn.commit();
 

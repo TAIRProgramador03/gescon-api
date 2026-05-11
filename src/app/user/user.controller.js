@@ -137,12 +137,7 @@ const createUser = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
+  const { user } = req.user;
 
   const id = Number(req.params.id);
 
@@ -155,7 +150,7 @@ const updateUser = async (req, res) => {
   const body = req.body;
 
   try {
-    const update = await putUser(id, body);
+    const update = await putUser(id, body, user);
 
     return res.status(200).json(update);
   } catch (error) {

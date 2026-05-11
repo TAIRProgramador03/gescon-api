@@ -332,14 +332,7 @@ const listAssingByContract = async (req, res) => {
 };
 
 const insertOperation = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
+  const { user } = req.user;
 
   const { idCliente, valorRepe, detalles } = req.body;
 
@@ -351,22 +344,24 @@ const insertOperation = async (req, res) => {
   try {
     const queryCabecera = `
               INSERT INTO ${SCHEMA_BD}.TBL_ASIGNACION_CAB 
-              (ID_CLIENTE, FECHA, USUARIO)
-              VALUES (?, ?, ?)
+              (ID_CLIENTE, FECHA, USUARIO, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?)
           `;
 
     const result = await cn.query(queryCabecera, [
       idCliente,
       converFecha,
-      "analista",
+      user,
+      user,
+      user
     ]);
 
     const idAsignaCab = result.insertId || (await obtenerUltimoIdAsigna(cn));
 
     const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBL_ASIGNACION_DET 
-              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF, CONDICION)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
     /*const queryTarifa = `
@@ -433,6 +428,8 @@ const insertOperation = async (req, res) => {
           funcionParteVar(detalle.idContrato),
           newKey,
           detalle.condicion,
+          user,
+          user
         ]);
       }
     }
@@ -955,14 +952,7 @@ const listVehNoPending = async (req, res) => {
 };
 
 const changeOperation = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
+  const { user } = req.user;
 
   const id = Number(req.params.id);
 
@@ -1013,13 +1003,13 @@ const changeOperation = async (req, res) => {
     if (isChecked) {
       const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
         WHERE ID = ?
       `;
 
       const sqlInsertReassign = `
-        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const oldAssign = {
@@ -1051,6 +1041,7 @@ const changeOperation = async (req, res) => {
         newAssing.terreno,
         convertDate,
         convertirFecha(dateFinish),
+        user,
         id,
       ]);
 
@@ -1072,17 +1063,19 @@ const changeOperation = async (req, res) => {
         convertDate,
         observation,
         id,
+        user,
+        user
       ]);
     } else {
       const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
         WHERE ID = ?
       `;
 
       const sqlInsertReassign = `
-        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const oldAssign = {
@@ -1113,6 +1106,7 @@ const changeOperation = async (req, res) => {
         newAssing.tarifa,
         newAssing.archivo,
         newAssing.terreno,
+        user,
         id,
       ]);
 
@@ -1134,6 +1128,8 @@ const changeOperation = async (req, res) => {
         convertDate,
         observation,
         id,
+        user,
+        user
       ]);
 
       if (file && validFile) {
