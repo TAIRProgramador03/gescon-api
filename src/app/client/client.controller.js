@@ -12,7 +12,8 @@ const listClient = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -64,7 +65,8 @@ const tableClient = async (req, res) => {
       .json({ success: false, message: "El idCli es obligatorio" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -121,7 +123,8 @@ const tableClientLea = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente

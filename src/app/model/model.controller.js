@@ -12,7 +12,8 @@ const listModels = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const result = await cn.query(

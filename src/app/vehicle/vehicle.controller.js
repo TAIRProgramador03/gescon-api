@@ -12,7 +12,8 @@ const listVehicles = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -44,7 +45,8 @@ const tableVehicles = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -160,7 +162,8 @@ const contVehicles = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -208,7 +211,8 @@ const vehicleLeasing = async (req, res) => {
   let query = "";
   let params = [];
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     if (nroLeasing === "all") {
@@ -277,7 +281,8 @@ const listVehiclesByContract = async (req, res) => {
       message: "Los parametros contratoId y clienteId son obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -344,7 +349,8 @@ const listModelGen = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT DISTINCT UPPER(PM.DESMODGEN) AS DESMODGEN, PM.IDMODGEN 
@@ -386,7 +392,8 @@ const listYearByModelGen = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro modelId es obligatorio" });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT DISTINCT CAST(SUBSTRING(TC.FECHA_FIRMA, 1, 4) AS INT) AS ANIOS FROM ${SCHEMA_BD}.TBLCONTRATO_DET td 
@@ -424,7 +431,8 @@ const listPlateTraceability = async (req, res) => {
 
   const { idContrato, idCliente, idLeasing, tipoTerr, status } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let filtrosA = "";

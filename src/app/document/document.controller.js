@@ -25,7 +25,8 @@ const listDocumentByNroContract = async (req, res) => {
       message: "Los parametros contratoId y clienteId son obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -75,7 +76,8 @@ const detailDocument = async (req, res) => {
       message: "El parametro documentoId es obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -157,7 +159,8 @@ const detailVehByDocu = async (req, res) => {
       message: "Los parametros documentoId y tipoTerr son obligatorios",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sqlLeasing = `
@@ -264,7 +267,8 @@ const insertDocument = async (req, res) => {
   const claseDocu = "H";
   const fechaFormatoDB = convertirFecha(fechaFirma);
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const queryCabecera = `

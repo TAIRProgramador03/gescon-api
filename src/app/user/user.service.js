@@ -3,7 +3,8 @@ const { SCHEMA_BD } = require("../../shared/conf.js");
 
 /* USUARIOS */
 const getUsers = async () => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT U.*, R.DESCRIPCION, R.DESCRIPCION2 FROM ${SCHEMA_BD}.T_US_GC U
@@ -34,7 +35,8 @@ const getUsers = async () => {
 };
 
 const getUserByField = async (field, value) => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const fieldMap = {
       id: "U.ID",
@@ -81,7 +83,8 @@ const getUserByField = async (field, value) => {
 };
 
 const getUserGesoperByField = async (field, value) => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const fieldMap = {
       id: "U.ID",
@@ -119,7 +122,8 @@ const getUserGesoperByField = async (field, value) => {
 };
 
 const getUserById = async (id) => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT U.*, R.DESCRIPCION, R.DESCRIPCION2 FROM ${SCHEMA_BD}.T_US_GC U
@@ -154,7 +158,8 @@ const getUserById = async (id) => {
 };
 
 const getNewUsers = async () => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT pu.ID, TRIM(pu.USUARIO) as USUARIO, TRIM(pu.COD_EMP) as COD_EMP, pu.IDPERFIL
@@ -270,7 +275,8 @@ const putUser = async (id, data, username) => {
 /* ROLES */
 
 const getRoles = async () => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT * FROM ${SCHEMA_BD}.T_RL_GC
@@ -293,7 +299,8 @@ const getRoles = async () => {
 };
 
 const getRolesGesoper = async () => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT * FROM ${SCHEMA_BD}.PO_USUARIOPERFIL
@@ -360,7 +367,8 @@ const postRole = async (data, username) => {
 /* PERMISOS */
 
 const getPermissions = async () => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT ID, TRIM(DESCRIPCION) AS DESCRIPCION
@@ -381,7 +389,8 @@ const getPermissions = async () => {
 };
 
 const getPermissionsByUser = async (id) => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT P.DESCRIPCION
@@ -406,7 +415,8 @@ const getPermissionsByUser = async (id) => {
 };
 
 const getPermissionsByRole = async (id) => {
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
   try {
     const sql = `
       SELECT P.ID, P.DESCRIPCION

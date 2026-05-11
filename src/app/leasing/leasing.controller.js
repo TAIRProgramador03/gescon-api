@@ -20,7 +20,8 @@ const listLeasing = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const result = await cn.query(
@@ -60,7 +61,8 @@ const listAllLeasing = async (req, res) => {
 
   const { bank, clientId, contractId, typeContract } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // let sql = `
@@ -235,7 +237,8 @@ const listLeasingOfClient = async (req, res) => {
     });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const query = `
@@ -285,7 +288,8 @@ const listLeasingByContract = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -344,7 +348,8 @@ const listLeasingByDocument = async (req, res) => {
       message: "El parametro documentoId son obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -387,7 +392,8 @@ const listLeasingGeneral = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let initWhere = "";
@@ -497,7 +503,8 @@ const detailLeasing = async (req, res) => {
         "Los parametros leasingId, nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // const sql = `
@@ -584,7 +591,8 @@ const detailVehByLeasing = async (req, res) => {
       message: "El parametro leasingId es obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -656,7 +664,8 @@ const detailAssignByLeasing = async (req, res) => {
         "Los parametros nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -755,7 +764,8 @@ const insertLeasing = async (req, res) => {
   const oldKey = archivoPdf;
   const newKey = oldKey.replace(/^temp\//, "");
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const queryCabecera = `

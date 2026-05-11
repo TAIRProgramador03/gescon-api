@@ -33,7 +33,8 @@ const listOperations = async (req, res) => {
   //     .json({ success: false, message: "El idCli es obligatorio" });
   // }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const filterCli = idCli ? `AND IDCLI = ?` : "";
@@ -91,7 +92,8 @@ const listAssingByContract = async (req, res) => {
       message: "El parametro idCliente es obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // let sql = `
@@ -336,7 +338,8 @@ const insertOperation = async (req, res) => {
 
   const { idCliente, valorRepe, detalles } = req.body;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   let fechita = new Date().toISOString().split("T")[0];
   let converFecha = convertirFecha(fechita);
@@ -508,7 +511,8 @@ const valideAssign = async (req, res) => {
     agrupados[key].terrenos.push(d.idTerreno);
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     for (let key in agrupados) {

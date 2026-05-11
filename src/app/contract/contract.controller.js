@@ -25,7 +25,8 @@ const contractNro = async (req, res) => {
   //     .json({ success: false, message: "El idCli es obligatorio" });
   // }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -131,7 +132,8 @@ const contractNroAdi = async (req, res) => {
 
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los contratos asociados al cliente
@@ -189,7 +191,8 @@ const tableContract = async (req, res) => {
     });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Usa parámetros preparados para prevenir inyección SQL
@@ -256,7 +259,8 @@ const detailContract = async (req, res) => {
     });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     // Consulta los detalles del contrato
@@ -592,7 +596,8 @@ const detailVehByCont = async (req, res) => {
       message: "El parametro contratoId es obligatorio",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sqlLeasing = `
@@ -678,7 +683,8 @@ const contContract = async (req, res) => {
 
   const { clienteId } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const filter = clienteId ? `WHERE ID_CLIENTE = ?` : ``
@@ -730,7 +736,8 @@ const contClient = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const result = await cn.query(`
@@ -1149,7 +1156,8 @@ const getContractById = async (req, res) => {
       message: "El parametro id no es un dato numérico",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
@@ -1230,7 +1238,8 @@ const verifyContractsTemp = async (req, res) => {
       .json({ success: false, message: "Token inválido o no proporcionado" });
   }
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `

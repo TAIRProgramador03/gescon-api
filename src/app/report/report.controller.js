@@ -13,7 +13,8 @@ const contVehicleFeet = async (req, res) => {
 
   const { clienteId, status } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let sql = `
@@ -144,7 +145,8 @@ const contVehicleLeasings = async (req, res) => {
 
   const { clienteId, all } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let sentences = ``;
@@ -419,7 +421,8 @@ const contLeasings = async (req, res) => {
 
   const { clienteId } = req.query;
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sqlVencidos = `
@@ -593,7 +596,8 @@ const listVehicleLeasingExpire = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let sentences;
@@ -699,7 +703,8 @@ const listVehicleLeasingToExpire = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     let sentences;
@@ -1318,7 +1323,8 @@ const contVehiculeByClient = async (req, res) => {
       : [clientesId]
     : [];
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const valueQuery = listClient.map(() => "?");
@@ -1378,7 +1384,8 @@ const contComparationDays = async (req, res) => {
       message: "Los parametros contractId y leasingId son obligatorios",
     });
 
-  const cn = await connection();
+  const pool = await connection();
+  const cn = await pool.connect();
 
   try {
     const sql = `
