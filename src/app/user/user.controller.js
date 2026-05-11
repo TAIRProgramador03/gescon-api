@@ -19,13 +19,6 @@ const {
 /* USUARIOS */
 
 const listUsers = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
-
   try {
     const users = await getUsers();
 
@@ -44,13 +37,6 @@ const listUsers = async (req, res) => {
 };
 
 const listNewUsers = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
-
   try {
     const users = await getNewUsers();
 
@@ -62,13 +48,6 @@ const listNewUsers = async (req, res) => {
 };
 
 const findUserById = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -93,13 +72,6 @@ const findUserById = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
-
   const body = req.body;
 
   try {
@@ -162,12 +134,6 @@ const updateUser = async (req, res) => {
 /* ROLES */
 
 const listRoles = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
   try {
     const roles = await getRoles();
 
@@ -179,12 +145,6 @@ const listRoles = async (req, res) => {
 };
 
 const listRolesGesoper = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
   try {
     const roles = await getRolesGesoper();
 
@@ -213,13 +173,6 @@ const createRole = async (req, res) => {
 /* PERMISOS */
 
 const listPermissions = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
-
   try {
     const permissions = await getPermissions();
 
@@ -231,12 +184,6 @@ const listPermissions = async (req, res) => {
 };
 
 const listPermissionsByUser = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
 
   const id = Number(req.params.id);
 
@@ -257,12 +204,6 @@ const listPermissionsByUser = async (req, res) => {
 };
 
 const listPermissionsByRole = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
 
   const id = Number(req.params.id);
 
@@ -283,12 +224,6 @@ const listPermissionsByRole = async (req, res) => {
 };
 
 const updatePermissionsByRole = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser)
-    return res
-      .status(401)
-      .json({ success: false, message: "Acción no permitida" });
 
   const id = Number(req.params.id);
 

@@ -3,15 +3,6 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listModels = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 

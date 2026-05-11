@@ -8,15 +8,6 @@ const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
 
 const listDocumentByNroContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { contratoId, clienteId } = req.query;
 
   if (!contratoId || !clienteId)
@@ -59,15 +50,6 @@ const listDocumentByNroContract = async (req, res) => {
 };
 
 const detailDocument = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { documentoId } = req.query;
 
   if (!documentoId)
@@ -142,15 +124,6 @@ const detailDocument = async (req, res) => {
 };
 
 const detailVehByDocu = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { documentoId, tipoTerr } = req.query;
 
   if (!documentoId || !tipoTerr)
@@ -231,15 +204,6 @@ const detailVehByDocu = async (req, res) => {
 };
 
 const insertDocument = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const {
     idCliente,
     idContrato,
@@ -342,15 +306,6 @@ const insertDocument = async (req, res) => {
 };
 
 const updateDocument = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -578,15 +533,6 @@ const updateDocument = async (req, res) => {
 };
 
 const getDocumentById = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const id = Number(req.params.id);
 
   if (isNaN(id))

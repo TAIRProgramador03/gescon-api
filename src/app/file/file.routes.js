@@ -1,6 +1,7 @@
 const Router = require("express").Router();
 const multer = require("multer");
 const { uploadFile, validateFile, previewFile } = require("./file.controller.js");
+const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 const path = require("path");
 const fs = require("fs");
@@ -33,6 +34,7 @@ const upload = multer({
 Router.post(
   "/subirArchivo",
   authenticateToken,
+  validUser,
   (req, res, next) => {
     upload(req, res, (err) => {
       if (err) {
@@ -50,8 +52,8 @@ Router.post(
   uploadFile,
 );
 
-Router.get("/validarArchivo", authenticateToken, validateFile);
+Router.get("/validarArchivo", authenticateToken, validUser, validateFile);
 
-Router.get("/previsualizarArchivo", authenticateToken, previewFile);
+Router.get("/previsualizarArchivo", authenticateToken, validUser, previewFile);
 
 module.exports = Router;

@@ -8,15 +8,6 @@ const connection = require("../../shared/connect.js");
 const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
 
 const contractNro = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   // if (!idCli) {
@@ -121,15 +112,6 @@ const contractNro = async (req, res) => {
 // };
 
 const contractNroAdi = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   const pool = await connection();
@@ -172,15 +154,6 @@ const contractNroAdi = async (req, res) => {
 };
 
 const tableContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli, id } = req.query; // Obtiene los parámetros de consulta
 
   // Validación inicial
@@ -241,15 +214,6 @@ const tableContract = async (req, res) => {
 };
 
 const detailContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { contratoId, clienteId } = req.query; // Obtiene el contratoId de los parámetros de consulta
 
   if (!clienteId) {
@@ -579,15 +543,6 @@ const detailContract = async (req, res) => {
 };
 
 const detailVehByCont = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { contratoId, tipoTerr } = req.query;
 
   if (!contratoId)
@@ -672,15 +627,6 @@ const detailVehByCont = async (req, res) => {
 };
 
 const contContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clienteId } = req.query;
 
   const pool = await connection();
@@ -727,15 +673,6 @@ const contContract = async (req, res) => {
 };
 
 const contClient = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -766,15 +703,6 @@ const contClient = async (req, res) => {
 };
 
 const insertContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const {
     idCliente,
     nroContrato,
@@ -892,15 +820,6 @@ const insertContract = async (req, res) => {
 };
 
 const updateContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { id } = req.params;
 
   const contractId = Number(id);
@@ -1137,15 +1056,6 @@ const updateContract = async (req, res) => {
 };
 
 const getContractById = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { id } = req.params;
 
   const contractId = Number(id);
@@ -1229,15 +1139,6 @@ const getContractById = async (req, res) => {
 };
 
 const verifyContractsTemp = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 

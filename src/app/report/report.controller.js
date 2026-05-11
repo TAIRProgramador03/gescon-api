@@ -2,15 +2,6 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const contVehicleFeet = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clienteId, status } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   const pool = await connection();
@@ -134,15 +125,6 @@ const contVehicleFeet = async (req, res) => {
 };
 
 const contVehicleLeasings = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clienteId, all } = req.query;
 
   const pool = await connection();
@@ -410,15 +392,6 @@ const contVehicleLeasings = async (req, res) => {
 };
 
 const contLeasings = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clienteId } = req.query;
 
   const pool = await connection();
@@ -580,15 +553,6 @@ const diferenceContractLeasing = async (req, res) => {
 };
 
 const listVehicleLeasingExpire = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { label, clienteId } = req.query;
 
   if (!label)
@@ -687,15 +651,6 @@ const listVehicleLeasingExpire = async (req, res) => {
 };
 
 const listVehicleLeasingToExpire = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { label, clienteId } = req.query;
 
   if (!label)
@@ -794,15 +749,6 @@ const listVehicleLeasingToExpire = async (req, res) => {
 };
 
 const depecratedVehicleExpires = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { label, clienteId } = req.query;
 
   const pool = await connection();
@@ -1003,15 +949,6 @@ const depecratedVehicleExpires = async (req, res) => {
 };
 
 const depecratedVehicleToExpires = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { label, clienteId } = req.query;
 
   const pool = await connection();
@@ -1192,15 +1129,6 @@ const depecratedVehicleToExpires = async (req, res) => {
 };
 
 const deprecatedVehicleById = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -1306,15 +1234,6 @@ const deprecatedVehicleById = async (req, res) => {
 };
 
 const contVehiculeByClient = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clientesId } = req.query;
 
   const listClient = clientesId
@@ -1367,15 +1286,6 @@ const contVehiculeByClient = async (req, res) => {
 };
 
 const contComparationDays = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { contractId, leasingId } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   if (!contractId || !leasingId)
@@ -1460,15 +1370,6 @@ const contComparationDays = async (req, res) => {
 };
 
 const contTotalPriceByModel = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { modelId, fromYear, toYear } = req.query;
 
   if (!modelId || !fromYear)
@@ -1547,15 +1448,6 @@ const contTotalPriceByModel = async (req, res) => {
 };
 
 const contTotalVehicleMap = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { clienteId } = req.query;
 
   const pool = await connection();

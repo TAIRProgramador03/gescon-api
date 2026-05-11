@@ -3,14 +3,6 @@ const { decodeString, convertirFecha, transformType } = require("../../shared/ut
 const connection = require("../../shared/connect.js");
 
 const listVehicles = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -36,14 +28,6 @@ const listVehicles = async (req, res) => {
 };
 
 const tableVehicles = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -153,14 +137,6 @@ const tableVehicles = async (req, res) => {
 };
 
 const contVehicles = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -198,14 +174,6 @@ const contVehicles = async (req, res) => {
 };
 
 const vehicleLeasing = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const { idCli, nroLeasing } = req.query;
   let query = "";
@@ -264,14 +232,6 @@ const vehicleLeasing = async (req, res) => {
 };
 
 const listVehiclesByContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const { contratoId, clienteId } = req.query;
 
@@ -340,14 +300,6 @@ const listVehiclesByContract = async (req, res) => {
 };
 
 const listModelGen = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -376,14 +328,6 @@ const listModelGen = async (req, res) => {
 };
 
 const listYearByModelGen = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const { modelId } = req.query;
 
@@ -420,14 +364,6 @@ const listYearByModelGen = async (req, res) => {
 };
 
 const listPlateTraceability = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const { idContrato, idCliente, idLeasing, tipoTerr, status } = req.query;
 
@@ -837,14 +773,6 @@ const listPlateTraceability = async (req, res) => {
 };
 
 const listPlateByRegion = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
 
   const {region, clienteId} = req.query;
 

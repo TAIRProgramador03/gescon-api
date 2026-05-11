@@ -16,15 +16,6 @@ const ExcelJS = require("exceljs");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const listOperations = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   // if (!idCli) {
@@ -75,15 +66,6 @@ const listOperations = async (req, res) => {
 };
 
 const listAssingByContract = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idContrato, idCliente, idLeasing, tipoTerr, status } = req.query;
 
   if (!idCliente)
@@ -469,15 +451,6 @@ const insertOperation = async (req, res) => {
 };
 
 const valideAssign = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { detalles } = req.body;
 
   if (!Array.isArray(detalles) || detalles.length === 0) {
@@ -602,15 +575,6 @@ const valideAssign = async (req, res) => {
 };
 
 const updateAssign = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -738,15 +702,6 @@ const updateAssign = async (req, res) => {
 };
 
 const listVehPending = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli, idOpe } = req.query;
 
   const pool = await connection();
@@ -843,15 +798,6 @@ const listVehPending = async (req, res) => {
 };
 
 const listVehNoPending = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli, idOpe } = req.query;
 
   const pool = await connection();
@@ -1161,15 +1107,6 @@ const changeOperation = async (req, res) => {
 };
 
 const listReassign = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const id = Number(req.params.id);
 
   if (isNaN(id)) {
@@ -1216,15 +1153,6 @@ const listReassign = async (req, res) => {
 };
 
 const getReassignById = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const id = Number(req.params.id);
 
   if (isNaN(id)) {
@@ -1339,14 +1267,6 @@ const getReassignById = async (req, res) => {
 };
 
 // const uploalMasiveRecords = async (req, res) => {
-//   const { id: idUser } = req.user;
-
-//   if (!idUser) {
-//     return res
-//       .status(401)
-//       .json({ success: false, message: "Token inválido o no proporcionado" });
-//   }
-
 //   const pool = await connection();
 //   const cn = await pool.connect();
 
@@ -1459,14 +1379,6 @@ const getReassignById = async (req, res) => {
 // };
 
 const uploalMasiveRecords = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 

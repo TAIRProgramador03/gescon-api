@@ -10,16 +10,17 @@ const {
   listPlateTraceability,
   listPlateByRegion
 } = require("./vehicle.controller.js");
+const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
-Router.get("/todosLosVehiculos", authenticateToken, listVehicles);
-Router.get("/tablaVehiculo", authenticateToken, tableVehicles);
-Router.get("/tablaconVehiculo", authenticateToken, contVehicles);
-Router.get("/consultaVehiculoLeasing", authenticateToken, vehicleLeasing);
-Router.get("/vehiculosPorContrato", authenticateToken, listVehiclesByContract)
-Router.get("/modedosGenericos", authenticateToken, listModelGen);
-Router.get("/aniosPorModelo", authenticateToken, listYearByModelGen);
-Router.get("/trazabilidadPlaca", authenticateToken, listPlateTraceability);
-Router.get("/vehiculosPorRegion", authenticateToken, listPlateByRegion);
+Router.get("/todosLosVehiculos", authenticateToken, validUser, listVehicles);
+Router.get("/tablaVehiculo", authenticateToken, validUser, tableVehicles);
+Router.get("/tablaconVehiculo", authenticateToken, validUser, contVehicles);
+Router.get("/consultaVehiculoLeasing", authenticateToken, validUser, vehicleLeasing);
+Router.get("/vehiculosPorContrato", authenticateToken, validUser, listVehiclesByContract)
+Router.get("/modedosGenericos", authenticateToken, validUser, listModelGen);
+Router.get("/aniosPorModelo", authenticateToken, validUser, listYearByModelGen);
+Router.get("/trazabilidadPlaca", authenticateToken, validUser, listPlateTraceability);
+Router.get("/vehiculosPorRegion", authenticateToken, validUser, listPlateByRegion);
 
 module.exports = Router;

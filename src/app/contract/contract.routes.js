@@ -12,18 +12,19 @@ const {
   updateContract,
   verifyContractsTemp,
 } = require("./contract.controller.js");
+const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
-Router.get("/contratosNro", authenticateToken, contractNro);
-Router.get("/contratosNroAdi", authenticateToken, contractNroAdi);
-Router.get("/tablaContrato", authenticateToken, tableContract);
-Router.get("/contratoDetalle", authenticateToken, detailContract);
-Router.get("/contContrato", authenticateToken, contContract);
-Router.get("/contCliente", authenticateToken, contClient);
-Router.get("/placasPorContrato", authenticateToken, detailVehByCont)
-Router.post("/insertarContrato", authenticateToken, insertContract);
-Router.put("/actualizarContrato/:id", authenticateToken, updateContract);
-Router.get("/contratoPorId/:id", authenticateToken, getContractById)
-Router.get("/verificarContratosTemp", authenticateToken, verifyContractsTemp)
+Router.get("/contratosNro", authenticateToken, validUser, contractNro);
+Router.get("/contratosNroAdi", authenticateToken, validUser, contractNroAdi);
+Router.get("/tablaContrato", authenticateToken, validUser, tableContract);
+Router.get("/contratoDetalle", authenticateToken, validUser, detailContract);
+Router.get("/contContrato", authenticateToken, validUser, contContract);
+Router.get("/contCliente", authenticateToken, validUser, contClient);
+Router.get("/placasPorContrato", authenticateToken, validUser, detailVehByCont)
+Router.post("/insertarContrato", authenticateToken, validUser, insertContract);
+Router.put("/actualizarContrato/:id", authenticateToken, validUser, updateContract);
+Router.get("/contratoPorId/:id", authenticateToken, validUser, getContractById)
+Router.get("/verificarContratosTemp", authenticateToken, validUser, verifyContractsTemp)
 
 module.exports = Router;

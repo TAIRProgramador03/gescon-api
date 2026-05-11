@@ -3,15 +3,6 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listClient = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -48,15 +39,6 @@ const listClient = async (req, res) => {
 };
 
 const tableClient = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
 
   if (!idCli) {
@@ -114,15 +96,6 @@ const tableClient = async (req, res) => {
 };
 
 const tableClientLea = async (req, res) => {
-  const { id: idUser } = req.user;
-
-  // Validación de token y sus datos
-  if (!idUser) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Token inválido o no proporcionado" });
-  }
-
   const pool = await connection();
   const cn = await pool.connect();
 
