@@ -1,7 +1,7 @@
 const Router = require("express").Router();
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 const validUser = require("../../shared/middleware/user-valid.js");
-const { listUsers, listPermissionsByUser, listRoles, listPermissionsByRole, updatePermissionsByRole, findUserById, updateUser, listNewUsers, createUser, listRolesGesoper, listPermissions, createRole } = require("./user.controller.js");
+const { listUsers, listPermissionsByUser, listRoles, listPermissionsByRole, updatePermissionsByRole, findUserById, updateUser, updatePasswordUser, listNewUsers, createUser, listRolesGesoper, listPermissions, createRole } = require("./user.controller.js");
 
 /* USUARIOS */
 Router.get("/obtenerUsuarios", authenticateToken, validUser, listUsers);
@@ -9,6 +9,7 @@ Router.get("/obtenerNuevosUsuarios", authenticateToken, validUser, listNewUsers)
 Router.get("/obtenerUsuarioPorId/:id", authenticateToken, validUser, findUserById);
 Router.post("/crearUsuario", authenticateToken, validUser, createUser);
 Router.put("/actualizarUsuario/:id", authenticateToken, validUser, updateUser);
+Router.put("/actualizarClave/:id", authenticateToken, validUser, updatePasswordUser);
 
 /* ROLES */
 Router.get("/obtenerRoles", authenticateToken, validUser, listRoles);

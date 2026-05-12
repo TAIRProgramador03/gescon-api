@@ -9,7 +9,7 @@ const validUser = async (req, res, next) => {
 
   try {
     const sql = `
-      SELECT TUG.USU AS USUARIO FROM SPEED400AT.T_US_GC tug WHERE TUG.ID = ?
+      SELECT TUG.USU AS USUARIO, TUG.ID_RL AS ID_ROL FROM SPEED400AT.T_US_GC tug WHERE TUG.ID = ?
     `;
 
     const result = await cn.query(sql, [idUser]);
@@ -18,6 +18,8 @@ const validUser = async (req, res, next) => {
       return res
         .status(403)
         .json({ success: false, message: "Acceso no autorizado" });
+
+    req.user.roleId = result[0].ID_ROL;
 
     next();
   } catch (error) {

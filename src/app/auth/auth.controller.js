@@ -1,18 +1,11 @@
 const jwt = require("jsonwebtoken");
 const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
+const bcryptjs = require("bcryptjs");
 
 const login = async (req, res) => {
   // Obtenemos los valores del login desde el cuerpo de la solicitud
   const { dbUser, password } = req.body;
-
-  // const isSup = dbUser.slice(0, 3);
-
-  // if (dbUser.trim().toLowerCase() !== "gescon" && isSup.trim().toLowerCase() !== "sup") {
-  //   return res
-  //     .status(401)
-  //     .json({ success: false, message: "Usuario no permitido" });
-  // }
 
   let cn;
 
@@ -37,14 +30,9 @@ const login = async (req, res) => {
     if(!result[0].CLV) return res.status(403).json({success: false, message: "El usuario no cuenta con contraseña"})
 
     // VALIDAR SI ES LA CONTRASEÑA
-    const sqlClv = `
-      SELECT * FROM ${SCHEMA_BD}.T_US_GC
-      WHERE USU = ? AND CLV = ?
-    `;
+    const hashed = await bcryptjs.compare(password, result[0].CLV);
 
-    const resultClv = await cn.query(sqlClv, [dbUser, password]);
-
-    if(resultClv.length == 0) return res.status(401).json({success: false, message: "La contraseña es incorrecta"})
+    if(!hashed) return res.status(401).json({success: false, message: "La contraseña es incorrecta"})
 
     // RETORNAR PERMISOS DE USUARIO
     const sqlPs = `

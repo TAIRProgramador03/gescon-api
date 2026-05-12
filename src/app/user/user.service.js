@@ -272,6 +272,37 @@ const putUser = async (id, data, username) => {
   }
 };
 
+const putPasswordUser = async (id, password, username) => {
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+     await cn.beginTransaction();
+
+    const sql = `
+      UPDATE ${SCHEMA_BD}.T_US_GC
+      SET 
+        CLV = ?,
+        ACTUALIZADO_EL = CURRENT TIMESTAMP,
+        ACTUALIZADO_POR = ?
+      WHERE ID = ?
+    `;
+
+    await cn.query(sql, [password, username, id]);
+
+    await cn.commit();
+
+    return { success: true };
+  } catch (error) {
+    await cn.rollback();
+
+    console.error(error);
+    throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
+  } finally {
+    if(cn) await cn.close();
+  }
+}
+
 /* ROLES */
 
 const getRoles = async () => {
@@ -488,6 +519,7 @@ module.exports = {
   postUser,
   postUserGesoper,
   putUser,
+  putPasswordUser,
   getRoles,
   getRolesGesoper,
   postRole,

@@ -14,7 +14,10 @@ const {
   getUserGesoperByField,
   getPermissions,
   postRole,
+  putPasswordUser,
 } = require("./user.service.js");
+
+const bcryptjs = require("bcryptjs");
 
 /* USUARIOS */
 
@@ -131,6 +134,57 @@ const updateUser = async (req, res) => {
   }
 };
 
+const updatePasswordUser = async (req, res) => {
+  const { user } = req.user;
+
+  const id = Number(req.params.id);
+
+  if (isNaN(id))
+    return res.status(400).json({
+      success: false,
+      message: "El parametro id debe ser un numero entero",
+    });
+
+  const body = req.body;
+
+  try {
+    const findUser = await getUserById(id);
+
+    if (!findUser)
+      return res
+        .status(404)
+        .json({ success: false, message: "No se encontro al usuario" });
+
+    if (body.password != body.confirm)
+      return res.status(400).json({
+        success: false,
+        message:
+          "La contraseña de confirmación no coincide con la contraseña nueva",
+      });
+
+    if (findUser.clave && findUser.clave !== "" ) {
+      const hashed = await bcryptjs.compare(body.oldPassword, findUser.clave);
+
+      if (!hashed)
+        return res.status(400).json({
+          success: false,
+          message: "La contraseña actual no es la correcta",
+        });
+    }
+
+    const salt = await bcryptjs.genSalt(Number(process.env.SALT_NUMBER));
+
+    const passHash = await bcryptjs.hash(body.password, salt);
+
+    const update = await putPasswordUser(id, passHash, user);
+
+    return res.status(200).json(update);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 /* ROLES */
 
 const listRoles = async (req, res) => {
@@ -184,7 +238,6 @@ const listPermissions = async (req, res) => {
 };
 
 const listPermissionsByUser = async (req, res) => {
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -204,7 +257,6 @@ const listPermissionsByUser = async (req, res) => {
 };
 
 const listPermissionsByRole = async (req, res) => {
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -224,7 +276,6 @@ const listPermissionsByRole = async (req, res) => {
 };
 
 const updatePermissionsByRole = async (req, res) => {
-
   const id = Number(req.params.id);
 
   if (isNaN(id))
@@ -257,6 +308,7 @@ module.exports = {
   findUserById,
   createUser,
   updateUser,
+  updatePasswordUser,
   listRoles,
   listRolesGesoper,
   createRole,
