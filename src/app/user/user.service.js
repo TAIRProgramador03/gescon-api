@@ -30,7 +30,11 @@ const getUsers = async () => {
     console.error(error);
     throw new Error(`Ocurrio algo al consultar lista de usuarios: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -78,7 +82,11 @@ const getUserByField = async (field, value) => {
     console.error(error);
     throw new Error(`Ocurrio algo al obtener usuario: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -117,7 +125,11 @@ const getUserGesoperByField = async (field, value) => {
     console.error(error);
     throw new Error(`Ocurrio algo al obtener usuario de gesoper: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -153,7 +165,11 @@ const getUserById = async (id) => {
     console.error(error);
     throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -185,7 +201,11 @@ const getNewUsers = async () => {
     console.error(error);
     throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -211,7 +231,11 @@ const postUser = async (data, username) => {
 
     throw new Error(`Ocurrio algo al crear usuario: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -237,7 +261,11 @@ const postUserGesoper = async (data) => {
 
     throw new Error(`Ocurrio algo al crear usuario en el gesoper: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -268,7 +296,11 @@ const putUser = async (id, data, username) => {
     console.error(error);
     throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -299,7 +331,11 @@ const putPasswordUser = async (id, password, username) => {
     console.error(error);
     throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
   } finally {
-    if(cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 }
 
@@ -325,7 +361,11 @@ const getRoles = async () => {
     console.error(error);
     throw new Error(`Ocurrio algo al consultar lista de roles: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -349,7 +389,11 @@ const getRolesGesoper = async () => {
       `Ocurrio algo al consultar lista de roles del gesoper: ${error}`,
     );
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -391,7 +435,11 @@ const postRole = async (data, username) => {
     await cn.rollback();
     throw new Error(`Ocurrio algo al insertar un rol: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -415,7 +463,11 @@ const getPermissions = async () => {
   } catch (error) {
     throw new Error(`Ocurrio algo al consultar lista de permisos: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -441,7 +493,11 @@ const getPermissionsByUser = async (id) => {
       `Ocurrio algo al consultar lista de permisos del usuario: ${error}`,
     );
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -470,7 +526,11 @@ const getPermissionsByRole = async (id) => {
       `Ocurrio algo al consultar lista de permisos del rol: ${error}`,
     );
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -506,7 +566,11 @@ const putPermissionsByRole = async (id, permissions) => {
     console.error(error);
     throw new Error(`Ocurrio un error al actualizar los permisos: ${error}`);
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 

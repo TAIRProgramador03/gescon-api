@@ -120,7 +120,11 @@ const contVehicleFeet = async (req, res) => {
       message: "Error al obtener reporte de flota vehicular",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -387,7 +391,11 @@ const contVehicleLeasings = async (req, res) => {
       message: "Error al obtener reportes de leasings",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -462,7 +470,11 @@ const contLeasings = async (req, res) => {
       message: "Error al obtener leasings vencidos y por vencer",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -548,7 +560,11 @@ const diferenceContractLeasing = async (req, res) => {
           "Error al obtener reporte de diferencia entre contrato y lesing",
       });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -646,7 +662,11 @@ const listVehicleLeasingExpire = async (req, res) => {
       message: "Error al obtener vehiculos por grafico",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -744,7 +764,11 @@ const listVehicleLeasingToExpire = async (req, res) => {
       message: "Error al obtener vehiculos por grafico",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -944,7 +968,11 @@ const depecratedVehicleExpires = async (req, res) => {
       message: "Error al obtener reporte de depreciación de vehiculos vencidos",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1124,7 +1152,11 @@ const depecratedVehicleToExpires = async (req, res) => {
         "Error al obtener reporte de depreciación de vehiculos por vencer",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1229,7 +1261,11 @@ const deprecatedVehicleById = async (req, res) => {
       message: "Error al obtener reporte de depreciación de vehiculos por id",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1281,7 +1317,11 @@ const contVehiculeByClient = async (req, res) => {
       message: "Error al obtener vehiculos por cliente",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1365,7 +1405,11 @@ const contComparationDays = async (req, res) => {
       message: "Error al obtener la diferencia de dias",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1443,7 +1487,11 @@ const contTotalPriceByModel = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener costos por modelo" });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -1493,16 +1541,22 @@ const contTotalVehicleMap = async (req, res) => {
       message: "Error al obtener total de vehiculos para mapa",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
 const notifications = async (req, res) => {
+  const {id: idUser, roleId} = req.user;
+
   const pool = await connection();
   const cn = await pool.connect();
 
   try {
-    const sql = `
+    let sql = `
       SELECT
       (
           SELECT COUNT(*)
@@ -1540,6 +1594,103 @@ const notifications = async (req, res) => {
       FROM SYSIBM.SYSDUMMY1
     `;
 
+    if(roleId != 1 && roleId != 2) {
+      sql = `
+        SELECT
+          (
+              SELECT COUNT(*)
+                FROM SPEED400AT.TBLCONTRATO_CAB TC
+                LEFT JOIN (
+                  SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                  LEFT JOIN (
+                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                    FROM SPEED400AT.PO_OPERACIONES A 
+                    INNER JOIN SPEED400AT.TCLIE B 
+                    ON A.IDCLI = B.CLICVE 
+                    WHERE A.ID <> 86 
+                    AND B.CLINOM <> '*** ANULADO ***'
+                  )PO
+                  ON MOXU.IDOPERACION = PO.ID
+                  LEFT JOIN SPEED400AT.T_US_GC tug 
+                  ON MOXU.CH_CODI_USUARIO = TUG.USU
+                  LEFT JOIN SPEED400AT.T_RL_GC trg 
+                  ON TUG.ID_RL = TRG.ID
+                  WHERE TUG.USU IS NOT NULL
+                ) CL
+                ON TC.ID_CLIENTE = CL.IDCLI 
+                WHERE TC.NRO_CONTRATO LIKE 'CPEN-%' AND CL.ID_USU = ${idUser}
+            ) AS TOTAL_CONTRATOS,
+            (
+                SELECT COUNT(*)
+                FROM SPEED400AT.TBLDOCUMENTO_CAB TD
+                LEFT JOIN (
+                  SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                  LEFT JOIN (
+                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                    FROM SPEED400AT.PO_OPERACIONES A 
+                    INNER JOIN SPEED400AT.TCLIE B 
+                    ON A.IDCLI = B.CLICVE 
+                    WHERE A.ID <> 86 
+                    AND B.CLINOM <> '*** ANULADO ***'
+                  )PO
+                  ON MOXU.IDOPERACION = PO.ID
+                  LEFT JOIN SPEED400AT.T_US_GC tug 
+                  ON MOXU.CH_CODI_USUARIO = TUG.USU
+                  LEFT JOIN SPEED400AT.T_RL_GC trg 
+                  ON TUG.ID_RL = TRG.ID
+                  WHERE TUG.USU IS NOT NULL
+                ) CL
+                ON TD.ID_CLIENTE = CL.IDCLI
+                WHERE TD.NRO_DOC LIKE 'DPEN-%' AND CL.ID_USU = ${idUser}
+            ) AS TOTAL_DOCUMENTOS,
+            (
+                SELECT COUNT(*)
+                FROM (
+                  SELECT 
+                    TAD.ID
+                    FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+                    LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB TAC
+                    ON TAD.ID_ASIGNACION = TAC.ID
+                    LEFT JOIN (
+                      SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+                    FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                    LEFT JOIN (
+                      SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                      FROM SPEED400AT.PO_OPERACIONES A 
+                      INNER JOIN SPEED400AT.TCLIE B 
+                      ON A.IDCLI = B.CLICVE 
+                      WHERE A.ID <> 86 
+                      AND B.CLINOM <> '*** ANULADO ***'
+                    )PO
+                    ON MOXU.IDOPERACION = PO.ID
+                    LEFT JOIN SPEED400AT.T_US_GC tug 
+                    ON MOXU.CH_CODI_USUARIO = TUG.USU
+                    LEFT JOIN SPEED400AT.T_RL_GC trg 
+                    ON TUG.ID_RL = TRG.ID
+                    WHERE TUG.USU IS NOT NULL
+                    ) CL
+                    ON TAC.ID_CLIENTE = CL.IDCLI
+                  JOIN (
+                    SELECT 
+                    IDVEH,
+                    SECOPE,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY IDVEH
+                    ORDER BY ID DESC
+                    ) AS RN
+                  FROM SPEED400AT.PO_ASIGNACION
+                  ) PA
+                  ON TAD.ID_VEH = PA.IDVEH
+                  WHERE PA.RN = 1 AND CL.ID_USU = ${idUser}
+                AND TAD.ID_OPE <> PA.SECOPE
+            ) X
+          ) AS TOTAL_REASIGNACIONES
+        FROM SYSIBM.SYSDUMMY1
+      `
+    }
+
     const result = await cn.query(sql);
 
     return res.status(200).json({
@@ -1554,7 +1705,11 @@ const notifications = async (req, res) => {
       message: "Error al obtener lista de notificaciones",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 

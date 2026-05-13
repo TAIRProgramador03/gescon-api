@@ -26,8 +26,10 @@ const listModels = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener los modelos" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };

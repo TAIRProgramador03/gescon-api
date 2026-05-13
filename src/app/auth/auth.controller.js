@@ -69,8 +69,10 @@ const login = async (req, res) => {
     console.error("Error al iniciar sesión:", error);
     res.json({ success: false, message: "Ocuarrio un error al intentar ingresar" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };

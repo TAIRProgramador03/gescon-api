@@ -34,13 +34,17 @@ const listLeasing = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener leasing" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };
 
 const listAllLeasing = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+
   const { bank, clientId, contractId, typeContract } = req.query;
 
   const pool = await connection();
@@ -158,6 +162,108 @@ const listAllLeasing = async (req, res) => {
       ORDER BY L.ID ASC
     `;
 
+    if (roleId != 1 && roleId != 2) {
+      if (condiciones.length > 0) {
+        filtros = " AND " + condiciones.join(" AND ");
+      }
+
+      sql = `
+        SELECT * FROM (
+          SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN, CL.ID_USU
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+          ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM SPEED400AT.PO_OPERACIONES A 
+              INNER JOIN SPEED400AT.TCLIE B 
+              ON A.IDCLI = B.CLICVE 
+              WHERE A.ID <> 86 
+              AND B.CLINOM <> '*** ANULADO ***'
+            )PO
+            ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN SPEED400AT.T_US_GC tug 
+            ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) CL
+          ON CL.IDCLI = L.ID_CLIENTE 
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM SPEED400AT.PO_OPERACIONES A 
+              INNER JOIN SPEED400AT.TCLIE B 
+              ON A.IDCLI = B.CLICVE 
+              WHERE A.ID <> 86 
+              AND B.CLINOM <> '*** ANULADO ***'
+            )PO
+            ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN SPEED400AT.T_US_GC tug 
+            ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) CLA
+          ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
+          WHERE L.TIPCON = 'P'
+
+          UNION ALL
+
+          SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN, CL.ID_USU
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
+          ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM SPEED400AT.PO_OPERACIONES A 
+              INNER JOIN SPEED400AT.TCLIE B 
+              ON A.IDCLI = B.CLICVE 
+              WHERE A.ID <> 86 
+              AND B.CLINOM <> '*** ANULADO ***'
+            )PO
+            ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN SPEED400AT.T_US_GC tug 
+            ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) CL
+          ON CL.IDCLI = L.ID_CLIENTE 
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM SPEED400AT.PO_OPERACIONES A 
+              INNER JOIN SPEED400AT.TCLIE B 
+              ON A.IDCLI = B.CLICVE 
+              WHERE A.ID <> 86 
+              AND B.CLINOM <> '*** ANULADO ***'
+            )PO
+            ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN SPEED400AT.T_US_GC tug 
+            ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) CLA
+          ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
+          WHERE L.TIPCON = 'H'
+        ) L
+        WHERE L.ID_USU = ${idUser} ${filtros}
+        ORDER BY L.ID ASC
+      `;
+    }
+
     const result = await cn.query(sql, params);
 
     const cleanedResult = result.map((row) => ({
@@ -195,7 +301,11 @@ const listAllLeasing = async (req, res) => {
       message: "Error al obtener la lista de leasings",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -243,8 +353,10 @@ const listLeasingOfClient = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener leasing" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };
@@ -290,7 +402,11 @@ const listLeasingByContract = async (req, res) => {
       message: "Error al listar leasings por contrato",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -331,11 +447,17 @@ const listLeasingByDocument = async (req, res) => {
       message: "Error al listar leasings por contrato",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
 const listLeasingGeneral = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+
   const { contratoId, clienteId } = req.query;
 
   const pool = await connection();
@@ -361,17 +483,73 @@ const listLeasingGeneral = async (req, res) => {
       filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H' AND A.ID_CLIENTE = ?";
     }
 
-    const sqlContract = `
+    let sqlContract = `
       SELECT A.ID, A.NRO_LEASING
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
       ${initWhere} ${filtroA}
     `;
 
-    const sqlDocument = `
+    let sqlDocument = `
       SELECT A.ID, A.NRO_LEASING
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
       ${initWhere} ${filtroB}
     `;
+
+    if (roleId != 1 && roleId != 2) {
+      if (contratoId || clienteId) {
+        initWhere = "AND";
+      }
+
+      sqlContract = `
+        SELECT A.ID, A.NRO_LEASING
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
+        LEFT JOIN (
+          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+            INNER JOIN ${SCHEMA_BD}.TCLIE B 
+            ON A.IDCLI = B.CLICVE 
+            WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+          )PO
+          ON MOXU.IDOPERACION = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          ON MOXU.CH_CODI_USUARIO = TUG.USU
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          ON TUG.ID_RL = TRG.ID
+          WHERE TUG.USU IS NOT NULL
+        ) TU
+        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI 
+        WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroA}
+      `;
+
+      sqlDocument = `
+        SELECT A.ID, A.NRO_LEASING
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
+        LEFT JOIN (
+          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+            INNER JOIN ${SCHEMA_BD}.TCLIE B 
+            ON A.IDCLI = B.CLICVE 
+            WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+          )PO
+          ON MOXU.IDOPERACION = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          ON MOXU.CH_CODI_USUARIO = TUG.USU
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          ON TUG.ID_RL = TRG.ID
+          WHERE TUG.USU IS NOT NULL
+        ) TU
+        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI 
+        WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroB}
+      `;
+    }
 
     let typeDoc = "";
     let idDoc;
@@ -426,7 +604,11 @@ const listLeasingGeneral = async (req, res) => {
       message: "Error al listar leasing por contrato o documento",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -506,7 +688,11 @@ const detailLeasing = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener detalle de leasing" });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -569,7 +755,11 @@ const detailVehByLeasing = async (req, res) => {
       message: "Error al obtener vehiculos por leasing",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 
@@ -699,7 +889,7 @@ const insertLeasing = async (req, res) => {
       funcionParteVar(idContrato),
       funcionNumerica(validAsoc),
       user,
-      user
+      user,
     ]);
 
     await moveFile(oldKey, newKey);
@@ -730,7 +920,7 @@ const insertLeasing = async (req, res) => {
           detalle.codini,
           detalle.cantidad,
           user,
-          user
+          user,
         ]);
 
         await cn.query(queryUpdateVehiculo, [detalle.idpla]);
@@ -744,8 +934,10 @@ const insertLeasing = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al insertar Leasing" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };

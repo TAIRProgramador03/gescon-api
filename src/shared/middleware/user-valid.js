@@ -23,8 +23,18 @@ const validUser = async (req, res, next) => {
 
     next();
   } catch (error) {
+    console.error("Error al validar usuario", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Error al validar usuario",
+    });
   } finally {
-    if (cn) await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
+    }
   }
 };
 

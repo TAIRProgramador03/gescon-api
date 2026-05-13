@@ -45,11 +45,17 @@ const listDocumentByNroContract = async (req, res) => {
       message: "Error al listar documentos por contrato",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
   }
 };
 
 const detailDocument = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+
   const { documentoId } = req.query;
 
   if (!documentoId)
@@ -63,15 +69,79 @@ const detailDocument = async (req, res) => {
 
   try {
     const sql = `
-      SELECT D.ID, D.NRO_DOC, D.TIPO_DOC, D.CANT_VEHI, D.FECHA_FIRMA, D.DURACION, D.KM_ADI, D.KM_TOTAL, D.VEH_SUP, D.VEH_SEV, D.VEH_SOC, D.VEH_CIU, D.ARCHIVO_PDF, D.DESCRIPCION, D.MOTIVO, COUNT(L.ID) AS CANT_LEA  
+      SELECT D.ID, D.NRO_DOC, D.TIPO_DOC, D.CANT_VEHI, D.FECHA_FIRMA, D.DURACION, D.KM_ADI, D.KM_TOTAL, D.ARCHIVO_PDF, D.DESCRIPCION, D.MOTIVO, COUNT(L.ID) AS CANT_LEA  
       FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB D
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB L
       ON D.ID = L.ID_CONTRATO AND L.TIPCON='H'
-      WHERE D.ID = ?
-      GROUP BY D.ID, D.NRO_DOC, D.TIPO_DOC, D.CANT_VEHI, D.FECHA_FIRMA, D.DURACION, D.KM_ADI, D.KM_TOTAL, D.VEH_SUP, D.VEH_SEV, D.VEH_SOC, D.VEH_CIU, D.ARCHIVO_PDF, D.DESCRIPCION, D.MOTIVO
+      WHERE D.ID = ? AND L.TIPCON='H'
+      GROUP BY D.ID, D.NRO_DOC, D.TIPO_DOC, D.CANT_VEHI, D.FECHA_FIRMA, D.DURACION, D.KM_ADI, D.KM_TOTAL, D.ARCHIVO_PDF, D.DESCRIPCION, D.MOTIVO
     `;
 
+    let sqlTotal = `
+      SELECT 
+        COALESCE(TOTAL_VEH_SU, 0) AS TOTAL_VEH_SUP,
+        COALESCE(TOTAL_VEH_SOC, 0) AS TOTAL_VEH_SOC,
+        COALESCE(TOTAL_VEH_CIU, 0) AS TOTAL_VEH_CIU,
+        COALESCE(TOTAL_VEH_SEV, 0) AS TOTAL_VEH_SEV
+      FROM (
+        SELECT
+        SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
+          SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
+          SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
+          SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
+        ON tad.ID_ASIGNACION  = tac.ID
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
+        ON tad.ID_CONTRATO = tdc.ID
+        WHERE tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ?
+      )
+    `;
+
+    if (roleId != 1 && roleId != 2) {
+      sqlTotal = `
+        SELECT 
+          COALESCE(TOTAL_VEH_SU, 0) AS TOTAL_VEH_SUP,
+          COALESCE(TOTAL_VEH_SOC, 0) AS TOTAL_VEH_SOC,
+          COALESCE(TOTAL_VEH_CIU, 0) AS TOTAL_VEH_CIU,
+          COALESCE(TOTAL_VEH_SEV, 0) AS TOTAL_VEH_SEV
+        FROM (
+          SELECT
+        SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
+          SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
+          SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
+          SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
+        ON tad.ID_ASIGNACION  = tac.ID
+        LEFT JOIN (
+        	SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+              LEFT JOIN (
+                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+                INNER JOIN ${SCHEMA_BD}.TCLIE B 
+                ON A.IDCLI = B.CLICVE 
+                WHERE A.ID <> 86 
+                AND B.CLINOM <> '*** ANULADO ***'
+              )PO
+              ON MOXU.IDOPERACION = PO.ID
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+              ON MOXU.CH_CODI_USUARIO = TUG.USU
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+              ON TUG.ID_RL = TRG.ID
+              WHERE TUG.USU IS NOT NULL
+        ) C
+        ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = TAD.ID_OPE
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
+        ON tad.ID_CONTRATO = tdc.ID
+        WHERE tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ? AND C.ID_USU = ${idUser}
+      )
+      `;
+    }
+
     const result = await cn.query(sql, [documentoId]);
+    const resultTotal = await cn.query(sqlTotal, [documentoId]);
 
     if (result.length == 0 || !result[0])
       return res
@@ -79,6 +149,7 @@ const detailDocument = async (req, res) => {
         .json({ success: false, message: "No se encontro el documento" });
 
     const findDocument = result[0];
+    const totalVeh = resultTotal[0];
 
     return res.status(200).json({
       id: findDocument.ID,
@@ -93,10 +164,10 @@ const detailDocument = async (req, res) => {
       }),
       kmAdi: findDocument.KM_ADI,
       kmTotal: findDocument.KM_TOTAL,
-      vehSup: findDocument.VEH_SUP,
-      vehSev: findDocument.VEH_SEV,
-      vehSoc: findDocument.VEH_SOC,
-      vehCiu: findDocument.VEH_CIU,
+      vehSup: totalVeh.TOTAL_VEH_SUP,
+      vehSev: totalVeh.TOTAL_VEH_SEV,
+      vehSoc: totalVeh.TOTAL_VEH_SOC,
+      vehCiu: totalVeh.TOTAL_VEH_CIU,
       motivoDoc: transformType(findDocument.MOTIVO.trim(), {
         1: "Ampliación",
         2: "Renovación",
@@ -119,11 +190,17 @@ const detailDocument = async (req, res) => {
       message: "Error al obtener detalle de documento",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
   }
 };
 
 const detailVehByDocu = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+
   const { documentoId, tipoTerr } = req.query;
 
   if (!documentoId || !tipoTerr)
@@ -136,43 +213,91 @@ const detailVehByDocu = async (req, res) => {
   const cn = await pool.connect();
 
   try {
-    const sqlLeasing = `
-      SELECT ID 
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB 
-      WHERE ID_CONTRATO = ? AND TIPCON = 'H'
-    `;
+    // const sqlLeasing = `
+    //   SELECT ID
+    //   FROM ${SCHEMA_BD}.TBL_LEASING_CAB
+    //   WHERE ID_CONTRATO = ? AND TIPCON = 'H'
+    // `;
 
-    const resultLea = await cn.query(sqlLeasing, [documentoId]);
+    // const resultLea = await cn.query(sqlLeasing, [documentoId]);
 
-    if (resultLea.length == 0)
-      return res
-        .status(404)
-        .json({ success: false, message: "Sin placas contratadas" });
+    // if (resultLea.length == 0)
+    //   return res
+    //     .status(404)
+    //     .json({ success: false, message: "Sin placas contratadas" });
 
-    const cleanLea = resultLea.map((row) => row.ID);
+    // const cleanLea = resultLea.map((row) => row.ID);
 
-    const placeHolders = resultLea.map(() => "?").join(",");
+    // const placeHolders = resultLea.map(() => "?").join(",");
 
-    const sqlDetLea = `
-      SELECT L.MODELO, L.PLACA, L.CANTIDAD, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, A.FECHA_FIN, LC.NRO_LEASING
-      FROM ${SCHEMA_BD}.TBL_LEASING_DET L
-      LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
+    // const sqlDetLea = `
+    //   SELECT L.MODELO, L.PLACA, L.CANTIDAD, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, A.FECHA_FIN, LC.NRO_LEASING
+    //   FROM ${SCHEMA_BD}.TBL_LEASING_DET L
+    //   LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
+    //   ON L.ID_VEH = V.ID
+    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
+    //   ON V.IDMAR = M.ID
+    //   LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+    //   ON V.SECOPE = O.ID
+    //   LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
+    //   ON L.PLACA = A.PLACA
+    //   LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+    //   ON LC.ID = L.ID_LEA_CAB
+    //   WHERE L.ID_LEA_CAB IN (${placeHolders}) AND L.TIPO_TERRENO LIKE ?
+    // `;
+
+    let sqlDet = `
+      SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+      FROM SPEED400AT.TBL_ASIGNACION_DET L
+      LEFT JOIN SPEED400AT.PO_VEHICULO V
       ON L.ID_VEH = V.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
+      LEFT JOIN SPEED400AT.PO_MARCA M
       ON V.IDMAR = M.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+      LEFT JOIN SPEED400AT.PO_MODELO MO
+      ON V.IDMOD = MO.ID
+      LEFT JOIN SPEED400AT.PO_OPERACIONES O
       ON V.SECOPE = O.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
-      ON L.PLACA = A.PLACA
-      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-      ON LC.ID = L.ID_LEA_CAB
-      WHERE ID_LEA_CAB IN (${placeHolders}) AND TIPO_TERRENO = ?
+      WHERE L.TP_TERRENO = ?
     `;
 
-    const resultDet = await cn.query(sqlDetLea, [
-      ...cleanLea,
-      tipoTerr.toUpperCase(),
-    ]);
+    if (roleId != 1 && roleId != 2) {
+      sqlDet = `
+        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+        FROM SPEED400AT.TBL_ASIGNACION_DET L
+        LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac
+        ON L.ID_ASIGNACION = TAC.ID
+        LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+                FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                LEFT JOIN (
+                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                  FROM SPEED400AT.PO_OPERACIONES A 
+                  INNER JOIN SPEED400AT.TCLIE B 
+                  ON A.IDCLI = B.CLICVE 
+                  WHERE A.ID <> 86 
+                  AND B.CLINOM <> '*** ANULADO ***'
+                )PO
+                ON MOXU.IDOPERACION = PO.ID
+                LEFT JOIN SPEED400AT.T_US_GC tug 
+                ON MOXU.CH_CODI_USUARIO = TUG.USU
+                LEFT JOIN SPEED400AT.T_RL_GC trg 
+                ON TUG.ID_RL = TRG.ID
+                WHERE TUG.USU IS NOT NULL
+          ) C
+          ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = L.ID_OPE
+        LEFT JOIN SPEED400AT.PO_VEHICULO V
+        ON L.ID_VEH = V.ID
+        LEFT JOIN SPEED400AT.PO_MARCA M
+        ON V.IDMAR = M.ID
+        LEFT JOIN SPEED400AT.PO_MODELO MO
+        ON V.IDMOD = MO.ID
+        LEFT JOIN SPEED400AT.PO_OPERACIONES O
+        ON V.SECOPE = O.ID
+        WHERE L.TP_TERRENO = ? AND C.ID_USU = ${idUser}
+      `;
+    }
+
+    const resultDet = await cn.query(sqlDet, [tipoTerr]);
 
     if (resultDet.length == 0)
       return res
@@ -182,7 +307,6 @@ const detailVehByDocu = async (req, res) => {
     const cleanedResult = resultDet.map((row) => ({
       modelo: row.MODELO.trim() ?? "",
       placa: row.PLACA.trim() ?? "",
-      cantidad: row.CANTIDAD,
       año: row.ANO,
       color: row.COLOR.trim() ?? "",
       marca: row.MARCA.trim() ?? "",
@@ -199,7 +323,11 @@ const detailVehByDocu = async (req, res) => {
       message: "Error al obtener placas por documento",
     });
   } finally {
-    if (cn) await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
   }
 };
 
@@ -263,7 +391,7 @@ const insertDocument = async (req, res) => {
       claseDocu,
       motivo,
       user,
-      user
+      user,
     ]);
 
     await moveFile(oldKey, newKey);
@@ -293,7 +421,7 @@ const insertDocument = async (req, res) => {
           detalle.kmAdicional,
           detalle.condicion,
           user,
-          user
+          user,
         ]);
       }
     }
@@ -305,8 +433,10 @@ const insertDocument = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al insertar documento" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -510,7 +640,7 @@ const updateDocument = async (req, res) => {
         detalle.kmAdicional,
         detalle.condicion,
         user,
-        user
+        user,
       ]);
     }
 
@@ -538,8 +668,10 @@ const updateDocument = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al insertar documento" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -618,7 +750,11 @@ const getDocumentById = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener documento por id" });
   } finally {
-    if (cn) await cn.close();
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
   }
 };
 

@@ -3,17 +3,40 @@ const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listClient = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+
   const pool = await connection();
   const cn = await pool.connect();
 
   try {
-    const sql = `
+    let sql = `
       SELECT DISTINCT A.IDCLI, B.CLINOM 
       FROM ${SCHEMA_BD}.PO_OPERACIONES A 
       INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
       WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
       ORDER BY CLINOM ASC
     `;
+
+    if(roleId != 1 && roleId != 2) {
+      sql = `
+        SELECT DISTINCT PO.IDCLI, PO.CLINOM
+        FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+        LEFT JOIN (
+          SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+          FROM SPEED400AT.PO_OPERACIONES A 
+          INNER JOIN SPEED400AT.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+        )PO
+        ON MOXU.IDOPERACION = PO.ID
+        LEFT JOIN SPEED400AT.T_US_GC tug 
+        ON MOXU.CH_CODI_USUARIO = TUG.USU
+        LEFT JOIN SPEED400AT.T_RL_GC trg 
+        ON TUG.ID_RL = TRG.ID
+        WHERE TUG.USU IS NOT NULL AND TUG.ID = ${idUser}
+      `
+    }
 
     const result = await cn.query(sql);
 
@@ -32,8 +55,10 @@ const listClient = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener clientes" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };
@@ -89,8 +114,10 @@ const tableClient = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener los datos" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };
@@ -137,8 +164,10 @@ const tableClientLea = async (req, res) => {
       .status(500)
       .json({ success: false, message: "Error al obtener los datos" });
   } finally {
-    if (cn) {
-      await cn.close();
+    try {
+        if(cn) await cn.close();
+    } catch(err) {
+        console.error(err);
     }
   }
 };
