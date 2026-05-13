@@ -59,8 +59,8 @@ const login = async (req, res) => {
     // Configura la cookie con el token JWT
     res.cookie("access_token", token, {
       httpOnly: true,
-      secure: false,
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });

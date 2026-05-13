@@ -28,6 +28,8 @@ app.use(
     origin: [
       "http://localhost",
       `http://${IP_LOCAL}`,
+      "http://localhost:8080",
+      `http://${IP_LOCAL}:8080`,
       "http://localhost:3000",
       `http://${IP_LOCAL}:3000`,
       `http://cdn.datatables.net`,
@@ -37,6 +39,9 @@ app.use(
       `http://locahost:5173`,
       `http://${IP_LOCAL}:8080`,
       `http://locahost:8080`,
+      "https://gescon.tair360.net",
+      "http://192.168.4.22",
+      "http://192.168.4.22:5173"
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),
