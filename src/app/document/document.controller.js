@@ -257,7 +257,7 @@ const detailVehByDocu = async (req, res) => {
       ON V.IDMOD = MO.ID
       LEFT JOIN SPEED400AT.PO_OPERACIONES O
       ON V.SECOPE = O.ID
-      WHERE L.TP_TERRENO = ?
+      WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
     `;
 
     if (roleId != 1 && roleId != 2) {
@@ -293,11 +293,11 @@ const detailVehByDocu = async (req, res) => {
         ON V.IDMOD = MO.ID
         LEFT JOIN SPEED400AT.PO_OPERACIONES O
         ON V.SECOPE = O.ID
-        WHERE L.TP_TERRENO = ? AND C.ID_USU = ${idUser}
+        WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
       `;
     }
 
-    const resultDet = await cn.query(sqlDet, [tipoTerr]);
+    const resultDet = await cn.query(sqlDet, [tipoTerr, documentoId]);
 
     if (resultDet.length == 0)
       return res
@@ -312,7 +312,7 @@ const detailVehByDocu = async (req, res) => {
       marca: row.MARCA.trim() ?? "",
       operacion: row.OPERACION.trim() ?? "",
       fechaFin: row.FECHA_FIN ? row.FECHA_FIN.trim() : "",
-      nroLeasing: row.NRO_LEASING.trim() ?? "",
+      nroLeasing: row.LEASING.trim() ?? "",
     }));
 
     return res.status(200).json(cleanedResult);
