@@ -147,6 +147,8 @@ const listAssingByContract = async (req, res) => {
         SELECT 
           DISTINCT(AD.ID),
           C.CLINOM AS CLIENTE, 
+          CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+          V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
           O.DESCRIPCION AS OPERACIONES, 
           V.ID_OPE AS ID_OPE_ACTUAL,
@@ -175,6 +177,8 @@ const listAssingByContract = async (req, res) => {
         ON AD.ID_ASIGNACION = AC.ID
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LC.NRO_LEASING = AD.LEASING
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+        ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
         LEFT JOIN (
           SELECT DISTINCT A.IDCLI, B.CLINOM 
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -182,7 +186,7 @@ const listAssingByContract = async (req, res) => {
           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
           ORDER BY CLINOM ASC
         ) C
-        ON AC.ID_CLIENTE = C.IDCLI
+        ON CC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
@@ -192,6 +196,7 @@ const listAssingByContract = async (req, res) => {
             V.COLOR,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
+            O.IDCLI,
             V.IDMAR,
             V.IDMOD
           FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -203,8 +208,6 @@ const listAssingByContract = async (req, res) => {
         ON MA.ID = V.IDMAR
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON MO.ID = V.IDMOD
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
         WHERE ${filtrosA}
 
         UNION ALL
@@ -212,6 +215,8 @@ const listAssingByContract = async (req, res) => {
         SELECT 
           DISTINCT(AD.ID),
           C.CLINOM AS CLIENTE, 
+          DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+          V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
           O.DESCRIPCION AS OPERACIONES, 
           V.ID_OPE AS ID_OPE_ACTUAL,
@@ -240,6 +245,10 @@ const listAssingByContract = async (req, res) => {
         ON AD.ID_ASIGNACION = AC.ID
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LC.NRO_LEASING = AD.LEASING
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+        ON DC.ID_PADRE = CC.ID
         LEFT JOIN (
           SELECT DISTINCT A.IDCLI, B.CLINOM 
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -247,7 +256,7 @@ const listAssingByContract = async (req, res) => {
           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
           ORDER BY CLINOM ASC
         ) C
-        ON AC.ID_CLIENTE = C.IDCLI
+        ON DC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
@@ -257,6 +266,7 @@ const listAssingByContract = async (req, res) => {
             V.COLOR,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
+            O.IDCLI,
             V.IDMAR,
             V.IDMOD
           FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -268,10 +278,6 @@ const listAssingByContract = async (req, res) => {
         ON MA.ID = V.IDMAR
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON MO.ID = V.IDMOD
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON DC.ID_PADRE = CC.ID
         WHERE ${filtrosB}
         ) T
       ) X
@@ -292,6 +298,8 @@ const listAssingByContract = async (req, res) => {
             SELECT 
               DISTINCT(AD.ID),
               C.CLINOM AS CLIENTE, 
+              CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
               O.DESCRIPCION AS OPERACIONES, 
               V.ID_OPE AS ID_OPE_ACTUAL,
@@ -320,6 +328,8 @@ const listAssingByContract = async (req, res) => {
             ON AD.ID_ASIGNACION = AC.ID
             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
             ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
@@ -338,7 +348,7 @@ const listAssingByContract = async (req, res) => {
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
+            ON CC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
@@ -348,6 +358,7 @@ const listAssingByContract = async (req, res) => {
                 V.COLOR,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
                 V.IDMAR,
                 V.IDMOD
               FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -359,8 +370,6 @@ const listAssingByContract = async (req, res) => {
             ON MA.ID = V.IDMAR
             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
             ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
             WHERE ${filtrosA}
 
             UNION ALL
@@ -368,6 +377,8 @@ const listAssingByContract = async (req, res) => {
             SELECT 
               DISTINCT(AD.ID),
               C.CLINOM AS CLIENTE, 
+              DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
               O.DESCRIPCION AS OPERACIONES, 
               V.ID_OPE AS ID_OPE_ACTUAL,
@@ -396,6 +407,10 @@ const listAssingByContract = async (req, res) => {
             ON AD.ID_ASIGNACION = AC.ID
             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
             ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+            ON DC.ID_PADRE = CC.ID
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
@@ -414,7 +429,7 @@ const listAssingByContract = async (req, res) => {
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
+            ON DC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
@@ -424,6 +439,7 @@ const listAssingByContract = async (req, res) => {
                 V.COLOR,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
                 V.IDMAR,
                 V.IDMOD
               FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -435,10 +451,6 @@ const listAssingByContract = async (req, res) => {
             ON MA.ID = V.IDMAR
             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
             ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
             WHERE ${filtrosB}
             ) T
           ) X
@@ -449,7 +461,9 @@ const listAssingByContract = async (req, res) => {
     const result = await cn.query(sql, [...params, ...params]);
 
     const convertResult = result.map((row) => ({
-      cliente: row.CLIENTE.trim(),
+      cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
+      idCliCont: row.ID_CLIENTE_CONT,
+      idCliOpe: row.ID_CLIENTE_OPE.trim(),
       idOpe: row.ID_OPE,
       operacion: row.OPERACIONES.trim(),
       idOpeActual: row.ID_OPE_ACTUAL,
@@ -1145,7 +1159,7 @@ const changeOperation = async (req, res) => {
     if (isChecked) {
       const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
         WHERE ID = ?
       `;
 

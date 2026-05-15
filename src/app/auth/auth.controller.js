@@ -27,12 +27,19 @@ const login = async (req, res) => {
         .status(404)
         .json({ success: false, message: "El usuario es incorrecto" });
 
-    if(!result[0].CLV) return res.status(403).json({success: false, message: "El usuario no cuenta con contraseña"})
+    if (!result[0].CLV)
+      return res.status(403).json({
+        success: false,
+        message: "El usuario no cuenta con contraseña",
+      });
 
     // VALIDAR SI ES LA CONTRASEÑA
     const hashed = await bcryptjs.compare(password, result[0].CLV);
 
-    if(!hashed) return res.status(401).json({success: false, message: "La contraseña es incorrecta"})
+    if (!hashed)
+      return res
+        .status(401)
+        .json({ success: false, message: "La contraseña es incorrecta" });
 
     // RETORNAR PERMISOS DE USUARIO
     const sqlPs = `
@@ -42,14 +49,19 @@ const login = async (req, res) => {
       JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON R.ID = RP.ID_RL
       JOIN ${SCHEMA_BD}.T_PS_GC P ON RP.ID_PS = P.ID
       WHERE U.USU = ?
-    `
+    `;
 
     const resultPs = await cn.query(sqlPs, [dbUser]);
 
-    const permissions = resultPs.map(row => row.DESCRIPCION);
+    const permissions = resultPs.map((row) => row.DESCRIPCION);
 
     // Si la conexión es exitosa, generamos un token JWT con los datos del usuario
-    const payload = {id: result[0].ID, user: result[0].USU, role: result[0].DESCRIPCION, permissions};
+    const payload = {
+      id: result[0].ID,
+      user: result[0].USU,
+      role: result[0].DESCRIPCION,
+      permissions,
+    };
     const token = jwt.sign(
       payload,
       process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w",
@@ -58,28 +70,35 @@ const login = async (req, res) => {
 
     // Configura la cookie con el token JWT
     res.cookie("access_token", token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none",
+      httpOnly: false,
+      secure: false,
+      sameSite: "strict",
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
     res.json({ success: true, message: "Ingreso autorizado", permissions });
   } catch (error) {
     console.error("Error al iniciar sesión:", error);
-    res.json({ success: false, message: "Ocuarrio un error al intentar ingresar" });
+    res.json({
+      success: false,
+      message: "Ocuarrio un error al intentar ingresar",
+    });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const logout = async (_req, res) => {
   // Limpiamos la cookie eliminando el token JWT
-  res.clearCookie("access_token");
+  res.clearCookie("access_token", {
+    httpOnly: false,
+    secure: false,
+    sameSite: "strict",
+  });
   res.json({ success: true, message: "Cierre de sesión exitoso" });
 };
 
@@ -98,7 +117,7 @@ const verify = async (req, res) => {
         message: "Token válido",
         globalDbUser: user.user,
         role: user.role,
-        permissions: user.permissions
+        permissions: user.permissions,
       });
     },
   );

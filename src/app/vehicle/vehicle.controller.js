@@ -441,9 +441,12 @@ const listPlateTraceability = async (req, res) => {
       } else if (status == "I") {
         filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
         filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
-      } else if (status == "P") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+      } else if (status == "PR") {
+        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+      } else if (status == "PA") {
+        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
       } else if (status == "V") {
         filtrosA += " AND V.ID_OPE = 109";
         filtrosB += " AND V.ID_OPE = 109";
@@ -460,6 +463,8 @@ const listPlateTraceability = async (req, res) => {
         SELECT 
           DISTINCT(AD.ID),
           C.CLINOM AS CLIENTE, 
+          CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+          V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
           O.DESCRIPCION AS OPERACIONES, 
           V.ID_OPE AS ID_OPE_ACTUAL,
@@ -488,6 +493,8 @@ const listPlateTraceability = async (req, res) => {
         ON AD.ID_ASIGNACION = AC.ID
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LC.NRO_LEASING = AD.LEASING
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+        ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
         LEFT JOIN (
           SELECT DISTINCT A.IDCLI, B.CLINOM 
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -495,7 +502,7 @@ const listPlateTraceability = async (req, res) => {
           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
           ORDER BY CLINOM ASC
         ) C
-        ON AC.ID_CLIENTE = C.IDCLI
+        ON CC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
@@ -505,6 +512,7 @@ const listPlateTraceability = async (req, res) => {
             V.COLOR,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
+            O.IDCLI,
             V.IDMAR,
             V.IDMOD
           FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -516,8 +524,6 @@ const listPlateTraceability = async (req, res) => {
         ON MA.ID = V.IDMAR
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON MO.ID = V.IDMOD
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
         WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
 
         UNION ALL
@@ -525,6 +531,8 @@ const listPlateTraceability = async (req, res) => {
         SELECT 
           DISTINCT(AD.ID),
           C.CLINOM AS CLIENTE, 
+          DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+          V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
           O.DESCRIPCION AS OPERACIONES, 
           V.ID_OPE AS ID_OPE_ACTUAL,
@@ -553,6 +561,10 @@ const listPlateTraceability = async (req, res) => {
         ON AD.ID_ASIGNACION = AC.ID
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LC.NRO_LEASING = AD.LEASING
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+        ON DC.ID_PADRE = CC.ID
         LEFT JOIN (
           SELECT DISTINCT A.IDCLI, B.CLINOM 
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -560,7 +572,7 @@ const listPlateTraceability = async (req, res) => {
           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
           ORDER BY CLINOM ASC
         ) C
-        ON AC.ID_CLIENTE = C.IDCLI
+        ON DC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
@@ -570,6 +582,7 @@ const listPlateTraceability = async (req, res) => {
             V.COLOR,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
+            O.IDCLI,
             V.IDMAR,
             V.IDMOD
           FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -581,10 +594,6 @@ const listPlateTraceability = async (req, res) => {
         ON MA.ID = V.IDMAR
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON MO.ID = V.IDMOD
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON DC.ID_PADRE = CC.ID
         WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
         ) T
       ) X
@@ -601,6 +610,8 @@ const listPlateTraceability = async (req, res) => {
         SELECT 
           DISTINCT(AD.ID),
           C.CLINOM AS CLIENTE, 
+          DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+          V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
           O.DESCRIPCION AS OPERACIONES, 
           V.ID_OPE AS ID_OPE_ACTUAL,
@@ -629,6 +640,10 @@ const listPlateTraceability = async (req, res) => {
         ON AD.ID_ASIGNACION = AC.ID
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LC.NRO_LEASING = AD.LEASING
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+        ON DC.ID_PADRE = CC.ID
         LEFT JOIN (
           SELECT DISTINCT A.IDCLI, B.CLINOM 
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -636,7 +651,7 @@ const listPlateTraceability = async (req, res) => {
           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
           ORDER BY CLINOM ASC
         ) C
-        ON AC.ID_CLIENTE
+        ON DC.ID_CLIENTE
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
@@ -646,6 +661,7 @@ const listPlateTraceability = async (req, res) => {
             V.COLOR,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
+            O.IDCLI,
             V.IDMAR,
             V.IDMOD
           FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -657,10 +673,6 @@ const listPlateTraceability = async (req, res) => {
         ON MA.ID = V.IDMAR
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON MO.ID = V.IDMOD
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON DC.ID_PADRE = CC.ID
         WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
         ) T
       ) X
@@ -682,6 +694,8 @@ const listPlateTraceability = async (req, res) => {
             SELECT 
               DISTINCT(AD.ID),
               C.CLINOM AS CLIENTE, 
+              CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
               O.DESCRIPCION AS OPERACIONES, 
               V.ID_OPE AS ID_OPE_ACTUAL,
@@ -710,6 +724,8 @@ const listPlateTraceability = async (req, res) => {
             ON AD.ID_ASIGNACION = AC.ID
             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
             ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
@@ -728,7 +744,7 @@ const listPlateTraceability = async (req, res) => {
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
+            ON CC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
@@ -738,6 +754,7 @@ const listPlateTraceability = async (req, res) => {
                 V.COLOR,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
                 V.IDMAR,
                 V.IDMOD
               FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -749,8 +766,6 @@ const listPlateTraceability = async (req, res) => {
             ON MA.ID = V.IDMAR
             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
             ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
             WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
 
             UNION ALL
@@ -758,6 +773,8 @@ const listPlateTraceability = async (req, res) => {
             SELECT 
               DISTINCT(AD.ID),
               C.CLINOM AS CLIENTE, 
+              DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
               O.DESCRIPCION AS OPERACIONES, 
               V.ID_OPE AS ID_OPE_ACTUAL,
@@ -786,6 +803,10 @@ const listPlateTraceability = async (req, res) => {
             ON AD.ID_ASIGNACION = AC.ID
             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
             ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+            ON DC.ID_PADRE = CC.ID
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
@@ -804,7 +825,7 @@ const listPlateTraceability = async (req, res) => {
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
+            ON DC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
@@ -814,6 +835,7 @@ const listPlateTraceability = async (req, res) => {
                 V.COLOR,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
                 V.IDMAR,
                 V.IDMOD
               FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -825,10 +847,6 @@ const listPlateTraceability = async (req, res) => {
             ON MA.ID = V.IDMAR
             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
             ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
             WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
             ) T
           ) X
@@ -845,6 +863,8 @@ const listPlateTraceability = async (req, res) => {
             SELECT 
               DISTINCT(AD.ID),
               C.CLINOM AS CLIENTE, 
+              DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
               O.DESCRIPCION AS OPERACIONES, 
               V.ID_OPE AS ID_OPE_ACTUAL,
@@ -873,6 +893,10 @@ const listPlateTraceability = async (req, res) => {
             ON AD.ID_ASIGNACION = AC.ID
             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
             ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+            ON DC.ID_PADRE = CC.ID
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO_ID AS ID_OPERACION
               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
@@ -891,7 +915,7 @@ const listPlateTraceability = async (req, res) => {
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
+            ON DC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
@@ -901,6 +925,7 @@ const listPlateTraceability = async (req, res) => {
                 V.COLOR,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
                 V.IDMAR,
                 V.IDMOD
               FROM ${SCHEMA_BD}.PO_VEHICULO V
@@ -912,10 +937,6 @@ const listPlateTraceability = async (req, res) => {
             ON MA.ID = V.IDMAR
             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
             ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
             WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
             ) T
           ) X
@@ -928,7 +949,9 @@ const listPlateTraceability = async (req, res) => {
 
       const convertResult = result.map((row) => ({
         idAssing: row.ID,
-        cliente: row.CLIENTE.trim(),
+        cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
+        idCliCont: row.ID_CLIENTE_CONT,
+        idCliOpe: row.ID_CLIENTE_OPE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
@@ -967,6 +990,8 @@ const listPlateTraceability = async (req, res) => {
       const convertResult = result.map((row) => ({
         idAssing: row.ID,
         cliente: row.CLIENTE.trim(),
+        idCliCont: row.ID_CLIENTE_CONT,
+        idCliOpe: row.ID_CLIENTE_OPE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
@@ -1005,6 +1030,8 @@ const listPlateTraceability = async (req, res) => {
       const convertResult = result.map((row) => ({
         idAssing: row.ID,
         cliente: row.CLIENTE.trim(),
+        idCliCont: row.ID_CLIENTE_CONT,
+        idCliOpe: row.ID_CLIENTE_OPE.trim(),
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
