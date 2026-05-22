@@ -219,10 +219,10 @@ const tableContract = async (req, res) => {
   const { idCli, id } = req.query; // Obtiene los parámetros de consulta
 
   // Validación inicial
-  if (!idCli || !id) {
+  if (!idCli) {
     return res.status(400).json({
       success: false,
-      message: "Los parámetros idCli e id son obligatorios.",
+      message: "El parámetro idCli es obligatorio.",
     });
   }
 
@@ -234,9 +234,9 @@ const tableContract = async (req, res) => {
     const query = `
               SELECT ID, NRO_CONTRATO AS DESCRIPCION, FECHA_FIRMA AS FECHACREA, CANT_VEHI AS TOTVEH, DURACION
               FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
-              WHERE ID_CLIENTE = ? AND ID = ?
+              WHERE ID_CLIENTE = ? ${id ? "AND ID = ?" : ""}
           `;
-    const result = await cn.query(query, [idCli, id]);
+    const result = await cn.query(query, id ? [idCli, id] : [idCli]);
 
     const cleanedResult = result.map((row) => {
       return {
@@ -373,6 +373,38 @@ const detailContract = async (req, res) => {
       WHERE ID_CLIENTE = ? 
       ${contratoId ? `AND ID = ?` : ""}
     `;
+
+    const sqlPendientes = `
+      SELECT COUNT(*) AS TOTAL_PENDIENTES FROM (
+        SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  
+        FROM (
+          SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO 
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+          INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B 
+          ON A.ID = B.ID_LEA_CAB) A 
+          LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C 
+          ON A.ID_VEH = C.ID 
+          LEFT JOIN ${SCHEMA_BD}.PO_MARCA D 
+          ON C.IDMAR = D.ID 
+          LEFT JOIN (
+            SELECT * FROM (
+              SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO 
+              FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+              INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A 
+              LEFT JOIN (
+                SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH 
+                FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A 
+                INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B 
+                ON A.ID=B.ID_ASIGNACION
+              ) B 
+              ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH
+            ) E 
+            ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
+        WHERE (A.ID_CLIENTE = ?) AND E.VEHICULO IS NULL 
+        GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING 
+        ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA
+      )
+    `
 
     let filtrosA = "";
     let filtrosB = "";
@@ -780,24 +812,24 @@ const detailContract = async (req, res) => {
             SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-          FROM SPEED400AT.TBL_ASIGNACION_DET tad 
-          LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac 
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
           ON tad.ID_ASIGNACION  = tac.ID
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
                 LEFT JOIN (
                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM SPEED400AT.PO_OPERACIONES A 
-                  INNER JOIN SPEED400AT.TCLIE B 
+                  FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+                  INNER JOIN ${SCHEMA_BD}.TCLIE B 
                   ON A.IDCLI = B.CLICVE 
                   WHERE A.ID <> 86 
                   AND B.CLINOM <> '*** ANULADO ***'
                 )PO
                 ON MOXU.IDOPERACION = PO.ID
-                LEFT JOIN SPEED400AT.T_US_GC tug 
+                LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
                 ON MOXU.CH_CODI_USUARIO = TUG.USU
-                LEFT JOIN SPEED400AT.T_RL_GC trg 
+                LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
                 ON TUG.ID_RL = TRG.ID
                 WHERE TUG.USU IS NOT NULL
           ) C
@@ -812,29 +844,29 @@ const detailContract = async (req, res) => {
             SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-          FROM SPEED400AT.TBL_ASIGNACION_DET tad 
-          LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac 
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
           ON tad.ID_ASIGNACION  = tac.ID
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
                 LEFT JOIN (
                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM SPEED400AT.PO_OPERACIONES A 
-                  INNER JOIN SPEED400AT.TCLIE B 
+                  FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+                  INNER JOIN ${SCHEMA_BD}.TCLIE B 
                   ON A.IDCLI = B.CLICVE 
                   WHERE A.ID <> 86 
                   AND B.CLINOM <> '*** ANULADO ***'
                 )PO
                 ON MOXU.IDOPERACION = PO.ID
-                LEFT JOIN SPEED400AT.T_US_GC tug 
+                LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
                 ON MOXU.CH_CODI_USUARIO = TUG.USU
-                LEFT JOIN SPEED400AT.T_RL_GC trg 
+                LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
                 ON TUG.ID_RL = TRG.ID
                 WHERE TUG.USU IS NOT NULL
           ) C
           ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = TAD.ID_OPE
-          LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB tdc
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
           ON tad.ID_CONTRATO = tdc.ID
           WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
           ${contratoId ? `AND tdc.ID_PADRE = ?` : ""}
@@ -866,6 +898,8 @@ const detailContract = async (req, res) => {
 
     const resultTotalAssign = await cn.query(sqlTotalAsign, paramsTotalVeh);
 
+    const resultTotalPending = await cn.query(sqlPendientes, [clienteId]);
+
     // Suponemos que hay solo un contrato en los resultados
     const contrato = contratoId ? resultCont[0] : null;
     const documento = resultDoc[0];
@@ -873,6 +907,7 @@ const detailContract = async (req, res) => {
     const totalActivas = resultTotalActivas[0];
     const totalVeh = resultTotalVeh[0];
     const totalVehAssign = resultTotalAssign[0];
+    const totalPending = resultTotalPending[0];
 
     // Respuesta con los detalles del contrato
     res.json({
@@ -895,6 +930,7 @@ const detailContract = async (req, res) => {
         cantidadDocumentos: documento.TOTAL_DOCUMENTOS,
         cantidadLeasing: leasing.TOTAL_LEASINGS,
         cantidadAsignados: totalVehAssign.TOTAL_ASIGNADOS,
+        pendientes: totalPending.TOTAL_PENDIENTES,
         archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : "",
       },
     });
