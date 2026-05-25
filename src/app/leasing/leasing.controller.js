@@ -35,9 +35,72 @@ const listLeasing = async (req, res) => {
       .json({ success: false, message: "Error al obtener leasing" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+};
+
+const listLeasingAdi = async (req, res) => {
+  const { clienteId, contratoId } = req.query;
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const conditions = [];
+    const params = [];
+
+    if (clienteId) {
+      conditions.push("ID_CLIENTE = ?");
+
+      params.push(clienteId);
+    }
+
+    if (contratoId) {
+      const [tipCon, idCon] = contratoId.split("_");
+
+      conditions.push("ID_CONTRATO = ?");
+
+      conditions.push("TIPCON = ?");
+
+      params.push(idCon, tipCon);
+    }
+
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+
+    const result = await cn.query(
+      `
+    SELECT ID, NRO_LEASING
+    FROM SPEED400AT.TBL_LEASING_CAB
+    ${whereClause}
+    ORDER BY NRO_LEASING ASC
+    `,
+      params,
+    );
+
+    // Decodificar los resultados desde latin1
+    const cleanedResult = result.map((row) => {
+      return {
+        ID: String(row.ID).trim(),
+        NRO_LEASING: decodeString(row.NRO_LEASING.trim()),
+      };
+    });
+
+    res.json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener los leasing:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener leasing" });
+  } finally {
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -302,9 +365,9 @@ const listAllLeasing = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -354,9 +417,9 @@ const listLeasingOfClient = async (req, res) => {
       .json({ success: false, message: "Error al obtener leasing" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -403,9 +466,9 @@ const listLeasingByContract = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -448,9 +511,9 @@ const listLeasingByDocument = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -605,9 +668,9 @@ const listLeasingGeneral = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -689,9 +752,9 @@ const detailLeasing = async (req, res) => {
       .json({ success: false, message: "Error al obtener detalle de leasing" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -756,9 +819,9 @@ const detailVehByLeasing = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -935,15 +998,16 @@ const insertLeasing = async (req, res) => {
       .json({ success: false, message: "Error al insertar Leasing" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 module.exports = {
   listLeasing,
+  listLeasingAdi,
   listAllLeasing,
   listLeasingOfClient,
   listLeasingByContract,

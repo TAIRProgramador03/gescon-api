@@ -1,9 +1,12 @@
 const { SCHEMA_BD } = require("../../shared/conf.js");
-const { decodeString, convertirFecha, transformType } = require("../../shared/utils.js");
+const {
+  decodeString,
+  convertirFecha,
+  transformType,
+} = require("../../shared/utils.js");
 const connection = require("../../shared/connect.js");
 
 const listVehicles = async (req, res) => {
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -22,15 +25,14 @@ const listVehicles = async (req, res) => {
       .json({ success: false, message: "Error al obtener los datos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const tableVehicles = async (req, res) => {
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -133,15 +135,14 @@ const tableVehicles = async (req, res) => {
       .json({ success: false, message: "Error al obtener los datos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const contVehicles = async (req, res) => {
-
   const pool = await connection();
   const cn = await pool.connect();
 
@@ -172,15 +173,14 @@ const contVehicles = async (req, res) => {
       .json({ success: false, message: "Error al obtener los datos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const vehicleLeasing = async (req, res) => {
-
   const { idCli, nroLeasing } = req.query;
   let query = "";
   let params = [];
@@ -232,15 +232,14 @@ const vehicleLeasing = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const listVehiclesByContract = async (req, res) => {
-
   const { contratoId, clienteId } = req.query;
 
   if (!contratoId || !clienteId)
@@ -304,15 +303,14 @@ const listVehiclesByContract = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const listModelGen = async (req, res) => {
-
   const pool = await connection();
   const cn = await pool.connect();
   try {
@@ -336,15 +334,14 @@ const listModelGen = async (req, res) => {
       .json({ success: false, message: "Error al listar modelos genericos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const listYearByModelGen = async (req, res) => {
-
   const { modelId } = req.query;
 
   if (!modelId)
@@ -376,9 +373,9 @@ const listYearByModelGen = async (req, res) => {
       .json({ success: false, message: "Error al listar años por modelo" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -392,6 +389,8 @@ const listPlateTraceability = async (req, res) => {
   const cn = await pool.connect();
 
   try {
+    const statusArray = typeof status === "string" ? status.split(",") : [];
+
     let filtrosA = "";
     let filtrosB = "";
     let params = [];
@@ -434,22 +433,65 @@ const listPlateTraceability = async (req, res) => {
       params.push(tipoTerr);
     }
 
-    if (status) {
-      if (status == "A") {
-        filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-        filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      } else if (status == "I") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
-      } else if (status == "PR") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-      } else if (status == "PA") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-      } else if (status == "V") {
-        filtrosA += " AND V.ID_OPE = 109";
-        filtrosB += " AND V.ID_OPE = 109";
+    // if (status) {
+    //   if (status == "A") {
+    //     filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+    //     filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+    //   } else if (status == "I") {
+    //     filtrosA +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
+    //     filtrosB +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
+    //   } else if (status == "PR") {
+    //     filtrosA +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+    //     filtrosB +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+    //   } else if (status == "PA") {
+    //     filtrosA +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+    //     filtrosB +=
+    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
+    //   } else if (status == "V") {
+    //     filtrosA += " AND V.ID_OPE = 109";
+    //     filtrosB += " AND V.ID_OPE = 109";
+    //   }
+    // }
+
+    if (status?.length) {
+      const conditions = [];
+
+      if (statusArray.includes("A")) {
+        conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
+      }
+
+      if (statusArray.includes("I")) {
+        conditions.push(
+          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
+        );
+      }
+
+      if (statusArray.includes("PR")) {
+        conditions.push(
+          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+        );
+      }
+
+      if (statusArray.includes("PA")) {
+        conditions.push(
+          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+        );
+      }
+
+      if (statusArray.includes("V")) {
+        conditions.push("(V.ID_OPE = 109)");
+      }
+
+      if (conditions.length) {
+        const filter = ` AND (${conditions.join(" OR ")})`;
+
+        filtrosA += filter;
+        filtrosB += filter;
       }
     }
 
@@ -679,8 +721,7 @@ const listPlateTraceability = async (req, res) => {
       WHERE RN = 1
     `;
 
-    
-    if(roleId != 1 && roleId != 2) {
+    if (roleId != 1 && roleId != 2) {
       filtrosA += ` AND C.ID_USU = ${idUser}`;
       filtrosB += ` AND C.ID_USU = ${idUser}`;
 
@@ -851,7 +892,7 @@ const listPlateTraceability = async (req, res) => {
             ) T
           ) X
           WHERE RN = 1
-      `
+      `;
 
       sqlDoc = `
         SELECT *
@@ -941,7 +982,7 @@ const listPlateTraceability = async (req, res) => {
             ) T
           ) X
           WHERE RN = 1
-      `
+      `;
     }
 
     if (typeDoc == "H") {
@@ -1073,24 +1114,25 @@ const listPlateTraceability = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
 
 const listPlateByRegion = async (req, res) => {
+  const { region, clienteId } = req.query;
 
-  const {region, clienteId} = req.query;
-
-  if(!region) return res.status(400).json({success: false, message: "El parametro region es obligatorio"})
+  if (!region)
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro region es obligatorio" });
 
   const pool = await connection();
   const cn = await pool.connect();
 
   try {
-
     const sql = `
       SELECT 
         TAD.PLACA, 
@@ -1128,15 +1170,15 @@ const listPlateByRegion = async (req, res) => {
       WHERE TUO.DEPARTAMENTO = ? ${clienteId ? "AND TAC.ID_CLIENTE = ?" : ""}
     `;
 
-    const params = [region.toUpperCase()]
+    const params = [region.toUpperCase()];
 
-    if(clienteId) {
-      params.push(clienteId)
+    if (clienteId) {
+      params.push(clienteId);
     }
 
-    const result = await cn.query(sql, params)
+    const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map(row => ({
+    const cleanedResult = result.map((row) => ({
       placa: row.PLACA.trim(),
       marca: row.MARCA.trim(),
       modelo: row.MODELO.trim(),
@@ -1145,20 +1187,20 @@ const listPlateByRegion = async (req, res) => {
         1: "Socavón",
         2: "Ciudad",
         3: "Severo",
-        4: "Pendiente"
+        4: "Pendiente",
       }),
       condicion: transformType(row.CONDICION, {
         0: "Titular",
         1: "Retén",
         2: "Logística",
-        3: "Pendiente"
+        3: "Pendiente",
       }),
       anio: row.ANIO,
       fechaIni: row.FECHA_INICIO.trim(),
       fechaFin: row.FECHA_FIN.trim(),
       operacion: row.OPERACION.trim(),
-      cliente: row.CLIENTE.trim()
-    }))
+      cliente: row.CLIENTE.trim(),
+    }));
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -1169,9 +1211,9 @@ const listPlateByRegion = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1185,5 +1227,5 @@ module.exports = {
   listModelGen,
   listYearByModelGen,
   listPlateTraceability,
-  listPlateByRegion
+  listPlateByRegion,
 };

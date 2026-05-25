@@ -60,9 +60,9 @@ const listOperations = async (req, res) => {
       .json({ success: false, message: "Error al obtener las operaciones" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -96,6 +96,9 @@ const listAssingByContract = async (req, res) => {
     //   WHERE B.ID_CONTRATO = ? AND A.ID_CLIENTE = ?
     // `;
 
+    const statusArray =
+      typeof status === "string" ? status.split(",") : [];
+
     let filtrosA = "";
     let filtrosB = "";
     let params = [];
@@ -124,16 +127,34 @@ const listAssingByContract = async (req, res) => {
       params.push(tipoTerr);
     }
 
-    if (status) {
-      if (status == "A") {
-        filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-        filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      } else if (status == "I") {
-        filtrosA += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
-        filtrosB += " AND O.ID != V.ID_OPE AND V.ID_OPE != 109";
-      } else if (status == "V") {
-        filtrosA += " AND V.ID_OPE = 109";
-        filtrosB += " AND V.ID_OPE = 109";
+    if (status?.length) {
+      const conditions = [];
+
+      if (statusArray.includes("A")) {
+        conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
+      }
+
+      if (statusArray.includes("I")) {
+        conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)");
+      }
+
+      if (statusArray.includes("PR")) {
+        conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)");
+      }
+
+      if (statusArray.includes("PA")) {
+        conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)");
+      }
+
+      if (statusArray.includes("V")) {
+        conditions.push("(V.ID_OPE = 109)");
+      }
+
+      if (conditions.length) {
+        const filter = ` AND (${conditions.join(" OR ")})`;
+
+        filtrosA += filter;
+        filtrosB += filter;
       }
     }
 
@@ -284,11 +305,11 @@ const listAssingByContract = async (req, res) => {
       WHERE RN = 1
     `;
 
-    if(roleId != 1 && roleId != 2) {
+    if (roleId != 1 && roleId != 2) {
       filtrosA += ` AND C.ID_USU = ${idUser}`;
       filtrosB += ` AND C.ID_USU = ${idUser}`;
 
-     sql =  `
+      sql = `
         SELECT *
         FROM (
           SELECT 
@@ -455,7 +476,7 @@ const listAssingByContract = async (req, res) => {
             ) T
           ) X
           WHERE RN = 1
-        `
+        `;
     }
 
     const result = await cn.query(sql, [...params, ...params]);
@@ -498,9 +519,9 @@ const listAssingByContract = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -528,7 +549,7 @@ const insertOperation = async (req, res) => {
       converFecha,
       user,
       user,
-      user
+      user,
     ]);
 
     const idAsignaCab = result.insertId || (await obtenerUltimoIdAsigna(cn));
@@ -604,7 +625,7 @@ const insertOperation = async (req, res) => {
           newKey,
           detalle.condicion,
           user,
-          user
+          user,
         ]);
       }
     }
@@ -635,9 +656,9 @@ const insertOperation = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -761,9 +782,9 @@ const valideAssign = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -892,9 +913,9 @@ const updateAssign = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -992,9 +1013,9 @@ const listVehPending = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1100,9 +1121,9 @@ const listVehNoPending = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1220,7 +1241,7 @@ const changeOperation = async (req, res) => {
         observation,
         id,
         user,
-        user
+        user,
       ]);
     } else {
       const sqlChangeOpe = `
@@ -1285,7 +1306,7 @@ const changeOperation = async (req, res) => {
         observation,
         id,
         user,
-        user
+        user,
       ]);
 
       if (file && validFile) {
@@ -1309,9 +1330,9 @@ const changeOperation = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1343,8 +1364,8 @@ const listReassign = async (req, res) => {
 
     const cleanedResult = result.map((row) => ({
       id: row.ID,
-      opeAnterior: row.OPERACION_ANTERIOR,
-      opeNueva: row.OPERACION_NUEVA,
+      opeAnterior: row.OPERACION_ANTERIOR.trim(),
+      opeNueva: row.OPERACION_NUEVA.trim(),
       fecha: row.FECHA_REASIGNACION,
       archivo: row.ARCHIVO,
     }));
@@ -1359,9 +1380,9 @@ const listReassign = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1477,9 +1498,9 @@ const getReassignById = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1691,9 +1712,9 @@ const uploalMasiveRecords = async (req, res) => {
     return res.status(500).json({ message: "Error al importar datos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
