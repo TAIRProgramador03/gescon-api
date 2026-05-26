@@ -75,7 +75,7 @@ const listLeasingAdi = async (req, res) => {
     const result = await cn.query(
       `
     SELECT ID, NRO_LEASING
-    FROM SPEED400AT.TBL_LEASING_CAB
+    FROM ${SCHEMA_BD}.TBL_LEASING_CAB
     ${whereClause}
     ORDER BY NRO_LEASING ASC
     `,
@@ -238,38 +238,38 @@ const listAllLeasing = async (req, res) => {
           ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
             LEFT JOIN (
               SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM SPEED400AT.PO_OPERACIONES A 
-              INNER JOIN SPEED400AT.TCLIE B 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B 
               ON A.IDCLI = B.CLICVE 
               WHERE A.ID <> 86 
               AND B.CLINOM <> '*** ANULADO ***'
             )PO
             ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN SPEED400AT.T_US_GC tug 
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
             ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
             ON TUG.ID_RL = TRG.ID
             WHERE TUG.USU IS NOT NULL
           ) CL
           ON CL.IDCLI = L.ID_CLIENTE 
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
             LEFT JOIN (
               SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM SPEED400AT.PO_OPERACIONES A 
-              INNER JOIN SPEED400AT.TCLIE B 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B 
               ON A.IDCLI = B.CLICVE 
               WHERE A.ID <> 86 
               AND B.CLINOM <> '*** ANULADO ***'
             )PO
             ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN SPEED400AT.T_US_GC tug 
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
             ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
             ON TUG.ID_RL = TRG.ID
             WHERE TUG.USU IS NOT NULL
           ) CLA
@@ -284,38 +284,38 @@ const listAllLeasing = async (req, res) => {
           ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
             LEFT JOIN (
               SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM SPEED400AT.PO_OPERACIONES A 
-              INNER JOIN SPEED400AT.TCLIE B 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B 
               ON A.IDCLI = B.CLICVE 
               WHERE A.ID <> 86 
               AND B.CLINOM <> '*** ANULADO ***'
             )PO
             ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN SPEED400AT.T_US_GC tug 
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
             ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
             ON TUG.ID_RL = TRG.ID
             WHERE TUG.USU IS NOT NULL
           ) CL
           ON CL.IDCLI = L.ID_CLIENTE 
           LEFT JOIN (
             SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
             LEFT JOIN (
               SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM SPEED400AT.PO_OPERACIONES A 
-              INNER JOIN SPEED400AT.TCLIE B 
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+              INNER JOIN ${SCHEMA_BD}.TCLIE B 
               ON A.IDCLI = B.CLICVE 
               WHERE A.ID <> 86 
               AND B.CLINOM <> '*** ANULADO ***'
             )PO
             ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN SPEED400AT.T_US_GC tug 
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
             ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN SPEED400AT.T_RL_GC trg 
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
             ON TUG.ID_RL = TRG.ID
             WHERE TUG.USU IS NOT NULL
           ) CLA
@@ -425,7 +425,7 @@ const listLeasingOfClient = async (req, res) => {
 };
 
 const listLeasingByContract = async (req, res) => {
-  const { contratoId, clienteId } = req.query;
+  const { contratoId, clienteId, tipoCon } = req.query;
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -434,15 +434,15 @@ const listLeasingByContract = async (req, res) => {
     const sql = `
       SELECT A.ID, A.NRO_LEASING, A.CANT_VEH, A.FECHA_INI, A.FECHA_FIN, A.ID_CONTRATO, A.ID_CLIENTE
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
-      ${contratoId && clienteId ? `WHERE A.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND TIPCON = 'P'` : contratoId ? `WHERE A.ID_CONTRATO = ? AND TIPCON = 'P'` : clienteId ? `WHERE A.ID_CLIENTE = ?` : ""}
+      ${contratoId && tipoCon && clienteId ? `WHERE A.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND TIPCON = ?` : contratoId && tipoCon ? `WHERE A.ID_CONTRATO = ? AND TIPCON = ?` : clienteId ? `WHERE A.ID_CLIENTE = ?` : ""}
     `;
 
     const params = [];
 
-    if (contratoId && clienteId) {
-      params.push(clienteId, contratoId);
-    } else if (contratoId) {
-      params.push(contratoId);
+    if (contratoId && clienteId && tipoCon) {
+      params.push(clienteId, contratoId, tipoCon);
+    } else if (contratoId && tipoCon) {
+      params.push(contratoId, tipoCon);
     } else if (clienteId) {
       params.push(clienteId);
     }
@@ -678,11 +678,11 @@ const listLeasingGeneral = async (req, res) => {
 const detailLeasing = async (req, res) => {
   const { leasingId, nroLeasing, clienteId, contratoId, tipoCont } = req.query;
 
-  if (!leasingId || !nroLeasing || !clienteId || !contratoId || !tipoCont)
+  if (!leasingId)
     return res.status(400).json({
       success: false,
       message:
-        "Los parametros leasingId, nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
+        "El parametro leasingId es obligatorio",
     });
 
   const pool = await connection();
@@ -701,26 +701,47 @@ const detailLeasing = async (req, res) => {
     // `;
 
     const sql = `
-      SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, COUNT(A.ID) AS CANT_ASIGN, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON
+      SELECT 
+        L.ID, 
+        L.BANCO, 
+        L.CANT_VEH, 
+        COUNT(A.ID) AS CANT_ASIGN, 
+        L.FECHA_INI, 
+        L.FECHA_FIN, 
+        L.PERIODO_GRACIA, 
+        L.PDF, 
+        L.DESCRIPCION, 
+        C.CLINOM AS CLIENTE, 
+        C2.CLINOM AS CLIENTE_ASOCIADO
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
+      ON L.NRO_LEASING = A.LEASING 
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+      ON A.ID_ASIGNACION = AC.ID
       LEFT JOIN (
-        SELECT A.ID, A.LEASING, AC.ID_CLIENTE, A.ID_CONTRATO, A.CLASE_CONTRATO
-        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET A
-        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-        ON AC.ID = A.ID_ASIGNACION
-        WHERE A.LEASING = ? AND AC.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND A.CLASE_CONTRATO = ?
-      ) A
-      ON L.NRO_LEASING = A.LEASING
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+      ) C
+      ON L.ID_CLIENTE = C.IDCLI
+      LEFT JOIN (
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+          ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+          AND B.CLINOM <> '*** ANULADO ***'
+      ) C2
+      ON L.ID_CLIENTE_ASOCIADO = C2.IDCLI
       WHERE L.ID = ?
-      GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON
+      GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON, C.CLINOM, C2.CLINOM
     `;
 
     const result = await cn.query(sql, [
-      nroLeasing,
-      clienteId,
-      contratoId,
-      tipoCont,
-      leasingId,
+      leasingId
     ]);
 
     if (result.length == 0 || !result[0])
@@ -732,8 +753,16 @@ const detailLeasing = async (req, res) => {
 
     return res.status(200).json({
       id: findLeasing.ID,
-      nroLeasing: findLeasing.NRO_LEASING.trim(),
-      banco: findLeasing.BANCO.trim(),
+      banco: transformType(findLeasing.BANCO.trim(), {
+        "1": "BANBIF",
+        "2": "BBVA",
+        "3": "BCP",
+        "4": "HSBC",
+        "5": "INTERBANK",
+        "6": "SCOTIABANK",
+        "7": "TAIR",
+        "8": "SANTANDER"
+      }),
       cantVehi: findLeasing.CANT_VEH,
       cantAsign: findLeasing.CANT_ASIGN,
       fechaInicio: findLeasing.FECHA_INI.toString(),
@@ -743,7 +772,8 @@ const detailLeasing = async (req, res) => {
       descripcion: findLeasing.DESCRIPCION
         ? findLeasing.DESCRIPCION.trim()
         : "",
-      tipo: findLeasing.TIPCON.trim(),
+      cliente: findLeasing.CLIENTE.trim(),
+      clienteAsoc: findLeasing.CLIENTE_ASOCIADO ? findLeasing.CLIENTE_ASOCIADO.trim() : findLeasing.CLIENTE.trim()
     });
   } catch (error) {
     console.error("Error al obtener detalle de leasing: ", error);

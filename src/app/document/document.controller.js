@@ -73,7 +73,7 @@ const detailDocument = async (req, res) => {
       FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB D
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB L
       ON D.ID = L.ID_CONTRATO AND L.TIPCON='H'
-      WHERE D.ID = ? AND L.TIPCON='H'
+      WHERE D.ID = ?
       GROUP BY D.ID, D.NRO_DOC, D.TIPO_DOC, D.CANT_VEHI, D.FECHA_FIRMA, D.DURACION, D.KM_ADI, D.KM_TOTAL, D.ARCHIVO_PDF, D.DESCRIPCION, D.MOTIVO
     `;
 
@@ -182,6 +182,11 @@ const detailDocument = async (req, res) => {
         : "",
       cantLea: findDocument.CANT_LEA,
       nroDocumento: findDocument.NRO_DOC.trim(),
+      isTemp: findDocument
+        ? findDocument.NRO_DOC.trim().toUpperCase().startsWith("DPEN-")
+          ? true
+          : false
+        : false,
     });
   } catch (error) {
     console.error("Error al obtener detalle de documento", error);
@@ -299,10 +304,10 @@ const detailVehByDocu = async (req, res) => {
 
     const resultDet = await cn.query(sqlDet, [tipoTerr, documentoId]);
 
-    if (resultDet.length == 0)
-      return res
-        .status(404)
-        .json({ success: false, message: "Sin placas encontradas" });
+    // if (resultDet.length == 0)
+    //   return res
+    //     .status(404)
+    //     .json({ success: false, message: "Sin placas encontradas" });
 
     const cleanedResult = resultDet.map((row) => ({
       modelo: row.MODELO.trim() ?? "",

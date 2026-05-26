@@ -914,7 +914,7 @@ const detailContract = async (req, res) => {
       success: true,
       data: {
         isTemp: contrato
-          ? contrato.NRO_CONTRATO.trim().toUpperCase().includes("CPEN")
+          ? contrato.NRO_CONTRATO.trim().toUpperCase().startsWith("CPEN-")
             ? true
             : false
           : false,
