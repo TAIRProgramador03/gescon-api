@@ -947,6 +947,7 @@ const listVehPending = async (req, res) => {
         TAD.PLACA,
         TAD.ID_CONTRATO,
         COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO,
+        COALESCE(TC.DURACION, TD.DURACION) AS PLAZO,
         TAD.CLASE_CONTRATO,
         TAD.TARIFA,
         TAD.CONDICION,
@@ -956,7 +957,9 @@ const listVehPending = async (req, res) => {
         PO.DESCRIPCION AS OPE_ASIGN, 
         PO3.DESCRIPCION AS OPE_ACTUAL,
         PO3.IDCLI AS ID_CLIENTE_OPE,
-        PA.DESDE AS FECHA_REF
+        PA.DESDE AS FECHA_REF,
+        TAD.FECHA_INI AS FECHA_INICIO,
+        TAD.FECHA_FIN AS FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
       JOIN (
         SELECT 
@@ -999,9 +1002,12 @@ const listVehPending = async (req, res) => {
       fechaRef: row.FECHA_REF,
       idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
       nroContrato: row.CONTRATO.trim(),
+      plazoContrato: row.PLAZO.trim(),
       tarifa: row.TARIFA,
       condicion: row.CONDICION.trim(),
       terreno: row.TP_TERRENO,
+      fechaInicio: row.FECHA_INICIO.trim(),
+      fechaFin: row.FECHA_FIN.trim(),
     }));
 
     return res.status(200).json(cleanedResult);
@@ -1144,6 +1150,7 @@ const changeOperation = async (req, res) => {
     condition,
     contract,
     date,
+    dateInit,
     dateFinish,
     file,
     isChecked,
@@ -1216,7 +1223,7 @@ const changeOperation = async (req, res) => {
         newAssing.tipo,
         newAssing.tarifa,
         newAssing.terreno,
-        convertDate,
+        convertirFecha(dateInit),
         convertirFecha(dateFinish),
         user,
         id,
@@ -1246,7 +1253,7 @@ const changeOperation = async (req, res) => {
     } else {
       const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
         WHERE ID = ?
       `;
 
@@ -1283,6 +1290,8 @@ const changeOperation = async (req, res) => {
         newAssing.tarifa,
         newAssing.archivo,
         newAssing.terreno,
+        convertirFecha(dateInit),
+        convertirFecha(dateFinish),
         user,
         id,
       ]);
