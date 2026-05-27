@@ -170,57 +170,45 @@ const listAllLeasing = async (req, res) => {
     // `;
 
     let sql = `
-      SELECT * FROM (
-        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN
-        FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
-        ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
-        LEFT JOIN (
-		      SELECT DISTINCT A.IDCLI, B.CLINOM 
-		      FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-		      INNER JOIN ${SCHEMA_BD}.TCLIE B 
-		      ON A.IDCLI = B.CLICVE 
-		      WHERE A.ID <> 86 
-		      AND B.CLINOM <> '*** ANULADO ***'
-        ) CL
-        ON CL.IDCLI = L.ID_CLIENTE 
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM 
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-          WHERE A.ID <> 86 
-          AND B.CLINOM <> '*** ANULADO ***'
-        ) CLA
-        ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
-        WHERE L.TIPCON = 'P'
-
-        UNION ALL
-
-        SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN
-        FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
-        ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM 
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-          WHERE A.ID <> 86 
-          AND B.CLINOM <> '*** ANULADO ***'
-        ) CL
-        ON CL.IDCLI = L.ID_CLIENTE 
-        LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM 
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-            INNER JOIN ${SCHEMA_BD}.TCLIE B 
-                ON A.IDCLI = B.CLICVE 
-            WHERE A.ID <> 86 
-              AND B.CLINOM <> '*** ANULADO ***'
-        ) CLA
-        ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
-        WHERE L.TIPCON = 'H'
-      ) L
+      SELECT 
+        L.ID, 
+        L.NRO_LEASING, 
+        L.BANCO, 
+        L.CANT_VEH AS CANTIDAD, 
+        L.FECHA_INI, 
+        L.FECHA_FIN, 
+        L.PERIODO_GRACIA, 
+        L.PDF, 
+        L.TIPCON, 
+        COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO, 
+        L.ID_CLIENTE, 
+        L.ID_CONTRATO, 
+        COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO, 
+        CL.CLINOM AS CLIENTE, 
+        COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+      ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+      ON L.ID_CONTRATO = TC2.ID AND L.TIPCON = 'H'
+      LEFT JOIN (
+        SELECT DISTINCT A.IDCLI, B.CLINOM 
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+        INNER JOIN ${SCHEMA_BD}.TCLIE B 
+        ON A.IDCLI = B.CLICVE 
+        WHERE A.ID <> 86 
+        AND B.CLINOM <> '*** ANULADO ***'
+      ) CL
+      ON CL.IDCLI = L.ID_CLIENTE 
+      LEFT JOIN (
+        SELECT DISTINCT A.IDCLI, B.CLINOM 
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+        INNER JOIN ${SCHEMA_BD}.TCLIE B 
+        ON A.IDCLI = B.CLICVE 
+        WHERE A.ID <> 86 
+        AND B.CLINOM <> '*** ANULADO ***'
+      ) CLA
+      ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO
       ${filtros}
       ORDER BY L.ID ASC
     `;
@@ -231,98 +219,67 @@ const listAllLeasing = async (req, res) => {
       }
 
       sql = `
-        SELECT * FROM (
-          SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN, CL.ID_USU
-          FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
-          ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+        SELECT 
+          L.ID, 
+          L.NRO_LEASING, 
+          L.BANCO, 
+          L.CANT_VEH AS CANTIDAD, 
+          L.FECHA_INI, 
+          L.FECHA_FIN, 
+          L.PERIODO_GRACIA, 
+          L.PDF, 
+          L.TIPCON, 
+          COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO, 
+          L.ID_CLIENTE, 
+          L.ID_CONTRATO, 
+          COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO, 
+          CL.CLINOM AS CLIENTE, 
+          COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN,
+          CL.ID_USU
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+        ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+        ON L.ID_CONTRATO = TC2.ID AND L.TIPCON = 'H'
+        LEFT JOIN (
+          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
           LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B 
-              ON A.IDCLI = B.CLICVE 
-              WHERE A.ID <> 86 
-              AND B.CLINOM <> '*** ANULADO ***'
-            )PO
-            ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
-            ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
-            ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
-          ) CL
-          ON CL.IDCLI = L.ID_CLIENTE 
+            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+            INNER JOIN ${SCHEMA_BD}.TCLIE B 
+            ON A.IDCLI = B.CLICVE 
+            WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+          )PO
+          ON MOXU.IDOPERACION = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          ON MOXU.CH_CODI_USUARIO = TUG.USU
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          ON TUG.ID_RL = TRG.ID
+          WHERE TUG.USU IS NOT NULL
+        ) CL
+        ON CL.IDCLI = L.ID_CLIENTE 
+        LEFT JOIN (
+          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
           LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B 
-              ON A.IDCLI = B.CLICVE 
-              WHERE A.ID <> 86 
-              AND B.CLINOM <> '*** ANULADO ***'
-            )PO
-            ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
-            ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
-            ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
-          ) CLA
-          ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
-          WHERE L.TIPCON = 'P'
-
-          UNION ALL
-
-          SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO, L.ID_CLIENTE_ASOCIADO, CL.CLINOM AS CLIENTE, CLA.CLINOM AS CLIENTE_ORIGEN, CL.ID_USU
-          FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
-          ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B 
-              ON A.IDCLI = B.CLICVE 
-              WHERE A.ID <> 86 
-              AND B.CLINOM <> '*** ANULADO ***'
-            )PO
-            ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
-            ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
-            ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
-          ) CL
-          ON CL.IDCLI = L.ID_CLIENTE 
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B 
-              ON A.IDCLI = B.CLICVE 
-              WHERE A.ID <> 86 
-              AND B.CLINOM <> '*** ANULADO ***'
-            )PO
-            ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
-            ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
-            ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
-          ) CLA
-          ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO 
-          WHERE L.TIPCON = 'H'
-        ) L
-        WHERE L.ID_USU = ${idUser} ${filtros}
+            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+            INNER JOIN ${SCHEMA_BD}.TCLIE B 
+            ON A.IDCLI = B.CLICVE 
+            WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+          )PO
+          ON MOXU.IDOPERACION = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          ON MOXU.CH_CODI_USUARIO = TUG.USU
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          ON TUG.ID_RL = TRG.ID
+          WHERE TUG.USU IS NOT NULL
+        ) CLA
+        ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO
+        WHERE CL.ID_USU = ${idUser} ${filtros}
         ORDER BY L.ID ASC
       `;
     }
@@ -343,8 +300,8 @@ const listAllLeasing = async (req, res) => {
         8: "SANTANDER",
       }),
       cantidad: row.CANTIDAD,
-      fechaIni: row.FECHA_INI,
-      fechaFin: row.FECHA_FIN,
+      fechaIni: String(row.FECHA_INI),
+      fechaFin: String(row.FECHA_FIN),
       perGracia: row.PERIODO_GRACIA,
       archivoPdf: row.PDF.trim(),
       tipoCon: transformType(row.TIPCON.trim(), {
