@@ -937,7 +937,7 @@ const insertLeasing = async (req, res) => {
       newKey,
       funcionNumerica(idContrato),
       funcionParteVar(idContrato),
-      funcionNumerica(validAsoc),
+      validAsoc,
       user,
       user,
     ]);
