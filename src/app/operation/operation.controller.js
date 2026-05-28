@@ -529,7 +529,7 @@ const listAssingByContract = async (req, res) => {
 const insertOperation = async (req, res) => {
   const { user } = req.user;
 
-  const { idCliente, valorRepe, detalles } = req.body;
+  const { idCliente, detalles } = req.body;
 
   const pool = await connection();
   const cn = await pool.connect();
@@ -602,12 +602,12 @@ const insertOperation = async (req, res) => {
         }
 
         // Si valorRepe es true, toma las fechas del primer detalle y reutilízalas
-        if (valorRepe === true || valorRepe === "true") {
-          if (i === 0) {
-            fechaIniGlobal = convertirFecha(detalle.fechaIni);
-            fechaFinGlobal = convertirFecha(detalle.fechaFin);
-          }
-        }
+        // if (valorRepe === true || valorRepe === "true") {
+        //   if (i === 0) {
+        //     fechaIniGlobal = convertirFecha(detalle.fechaIni);
+        //     fechaFinGlobal = convertirFecha(detalle.fechaFin);
+        //   }
+        // }
 
         await cn.query(queryDetalle, [
           idAsignaCab,
@@ -618,8 +618,8 @@ const insertOperation = async (req, res) => {
           detalle.idOperacion,
           funcionNumerica(detalle.idContrato),
           detalle.idTerreno,
-          valorRepe ? fechaIniGlobal : convertirFecha(detalle.fechaIni),
-          valorRepe ? fechaFinGlobal : convertirFecha(detalle.fechaFin),
+          convertirFecha(detalle.fechaIni),
+          convertirFecha(detalle.fechaFin),
           detalle.leasing,
           funcionParteVar(detalle.idContrato),
           newKey,
