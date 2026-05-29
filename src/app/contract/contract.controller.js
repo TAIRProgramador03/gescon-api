@@ -50,9 +50,9 @@ const contractNro = async (req, res) => {
       .json({ success: false, message: "Error al obtener contratos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -208,9 +208,9 @@ const contractNroAdi = async (req, res) => {
       .json({ success: false, message: "Error al obtener contratos" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -270,9 +270,9 @@ const tableContract = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -404,7 +404,7 @@ const detailContract = async (req, res) => {
         GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING 
         ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA
       )
-    `
+    `;
 
     let filtrosA = "";
     let filtrosB = "";
@@ -571,7 +571,7 @@ const detailContract = async (req, res) => {
       paramsTotalVeh.push(clienteId, clienteId);
     }
 
-    if(roleId != 1 && roleId != 2) {
+    if (roleId != 1 && roleId != 2) {
       filtrosA += ` AND C.ID_USU = ${idUser}`;
       filtrosB += ` AND C.ID_USU = ${idUser}`;
 
@@ -734,7 +734,7 @@ const detailContract = async (req, res) => {
         ) X
         WHERE RN = 1
       )
-      `
+      `;
 
       sqlTotalAsign = `
         SELECT COUNT(*) AS TOTAL_ASIGNADOS FROM (
@@ -798,7 +798,7 @@ const detailContract = async (req, res) => {
           WHERE AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
           ${contratoId ? "AND CC.ID = ?" : ""}
         )
-      `
+      `;
 
       sqlTotalVeh = `
         SELECT 
@@ -871,7 +871,7 @@ const detailContract = async (req, res) => {
           WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
           ${contratoId ? `AND tdc.ID_PADRE = ?` : ""}
         )
-      `
+      `;
     }
 
     const resultCont = await cn.query(
@@ -942,9 +942,9 @@ const detailContract = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1030,9 +1030,9 @@ const detailVehByCont = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1080,9 +1080,9 @@ const contContract = async (req, res) => {
       .json({ success: false, message: "Error al obtener los contadores" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1112,9 +1112,9 @@ const contClient = async (req, res) => {
       .json({ success: false, message: "Error al obtener los contadores" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1237,9 +1237,9 @@ const insertContract = async (req, res) => {
       .json({ success: false, message: "Error al insertar contrato" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1481,9 +1481,9 @@ const updateContract = async (req, res) => {
       .json({ success: false, message: "Error al insertar contrato" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1568,9 +1568,60 @@ const getContractById = async (req, res) => {
       .json({ success: false, message: "Error al obtener contrato por id" });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+};
+
+const getContractAdiById = async (req, res) => {
+  const { id } = req.params;
+
+  const type = id.split("_")[0];
+  const contractId = id.split("_")[1];
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    let sql = "";
+
+    if (type == "P") {
+      sql = `
+      SELECT ID, tc.NRO_CONTRATO, DURACION FROM SPEED400AT.TBLCONTRATO_CAB tc WHERE ID = ?;
+    `;
+    } else if (type == "H") {
+      sql = `
+      SELECT ID, tc.NRO_DOC AS NRO_CONTRATO, DURACION FROM SPEED400AT.TBLDOCUMENTO_CAB tc WHERE ID = ?;
+    `;
+    }
+
+    const result = await cn.query(sql, [contractId]);
+
+    if (result.length == 0)
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el contrato solicitado",
+      });
+
+    const contractData = {
+      idCliente: result[0].ID_CLIENTE,
+      nroContrato: result[0].NRO_CONTRATO.trim(),
+      duracion: result[0].DURACION.trim(),
+    };
+
+    return res.status(200).json(contractData);
+  } catch (error) {
+    console.error("Error al obtener contrato por id", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contrato por id" });
+  } finally {
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1652,9 +1703,9 @@ const verifyContractsTemp = async (req, res) => {
     });
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -1670,5 +1721,6 @@ module.exports = {
   insertContract,
   updateContract,
   getContractById,
+  getContractAdiById,
   verifyContractsTemp,
 };

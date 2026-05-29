@@ -1158,7 +1158,6 @@ const changeOperation = async (req, res) => {
     observation,
     tariff,
     terrain,
-    timeLine,
   } = req.body;
 
   const pool = await connection();

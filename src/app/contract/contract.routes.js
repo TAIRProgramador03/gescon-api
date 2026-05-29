@@ -25,6 +25,7 @@ Router.get("/placasPorContrato", authenticateToken, validUser, detailVehByCont)
 Router.post("/insertarContrato", authenticateToken, validUser, insertContract);
 Router.put("/actualizarContrato/:id", authenticateToken, validUser, updateContract);
 Router.get("/contratoPorId/:id", authenticateToken, validUser, getContractById)
+Router.get("/contratoAdiPorId/:id", authenticateToken, validUser, getContractAdiById)
 Router.get("/verificarContratosTemp", authenticateToken, validUser, verifyContractsTemp)
 
 module.exports = Router;
