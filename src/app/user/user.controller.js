@@ -75,6 +75,8 @@ const findUserById = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
+  const { user } = req.user;
+
   const body = req.body;
 
   try {
@@ -102,7 +104,7 @@ const createUser = async (req, res) => {
       await postUserGesoper(body);
     }
 
-    const create = await postUser(body);
+    const create = await postUser(body, user);
 
     return res.status(201).json(create);
   } catch (error) {

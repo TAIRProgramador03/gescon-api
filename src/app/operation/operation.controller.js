@@ -1166,6 +1166,8 @@ const changeOperation = async (req, res) => {
   const convertDate = convertirFecha(date);
   const validFile = file ? file.replace(/^temp\//, "") : null;
 
+  console.log(req.body);  
+
   try {
     const sqlFind = `
       SELECT ID_CONTRATO, CONDICION, CLASE_CONTRATO, TARIFA, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
@@ -1252,7 +1254,7 @@ const changeOperation = async (req, res) => {
     } else {
       const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP,
+        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
         WHERE ID = ?
       `;
 

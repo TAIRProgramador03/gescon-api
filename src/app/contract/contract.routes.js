@@ -9,6 +9,7 @@ const {
   contClient,
   detailVehByCont,
   getContractById,
+  getContractAdiById,
   updateContract,
   verifyContractsTemp,
 } = require("./contract.controller.js");
