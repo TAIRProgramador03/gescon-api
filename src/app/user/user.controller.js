@@ -104,6 +104,12 @@ const createUser = async (req, res) => {
       await postUserGesoper(body);
     }
 
+    const salt = await bcryptjs.genSalt(Number(process.env.SALT_NUMBER));
+
+    const passHash = await bcryptjs.hash(body.clave, salt);
+
+    body.clave = passHash;
+
     const create = await postUser(body, user);
 
     return res.status(201).json(create);

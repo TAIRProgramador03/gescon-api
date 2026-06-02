@@ -31,9 +31,9 @@ const getUsers = async () => {
     throw new Error(`Ocurrio algo al consultar lista de usuarios: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -83,9 +83,9 @@ const getUserByField = async (field, value) => {
     throw new Error(`Ocurrio algo al obtener usuario: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -126,9 +126,9 @@ const getUserGesoperByField = async (field, value) => {
     throw new Error(`Ocurrio algo al obtener usuario de gesoper: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -166,9 +166,9 @@ const getUserById = async (id) => {
     throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -202,9 +202,9 @@ const getNewUsers = async () => {
     throw new Error(`Ocurrio algo al obtener usuario por id: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -212,6 +212,9 @@ const getNewUsers = async () => {
 const postUser = async (data, username) => {
   const pool = await connection();
   const cn = await pool.connect();
+
+  console.log(data);
+  console.log(username);
 
   try {
     await cn.beginTransaction();
@@ -221,7 +224,14 @@ const postUser = async (data, username) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `;
 
-    await cn.query(sql, [data.usuario, data.codEmp, data.clave, data.rol, username, username]);
+    await cn.query(sql, [
+      data.usuario,
+      data.codEmp,
+      data.clave,
+      data.rol,
+      username,
+      username,
+    ]);
 
     await cn.commit();
 
@@ -229,12 +239,14 @@ const postUser = async (data, username) => {
   } catch (error) {
     await cn.rollback();
 
+    console.error("Error completo:", error);
+
     throw new Error(`Ocurrio algo al crear usuario: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -262,9 +274,9 @@ const postUserGesoper = async (data) => {
     throw new Error(`Ocurrio algo al crear usuario en el gesoper: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -297,9 +309,9 @@ const putUser = async (id, data, username) => {
     throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -309,7 +321,7 @@ const putPasswordUser = async (id, password, username) => {
   const cn = await pool.connect();
 
   try {
-     await cn.beginTransaction();
+    await cn.beginTransaction();
 
     const sql = `
       UPDATE ${SCHEMA_BD}.T_US_GC
@@ -332,12 +344,12 @@ const putPasswordUser = async (id, password, username) => {
     throw new Error(`Ocurrio algo al actualizar usuario: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
-}
+};
 
 /* ROLES */
 
@@ -362,9 +374,9 @@ const getRoles = async () => {
     throw new Error(`Ocurrio algo al consultar lista de roles: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -390,9 +402,9 @@ const getRolesGesoper = async () => {
     );
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -415,7 +427,13 @@ const postRole = async (data, username) => {
       VALUES (?, ?, ?, ?, ?)
     `;
 
-    await cn.query(sqlRole, [roleId, data.name, data.description, username, username]);
+    await cn.query(sqlRole, [
+      roleId,
+      data.name,
+      data.description,
+      username,
+      username,
+    ]);
 
     const sqlPermissions = `
       INSERT INTO ${SCHEMA_BD}.T_RL_PS_GC (ID_RL, ID_PS)
@@ -436,9 +454,9 @@ const postRole = async (data, username) => {
     throw new Error(`Ocurrio algo al insertar un rol: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -450,7 +468,7 @@ const getPermissions = async () => {
   const cn = await pool.connect();
   try {
     const sql = `
-      SELECT ID, TRIM(DESCRIPCION) AS DESCRIPCION
+      SELECT ID, TRIM(DESCRIPCION) AS DESCRIPCION, NOMBRE, MODULO, DESCRIPCION2
       FROM ${SCHEMA_BD}.T_PS_GC
     `;
 
@@ -458,15 +476,18 @@ const getPermissions = async () => {
 
     return result.map((row) => ({
       id: row.ID,
-      name: row.DESCRIPCION,
+      name: row.NOMBRE.trim(),
+      description: row.DESCRIPCION2.trim(),
+      module: row.MODULO.trim(),
+      key: row.DESCRIPCION,
     }));
   } catch (error) {
     throw new Error(`Ocurrio algo al consultar lista de permisos: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -476,17 +497,41 @@ const getPermissionsByUser = async (id) => {
   const cn = await pool.connect();
   try {
     const sql = `
-      SELECT P.DESCRIPCION
-      FROM ${SCHEMA_BD}.T_US_GC U
-      JOIN ${SCHEMA_BD}.T_RL_GC R ON U.ID_RL = R.ID
-      JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON R.ID = RP.ID_RL
-      JOIN ${SCHEMA_BD}.T_PS_GC P ON RP.ID_PS = P.ID
-      WHERE U.ID = ?    
+      SELECT
+        P.ID,
+        P.DESCRIPCION,
+        P.NOMBRE,
+        P.DESCRIPCION2,
+        P.MODULO,
+        CASE
+            WHEN RP.ID_PS IS NOT NULL THEN 1
+            ELSE 0
+        END AS ACTIVO
+    FROM ${SCHEMA_BD}.T_PS_GC P
+    LEFT JOIN (
+        SELECT
+            RP.ID_PS
+        FROM ${SCHEMA_BD}.T_US_GC U
+        JOIN ${SCHEMA_BD}.T_RL_GC R
+            ON U.ID_RL = R.ID
+        JOIN ${SCHEMA_BD}.T_RL_PS_GC RP
+            ON R.ID = RP.ID_RL
+        WHERE U.ID = ?
+    ) RP
+        ON P.ID = RP.ID_PS
+    ORDER BY P.MODULO
     `;
 
     const result = await cn.query(sql, [id]);
 
-    return result.map((row) => row.DESCRIPCION);
+    return result.map((row) => ({
+      id: row.ID,
+      modulo: row.MODULO.trim(),
+      nombre: row.NOMBRE.trim(),
+      descripcion: row.DESCRIPCION2.trim(),
+      key: row.DESCRIPCION.trim(),
+      activo: row.ACTIVO ? true : false,
+    }));
   } catch (error) {
     console.error(error);
     throw new Error(
@@ -494,9 +539,9 @@ const getPermissionsByUser = async (id) => {
     );
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -506,19 +551,32 @@ const getPermissionsByRole = async (id) => {
   const cn = await pool.connect();
   try {
     const sql = `
-      SELECT P.ID, P.DESCRIPCION
-      FROM ${SCHEMA_BD}.T_RL_GC R
-      JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON R.ID = RP.ID_RL
-      JOIN ${SCHEMA_BD}.T_PS_GC P ON RP.ID_PS = P.ID
-      WHERE R.ID = ?
-      ORDER BY P.ID ASC
+      SELECT
+        P.ID,
+        P.DESCRIPCION,
+        P.NOMBRE,
+        P.DESCRIPCION2,
+        P.MODULO,
+        CASE
+            WHEN RP.ID_PS IS NOT NULL THEN 1
+            ELSE 0
+        END AS ACTIVO
+    FROM SPEED400AT.T_PS_GC P
+    LEFT JOIN SPEED400AT.T_RL_PS_GC RP
+        ON P.ID = RP.ID_PS
+        AND RP.ID_RL = ?
+    ORDER BY P.MODULO
     `;
 
     const result = await cn.query(sql, [id]);
 
     return result.map((row) => ({
       id: row.ID,
-      descripcion: row.DESCRIPCION,
+      modulo: row.MODULO.trim(),
+      nombre: row.NOMBRE.trim(),
+      descripcion: row.DESCRIPCION2.trim(),
+      key: row.DESCRIPCION.trim(),
+      activo: row.ACTIVO ? true : false,
     }));
   } catch (error) {
     console.error(error);
@@ -527,9 +585,9 @@ const getPermissionsByRole = async (id) => {
     );
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
@@ -567,9 +625,9 @@ const putPermissionsByRole = async (id, permissions) => {
     throw new Error(`Ocurrio un error al actualizar los permisos: ${error}`);
   } finally {
     try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
     }
   }
 };
