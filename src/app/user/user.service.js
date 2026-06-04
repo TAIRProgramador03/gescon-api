@@ -292,6 +292,7 @@ const putUser = async (id, data, username) => {
       UPDATE ${SCHEMA_BD}.T_US_GC
       SET 
         ID_RL = ?,
+        V_TK = V_TK + 1,
         ACTUALIZADO_EL = CURRENT TIMESTAMP,
         ACTUALIZADO_POR = ?
       WHERE ID = ?
@@ -614,6 +615,13 @@ const putPermissionsByRole = async (id, permissions) => {
     for (const perm of permissions) {
       await cn.query(sqlInsert, [id, perm]);
     }
+
+    const sqlIncrementVersion = `
+      UPDATE ${SCHEMA_BD}.T_US_GC
+      SET V_TK = V_TK + 1
+      WHERE ID_RL = ?
+    `;
+    await cn.query(sqlIncrementVersion, [id]);
 
     await cn.commit();
 

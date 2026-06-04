@@ -14,7 +14,7 @@ const login = async (req, res) => {
 
     // VALIDAR SI EXISTE USUARIO
     const sql = `
-      SELECT U.ID, U.USU, U.CLV, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
+      SELECT U.ID, U.USU, U.CLV, U.V_TK, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
       JOIN ${SCHEMA_BD}.T_RL_GC R
       ON U.ID_RL = R.ID
       WHERE USU = ?
@@ -60,6 +60,7 @@ const login = async (req, res) => {
       id: result[0].ID,
       user: result[0].USU,
       role: result[0].DESCRIPCION,
+      tokenVersion: result[0].V_TK,
       permissions,
     };
     const token = jwt.sign(
@@ -99,6 +100,7 @@ const logout = async (_req, res) => {
     secure: false,
     sameSite: "strict",
   });
+  
   res.json({ success: true, message: "Cierre de sesión exitoso" });
 };
 
@@ -107,20 +109,52 @@ const verify = async (req, res) => {
 
   if (!token) return res.status(401).send("No hay token");
 
-  jwt.verify(
-    token,
-    process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w",
-    (err, user) => {
-      if (err) return res.status(403).send("Token inválido");
-      res.status(200).json({
-        success: true,
-        message: "Token válido",
-        globalDbUser: user.user,
-        role: user.role,
-        permissions: user.permissions,
-      });
-    },
-  );
+  let decoded;
+
+  try {
+    decoded = jwt.verify(
+      token,
+      process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w",
+    );
+  } catch (err) {
+    return res.status(403).send("Token inválido");
+  }
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      SELECT U.V_TK FROM ${SCHEMA_BD}.T_US_GC U
+      WHERE U.ID = ?
+    `;
+
+    const result = await cn.query(sql, [decoded.id]);
+    const usuario = result[0];
+
+    if (!usuario || decoded.tokenVersion !== usuario.V_TK) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Sesión expirada" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Token válido",
+      globalDbUser: decoded.user,
+      role: decoded.role,
+      permissions: decoded.permissions,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  } finally {
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
+  }
 };
 
 module.exports = {
