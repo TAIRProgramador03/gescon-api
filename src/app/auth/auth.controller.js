@@ -77,12 +77,12 @@ const login = async (req, res) => {
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.json({ success: true, message: "Ingreso autorizado", permissions });
+    res.status(200).json({ success: true, message: "Ingreso autorizado", permissions });
   } catch (error) {
     console.error("Error al iniciar sesión:", error);
-    res.json({
+    res.status(500).json({
       success: false,
-      message: "Ocuarrio un error al intentar ingresar",
+      message: "Ocurrio un error al intentar ingresar",
     });
   } finally {
     try {
