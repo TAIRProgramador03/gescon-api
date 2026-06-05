@@ -14,7 +14,7 @@ const login = async (req, res) => {
 
     // VALIDAR SI EXISTE USUARIO
     const sql = `
-      SELECT U.ID, U.USU, U.CLV, U.V_TK, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
+      SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.V_TK, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
       JOIN ${SCHEMA_BD}.T_RL_GC R
       ON U.ID_RL = R.ID
       WHERE USU = ?
@@ -59,6 +59,10 @@ const login = async (req, res) => {
     const payload = {
       id: result[0].ID,
       user: result[0].USU,
+      nombre:
+        result[0].NOMBRE && result[0].APELLIDO
+          ? `${result[0].NOMBRE} ${result[0].APELLIDO}`
+          : result[0].USU,
       role: result[0].DESCRIPCION,
       tokenVersion: result[0].V_TK,
       permissions,
@@ -77,7 +81,9 @@ const login = async (req, res) => {
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.status(200).json({ success: true, message: "Ingreso autorizado", permissions });
+    res
+      .status(200)
+      .json({ success: true, message: "Ingreso autorizado", permissions });
   } catch (error) {
     console.error("Error al iniciar sesión:", error);
     res.status(500).json({
@@ -144,6 +150,7 @@ const verify = async (req, res) => {
       message: "Token válido",
       globalDbUser: decoded.user,
       role: decoded.role,
+      nombre: decoded.nombre,
       permissions: decoded.permissions,
     });
   } catch (error) {

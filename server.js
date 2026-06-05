@@ -1,6 +1,8 @@
 require("dotenv").config(); // Esto carga las variables del archivo .env
 
 const express = require("express");
+const http = require("http");
+const { WebSocketServer } = require("ws");
 const cors = require("cors");
 const path = require("path");
 const cookieParser = require("cookie-parser");
@@ -22,6 +24,40 @@ const userRoutes = require("./src/app/user/user.routes.js");
 
 const app = express();
 const port = process.env.PORT ?? "3000";
+
+const server = http.createServer(app);
+
+const wss = new WebSocketServer({ noServer: true }); // ← sin server ni path
+
+wss.on("connection", (ws, req) => {
+  console.log("[WS] ✅ Cliente conectado:", req.socket.remoteAddress);
+
+  ws.on("message", (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === "ping") {
+        ws.send(JSON.stringify({ type: "pong", timestamp: msg.timestamp }));
+      }
+    } catch {
+      /* ignorar */
+    }
+  });
+
+  ws.on("error", (err) => console.error("[WS] error:", err));
+});
+
+// Manejar el upgrade manualmente
+server.on("upgrade", (req, socket, head) => {
+  console.log("[WS] Upgrade solicitado para:", req.url);
+
+  if (req.url === "/ws/heartbeat") {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit("connection", ws, req);
+    });
+  } else {
+    socket.destroy(); // rechazar paths desconocidos
+  }
+});
 
 app.use(
   cors({
@@ -74,21 +110,7 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
-app.get("/heartbeat", (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  res.write("data: ok\n\n");
-
-  const interval = setInterval(() => {
-    res.write("data: ok\n\n");
-  }, 10_000);
-
-  req.on("close", () => clearInterval(interval));
-});
-
 // Iniciar servidor IP_LOCAL/
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Servidor corriendo en https://${IP_LOCAL}:${port}`);
 });

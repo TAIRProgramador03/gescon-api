@@ -1,9 +1,10 @@
 const Router = require("express").Router();
 const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
-const { insertDocument, listDocumentByNroContract, detailDocument, detailVehByDocu, detailVehByCont, getDocumentById, updateDocument } = require("./document.controller.js");
+const { insertDocument, listDocumentByNroContract, detailDocument, detailVehByDocu, detailVehByCont, getDocumentById, updateDocument, getDocumentByContract } = require("./document.controller.js");
 
 Router.get("/documentoPorContrato", authenticateToken, validUser, listDocumentByNroContract)
+Router.get("/selectDocumentoPorContrato", authenticateToken, validUser, getDocumentByContract)
 Router.get("/detalleDocumento", authenticateToken, validUser, detailDocument)
 Router.get("/placasPorDocumento", authenticateToken, validUser, detailVehByDocu)
 Router.get("/obtenerDocumentoPorId/:id", authenticateToken, validUser, getDocumentById)

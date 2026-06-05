@@ -633,13 +633,13 @@ const listLeasingGeneral = async (req, res) => {
 };
 
 const detailLeasing = async (req, res) => {
-  const { leasingId, nroLeasing, clienteId, contratoId, tipoCont } = req.query;
+  const { leasingId,  clienteId } = req.query;
 
-  if (!leasingId)
+  if (!leasingId || !clienteId)
     return res.status(400).json({
       success: false,
       message:
-        "El parametro leasingId es obligatorio",
+        "El parametro leasingId y clienteId son obligatorios",
     });
 
   const pool = await connection();
@@ -671,10 +671,13 @@ const detailLeasing = async (req, res) => {
         C.CLINOM AS CLIENTE, 
         C2.CLINOM AS CLIENTE_ASOCIADO
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
+      LEFT JOIN (
+      	SELECT TAD.* FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+      	LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
+      	ON TAD.ID_ASIGNACION = TAC.ID
+      	WHERE TAC.ID_CLIENTE = ?
+      ) A
       ON L.NRO_LEASING = A.LEASING 
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-      ON A.ID_ASIGNACION = AC.ID
       LEFT JOIN (
         SELECT DISTINCT A.IDCLI, B.CLINOM
           FROM ${SCHEMA_BD}.PO_OPERACIONES A 
@@ -698,6 +701,7 @@ const detailLeasing = async (req, res) => {
     `;
 
     const result = await cn.query(sql, [
+      clienteId,
       leasingId
     ]);
 
