@@ -21,7 +21,7 @@ const reportRoutes = require("./src/app/report/report.routes.js");
 const userRoutes = require("./src/app/user/user.routes.js");
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT ?? "3000";
 
 app.use(
   cors({
