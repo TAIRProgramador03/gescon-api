@@ -74,6 +74,20 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.get("/heartbeat", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  res.write("data: ok\n\n");
+
+  const interval = setInterval(() => {
+    res.write("data: ok\n\n");
+  }, 10_000);
+
+  req.on("close", () => clearInterval(interval));
+});
+
 // Iniciar servidor IP_LOCAL/
 app.listen(port, () => {
   console.log(`Servidor corriendo en https://${IP_LOCAL}:${port}`);
