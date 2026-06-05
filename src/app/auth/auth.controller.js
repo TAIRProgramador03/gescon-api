@@ -71,9 +71,9 @@ const login = async (req, res) => {
 
     // Configura la cookie con el token JWT
     res.cookie("access_token", token, {
-      httpOnly: false,
-      secure: false,
-      sameSite: "strict",
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
       path: "/",
       maxAge: 24 * 60 * 60 * 1000,
     });
@@ -96,11 +96,12 @@ const login = async (req, res) => {
 const logout = async (_req, res) => {
   // Limpiamos la cookie eliminando el token JWT
   res.clearCookie("access_token", {
-    httpOnly: false,
-    secure: false,
-    sameSite: "strict",
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    path: "/",
   });
-  
+
   res.json({ success: true, message: "Cierre de sesión exitoso" });
 };
 
