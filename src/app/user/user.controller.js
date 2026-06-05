@@ -28,6 +28,8 @@ const listUsers = async (req, res) => {
     return res.status(200).json(
       users.map((user) => ({
         id: user.id,
+        nombre: user.nombre,
+        apellido: user.apellido,
         usuario: user.usuario,
         codEmp: user.codEmp,
         rol: user.rol,

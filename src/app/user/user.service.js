@@ -16,6 +16,8 @@ const getUsers = async () => {
 
     return result.map((row) => ({
       id: row.ID,
+      nombre: row.NOMBRE ? row.NOMBRE.trim() : "",
+      apellido: row.APELLIDO ? row.APELLIDO.trim() : "",
       usuario: row.USU.trim(),
       codEmp: row.COD_EMP ? row.COD_EMP.trim() : "",
       clave: row.CLV ? row.CLV.trim() : "",
@@ -66,6 +68,8 @@ const getUserByField = async (field, value) => {
 
     return {
       id: result[0].ID,
+      nombre: row.NOMBRE ? row.NOMBRE.trim() : "",
+      apellido: row.APELLIDO ? row.APELLIDO.trim() : "",
       usuario: result[0].USU.trim(),
       codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
       clave: result[0].CLV ? result[0].CLV.trim() : "",
@@ -149,6 +153,8 @@ const getUserById = async (id) => {
 
     return {
       id: result[0].ID,
+      nombre: row.NOMBRE ? row.NOMBRE.trim() : "",
+      apellido: row.APELLIDO ? row.APELLIDO.trim() : "",
       usuario: result[0].USU.trim(),
       codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
       clave: result[0].CLV ? result[0].CLV.trim() : "",
@@ -183,8 +189,7 @@ const getNewUsers = async () => {
       WHERE NOT EXISTS (
           SELECT 1
           FROM ${SCHEMA_BD}.T_US_GC tug
-          WHERE tug."ID" = pu."ID" 
-            AND tug.USU = pu.USUARIO 
+          WHERE tug.USU = pu.USUARIO 
             AND tug.COD_EMP = PU.COD_EMP 
       )
     `;
@@ -213,18 +218,17 @@ const postUser = async (data, username) => {
   const pool = await connection();
   const cn = await pool.connect();
 
-  console.log(data);
-  console.log(username);
-
   try {
     await cn.beginTransaction();
 
     const sql = `
-      INSERT INTO ${SCHEMA_BD}.T_US_GC (USU, COD_EMP, CLV, ID_RL, CREADO_POR, ACTUALIZADO_POR)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO ${SCHEMA_BD}.T_US_GC (NOMBRE, APELLIDO, USU, COD_EMP, CLV, ID_RL, CREADO_POR, ACTUALIZADO_POR)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     await cn.query(sql, [
+      data.nombre,
+      data.apellido,
       data.usuario,
       data.codEmp,
       data.clave,
