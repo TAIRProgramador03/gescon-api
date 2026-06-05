@@ -53,6 +53,50 @@ const listDocumentByNroContract = async (req, res) => {
   }
 };
 
+const getDocumentByContract = async (req, res) => {
+  const { contratoId } = req.query;
+
+  if (!contratoId)
+    return res.status(400).json({
+      success: false,
+      message: "El parametro contratoId es obligatorio",
+    });
+
+  const pool = await connection();
+  const cn = await pool.connect();
+
+  try {
+    const sql = `
+      SELECT A.ID, A.NRO_DOC
+      FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB A 
+      INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB B 
+      ON B.ID = A.ID_PADRE
+      WHERE B.ID = ?
+    `;
+
+    const result = await cn.query(sql, [contratoId]);
+
+    const cleanedResult = result.map((row) => ({
+      id: row.ID,
+      nroDocumento: row.NRO_DOC ? row.NRO_DOC.trim() : "",
+    }));
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al listar documentos por contrato: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al listar documentos por contrato",
+    });
+  } finally {
+    try {
+      if (cn) await cn.close();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+};
+
 const detailDocument = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
@@ -766,6 +810,7 @@ const getDocumentById = async (req, res) => {
 module.exports = {
   insertDocument,
   listDocumentByNroContract,
+  getDocumentByContract,
   detailVehByDocu,
   detailDocument,
   getDocumentById,
