@@ -21,7 +21,7 @@ const reportRoutes = require("./src/app/report/report.routes.js");
 const userRoutes = require("./src/app/user/user.routes.js");
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT ?? "3000";
 
 app.use(
   cors({
@@ -72,6 +72,20 @@ app.use(userRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+app.get("/heartbeat", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  res.write("data: ok\n\n");
+
+  const interval = setInterval(() => {
+    res.write("data: ok\n\n");
+  }, 10_000);
+
+  req.on("close", () => clearInterval(interval));
 });
 
 // Iniciar servidor IP_LOCAL/
