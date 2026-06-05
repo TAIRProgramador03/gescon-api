@@ -29,6 +29,12 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+# Usuario no-root por seguridad
+RUN useradd -m appuser && chown -R appuser:appuser /gescon-api
+USER appuser
+
+ENV NODE_ENV=production
+
 EXPOSE 3000
 
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

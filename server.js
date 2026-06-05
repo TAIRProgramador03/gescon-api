@@ -2,10 +2,10 @@ require("dotenv").config(); // Esto carga las variables del archivo .env
 
 const express = require("express");
 const cors = require("cors");
-const path = require('path');
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const { IP_LOCAL } = require("./src/shared/conf.js");
-const authenticateToken = require("./src/shared/middleware/jwt-valid.js")
+const authenticateToken = require("./src/shared/middleware/jwt-valid.js");
 
 // RUTAS DE API
 const authRoutes = require("./src/app/auth/auth.routes.js");
@@ -17,8 +17,8 @@ const vehicleRoutes = require("./src/app/vehicle/vehicle.routes.js");
 const operationRoutes = require("./src/app/operation/operation.routes.js");
 const fileRoutes = require("./src/app/file/file.routes.js");
 const modelRoutes = require("./src/app/model/model.routes.js");
-const reportRoutes = require("./src/app/report/report.routes.js")
-const userRoutes = require("./src/app/user/user.routes.js")
+const reportRoutes = require("./src/app/report/report.routes.js");
+const userRoutes = require("./src/app/user/user.routes.js");
 
 const app = express();
 const port = 3000;
@@ -41,7 +41,7 @@ app.use(
       `http://locahost:8080`,
       "https://gescon.tair360.net",
       "http://192.168.4.22",
-      "http://192.168.4.22:5173"
+      "http://192.168.4.22:5173",
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),
@@ -51,7 +51,11 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 
 // Acceso a los archivos public
-app.use("/files", authenticateToken, express.static(path.join(__dirname, '/public')));
+app.use(
+  "/files",
+  authenticateToken,
+  express.static(path.join(__dirname, "/public")),
+);
 
 // Rutas de api
 app.use(authRoutes);
@@ -65,6 +69,10 @@ app.use(fileRoutes);
 app.use(modelRoutes);
 app.use(reportRoutes);
 app.use(userRoutes);
+
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 // Iniciar servidor IP_LOCAL/
 app.listen(port, () => {
