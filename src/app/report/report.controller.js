@@ -1,15 +1,13 @@
-const connection = require("../../shared/connect.js");
+const { withConnection } = require("../../shared/utils.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const contVehicleFeet = async (req, res) => {
   const { clienteId, status } = req.query; // Obtiene el idCli de los parámetros de consulta
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    let sql = `
-      SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA 
+    const data = await withConnection(async (cn) => {
+      let sql = `
+      SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA
       FROM (
         SELECT CC.ID_CLIENTE, SUM(CD.PRECIO_VEH * CD.CANTIDAD) AS TOTAL_VEHICULO, SUM(CD.PRECIO_VENTA * CD.CANTIDAD) AS TOTAL_VENTA FROM ${SCHEMA_BD}.TBLCONTRATO_DET CD
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
@@ -25,19 +23,19 @@ const contVehicleFeet = async (req, res) => {
       )
     `;
 
-    const params = [];
+      const params = [];
 
-    if (status) {
-      if (status == "A") {
-        sql = `
-          SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA 
+      if (status) {
+        if (status == "A") {
+          sql = `
+          SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA
           FROM (
             SELECT CC.ID_CLIENTE, SUM(CD.PRECIO_VEH * CD.CANTIDAD) AS TOTAL_VEHICULO, SUM(CD.PRECIO_VENTA * CD.CANTIDAD) AS TOTAL_VENTA FROM ${SCHEMA_BD}.TBLCONTRATO_DET CD
             LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
             ON CC.ID = CD.ID_CON_CAB
             WHERE ADD_MONTHS(
               DATE(
-                SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || 
+                SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' ||
                 SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-'  ||
                 SUBSTR(CC.FECHA_FIRMA, 7, 2)
               ),
@@ -52,7 +50,7 @@ const contVehicleFeet = async (req, res) => {
             ON DC.ID = DD.ID_CON_CAB
             WHERE ADD_MONTHS(
               DATE(
-                SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || 
+                SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' ||
                 SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-'  ||
                 SUBSTR(DC.FECHA_FIRMA, 7, 2)
               ),
@@ -61,16 +59,16 @@ const contVehicleFeet = async (req, res) => {
           GROUP BY DC.ID_CLIENTE
           )
         `;
-      } else if (status == "F") {
-        sql = `
-          SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA 
+        } else if (status == "F") {
+          sql = `
+          SELECT COALESCE(SUM(TOTAL_VEHICULO), 0) AS TOTAL_VEHICULO, COALESCE(SUM(TOTAL_VENTA), 0) AS TOTAL_VENTA
           FROM (
             SELECT CC.ID_CLIENTE, SUM(CD.PRECIO_VEH * CD.CANTIDAD) AS TOTAL_VEHICULO, SUM(CD.PRECIO_VENTA * CD.CANTIDAD) AS TOTAL_VENTA FROM ${SCHEMA_BD}.TBLCONTRATO_DET CD
             LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
             ON CC.ID = CD.ID_CON_CAB
             WHERE ADD_MONTHS(
               DATE(
-                SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || 
+                SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' ||
                 SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-'  ||
                 SUBSTR(CC.FECHA_FIRMA, 7, 2)
               ),
@@ -85,7 +83,7 @@ const contVehicleFeet = async (req, res) => {
             ON DC.ID = DD.ID_CON_CAB
             WHERE ADD_MONTHS(
               DATE(
-                SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || 
+                SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' ||
                 SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-'  ||
                 SUBSTR(DC.FECHA_FIRMA, 7, 2)
               ),
@@ -94,24 +92,25 @@ const contVehicleFeet = async (req, res) => {
           GROUP BY DC.ID_CLIENTE
           )
         `;
+        }
       }
-    }
 
-    if (clienteId) {
-      sql += ` WHERE ID_CLIENTE = ?`;
-      params.push(clienteId);
-    }
+      if (clienteId) {
+        sql += ` WHERE ID_CLIENTE = ?`;
+        params.push(clienteId);
+      }
 
-    const result = await cn.query(sql, params);
+      return await cn.query(sql, params);
+    });
 
-    if (result.length == 0 || !result[0])
+    if (data.length == 0 || !data[0])
       return res
         .status(400)
         .json({ success: false, message: "No se encontraron resultados" });
 
     return res.status(200).json({
-      totalCosto: result[0].TOTAL_VEHICULO,
-      totalVenta: result[0].TOTAL_VENTA,
+      totalCosto: data[0].TOTAL_VEHICULO,
+      totalVenta: data[0].TOTAL_VENTA,
     });
   } catch (error) {
     console.error("Error al obtener reporte de flota vehicular", error);
@@ -119,44 +118,36 @@ const contVehicleFeet = async (req, res) => {
       success: false,
       message: "Error al obtener reporte de flota vehicular",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const contVehicleLeasings = async (req, res) => {
   const { clienteId, all } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    let sentences = ``;
-    const params = [];
+    const cleanedResult = await withConnection(async (cn) => {
+      let sentences = ``;
+      const params = [];
 
-    if (clienteId) {
-      if (all == "true") {
-        sentences += `WHERE CLIENTE = ?`;
-      } else if (all == "false") {
-        sentences += `WHERE CLIENTE = ? AND SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
-      } else if (!all) {
-        sentences += `WHERE CLIENTE = ?`;
+      if (clienteId) {
+        if (all == "true") {
+          sentences += `WHERE CLIENTE = ?`;
+        } else if (all == "false") {
+          sentences += `WHERE CLIENTE = ? AND SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
+        } else if (!all) {
+          sentences += `WHERE CLIENTE = ?`;
+        }
+
+        params.push(clienteId);
+      } else {
+        if (all && all == "false") {
+          sentences += `WHERE SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
+        }
       }
 
-      params.push(clienteId);
-    } else {
-      if (all && all == "false") {
-        sentences += `WHERE SECOPE = ID_OPE AND SECOPE NOT IN (211, 238, 109, 162)`;
-      }
-    }
-
-    let sql = `
+      let sql = `
       SELECT * FROM (
-      SELECT 
+      SELECT
         LD.ID,
         LD.PLACA,
         LD.MODELO,
@@ -164,13 +155,13 @@ const contVehicleLeasings = async (req, res) => {
         LC.ID_CLIENTE AS CLIENTE,
         LC.TIPCON AS TIPO_CON,
         DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
           SUBSTR(C.FECHA_FIRMA, 7, 2)
         ) AS FECHA_INI_CON,
         ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -179,7 +170,7 @@ const contVehicleLeasings = async (req, res) => {
         CAST(ROUND((DAYS(
         ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -188,31 +179,31 @@ const contVehicleLeasings = async (req, res) => {
         ) -
         DAYS (
         DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
           SUBSTR(C.FECHA_FIRMA, 7, 2)
         )
         )) / 365.25, 0) AS INTEGER) AS ANOS_CONTRATO,
         DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_INI, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_INI, 7, 2)
         ) AS FECHA_INI_LEA,
         DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_FIN, 7, 2)
         ) AS FECHA_FIN_LEA,
         CAST(ROUND((DAYS(
           DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_FIN, 7, 2)
         )
         ) -
         DAYS (
         DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_INI, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_INI, 7, 2)
         )
@@ -220,7 +211,7 @@ const contVehicleLeasings = async (req, res) => {
         DAYS(
           ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -228,18 +219,18 @@ const contVehicleLeasings = async (req, res) => {
           )
         ) - DAYS (
           DATE(
-            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
         ) AS DIFERENCIA_DIAS,
         DATE(
-        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' ||
             SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_INI, 7, 2)
         ) AS FECHA_ACTA_INI,
         DATE(
-        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' ||
             SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_FIN, 7, 2)
         ) AS FECHA_ACTA_FIN,
@@ -258,7 +249,7 @@ const contVehicleLeasings = async (req, res) => {
 
       UNION ALL
 
-      SELECT 
+      SELECT
         LD.ID,
         LD.PLACA,
         LD.MODELO,
@@ -266,13 +257,13 @@ const contVehicleLeasings = async (req, res) => {
         LC.ID_CLIENTE AS CLIENTE,
         LC.TIPCON AS TIPO_CON,
         DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
           SUBSTR(C.FECHA_FIRMA, 7, 2)
         ) AS FECHA_INI_CON,
         ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -281,7 +272,7 @@ const contVehicleLeasings = async (req, res) => {
         CAST(ROUND((DAYS(
         ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -290,31 +281,31 @@ const contVehicleLeasings = async (req, res) => {
         ) -
         DAYS (
         DATE(
-          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+          SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
           SUBSTR(C.FECHA_FIRMA, 7, 2)
         )
         )) / 365.25, 0) AS INTEGER) AS ANOS_CONTRATO,
         DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_INI, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_INI, 7, 2)
         ) AS FECHA_INI_LEA,
         DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_FIN, 7, 2)
         ) AS FECHA_FIN_LEA,
         CAST(ROUND((DAYS(
           DATE(
-          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_FIN, 7, 2)
         )
         ) -
         DAYS (
         DATE(
-          SUBSTR(LC.FECHA_INI, 1, 4) || '-' || 
+          SUBSTR(LC.FECHA_INI, 1, 4) || '-' ||
           SUBSTR(LC.FECHA_INI, 5, 2) || '-'  ||
           SUBSTR(LC.FECHA_INI, 7, 2)
         )
@@ -322,7 +313,7 @@ const contVehicleLeasings = async (req, res) => {
         DAYS(
           ADD_MONTHS(
           DATE(
-            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+            SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
             SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
             SUBSTR(C.FECHA_FIRMA, 7, 2)
           ),
@@ -330,18 +321,18 @@ const contVehicleLeasings = async (req, res) => {
           )
         ) - DAYS (
           DATE(
-            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || 
+            SUBSTR(LC.FECHA_FIN, 1, 4) || '-' ||
             SUBSTR(LC.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(LC.FECHA_FIN, 7, 2)
           )
         ) AS DIFERENCIA_DIAS,
         DATE(
-        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' || 
+        	SUBSTR(AD.FECHA_INI, 1, 4) || '-' ||
             SUBSTR(AD.FECHA_INI, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_INI, 7, 2)
         ) AS FECHA_ACTA_INI,
         DATE(
-        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || 
+        	SUBSTR(AD.FECHA_FIN, 1, 4) || '-' ||
             SUBSTR(AD.FECHA_FIN, 5, 2) || '-'  ||
             SUBSTR(AD.FECHA_FIN, 7, 2)
         ) AS FECHA_ACTA_FIN,
@@ -361,27 +352,28 @@ const contVehicleLeasings = async (req, res) => {
       ORDER BY ID
     `;
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      id: row.ID,
-      placa: row.PLACA.trim(),
-      modelo: row.MODELO.trim(),
-      nroLeasing: row.NRO_LEASING.trim(),
-      cliente: row.CLIENTE,
-      tipoCont: row.TIPO_CON.trim(),
-      fechaIniCont: row.FECHA_INI_CON ? row.FECHA_INI_CON.trim() : "",
-      fechaFinCont: row.FECHA_FIN_CON ? row.FECHA_FIN_CON.trim() : "",
-      añosContrato: row.ANOS_CONTRATO,
-      fechaIniLea: row.FECHA_INI_LEA.trim(),
-      fechaFinLea: row.FECHA_FIN_LEA.trim(),
-      añosLeasing: row.ANOS_LEA,
-      diferenciaDias: row.DIFERENCIA_DIAS,
-      fechaIniActa: row.FECHA_ACTA_INI ?? "",
-      fechaFinActa: row.FECHA_ACTA_FIN ?? "",
-      idOpe: row.ID_OPE,
-      secOpe: row.SECOPE,
-    }));
+      return result.map((row) => ({
+        id: row.ID,
+        placa: row.PLACA.trim(),
+        modelo: row.MODELO.trim(),
+        nroLeasing: row.NRO_LEASING.trim(),
+        cliente: row.CLIENTE,
+        tipoCont: row.TIPO_CON.trim(),
+        fechaIniCont: row.FECHA_INI_CON ? row.FECHA_INI_CON.trim() : "",
+        fechaFinCont: row.FECHA_FIN_CON ? row.FECHA_FIN_CON.trim() : "",
+        añosContrato: row.ANOS_CONTRATO,
+        fechaIniLea: row.FECHA_INI_LEA.trim(),
+        fechaFinLea: row.FECHA_FIN_LEA.trim(),
+        añosLeasing: row.ANOS_LEA,
+        diferenciaDias: row.DIFERENCIA_DIAS,
+        fechaIniActa: row.FECHA_ACTA_INI ?? "",
+        fechaFinActa: row.FECHA_ACTA_FIN ?? "",
+        idOpe: row.ID_OPE,
+        secOpe: row.SECOPE,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -390,24 +382,16 @@ const contVehicleLeasings = async (req, res) => {
       success: false,
       message: "Error al obtener reportes de leasings",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const contLeasings = async (req, res) => {
   const { clienteId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sqlVencidos = `
-      SELECT 
+    const { resultVencidos, resultPorVencer } = await withConnection(async (cn) => {
+      const sqlVencidos = `
+      SELECT
         COUNT(CASE WHEN  DIFERENCIA_DIAS < 0 AND DIFERENCIA_DIAS >= -30 THEN 1 END) AS "MENOR_30_DIAS" ,
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -30 AND DIFERENCIA_DIAS >= -45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -45 AND DIFERENCIA_DIAS >= -60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
@@ -421,8 +405,8 @@ const contLeasings = async (req, res) => {
       ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
     `;
 
-    const sqlPorVencer = `
-      SELECT 
+      const sqlPorVencer = `
+      SELECT
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 0 AND DIFERENCIA_DIAS <= 30 THEN 1 END) AS "MENOR_30_DIAS" ,
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 30 AND DIFERENCIA_DIAS <= 45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 45 AND DIFERENCIA_DIAS <= 60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
@@ -436,12 +420,15 @@ const contLeasings = async (req, res) => {
       ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
     `;
 
-    const params = [];
+      const params = [];
 
-    if (clienteId) params.push(clienteId);
+      if (clienteId) params.push(clienteId);
 
-    const resultVencidos = await cn.query(sqlVencidos, params);
-    const resultPorVencer = await cn.query(sqlPorVencer, params);
+      const rv = await cn.query(sqlVencidos, params);
+      const rpv = await cn.query(sqlPorVencer, params);
+
+      return { resultVencidos: rv, resultPorVencer: rpv };
+    });
 
     const clsVencidos = {
       menor30Dias: resultVencidos[0].MENOR_30_DIAS,
@@ -469,43 +456,34 @@ const contLeasings = async (req, res) => {
       success: false,
       message: "Error al obtener leasings vencidos y por vencer",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const diferenceContractLeasing = async (req, res) => {
-  
   const {clienteId} = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
-      SELECT 
-        TC.NRO_CONTRATO, 
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT
+        TC.NRO_CONTRATO,
         DATE(
           SUBSTR(TC.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(TC.FECHA_FIRMA, 5, 2) || '-' ||
           SUBSTR(TC.FECHA_FIRMA, 7, 2)
-        ) AS FECHA_FIRMA_CONTRATO, 
+        ) AS FECHA_FIRMA_CONTRATO,
         DATE(
           SUBSTR(TC.FECHA_FIRMA, 1, 4) || '-' ||
           SUBSTR(TC.FECHA_FIRMA, 5, 2) || '-' ||
           SUBSTR(TC.FECHA_FIRMA, 7, 2)
         ) + CAST(TC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
         CAST(TC.DURACION AS INTEGER) / 12 AS PLAZO_ANIOS_CONTRATO,
-        TLC.NRO_LEASING, 
+        TLC.NRO_LEASING,
         DATE(
           SUBSTR(TLC.FECHA_INI, 1, 4) || '-' ||
           SUBSTR(TLC.FECHA_INI, 5, 2) || '-' ||
           SUBSTR(TLC.FECHA_INI, 7, 2)
-        ) AS FECHA_INICIO_LEASING, 
+        ) AS FECHA_INICIO_LEASING,
         DATE(
           SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' ||
           SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' ||
@@ -518,7 +496,7 @@ const diferenceContractLeasing = async (req, res) => {
                 SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' ||
                 SUBSTR(TLC.FECHA_FIN, 7, 2)
               ),
-          
+
               DATE(
                 SUBSTR(TLC.FECHA_INI, 1, 4) || '-' ||
                 SUBSTR(TLC.FECHA_INI, 5, 2) || '-' ||
@@ -526,25 +504,26 @@ const diferenceContractLeasing = async (req, res) => {
               )
           ) / 12
         ) AS PLAZO_ANIOS_LEASING
-      FROM SPEED400AT.TBLCONTRATO_CAB tc 
-      LEFT JOIN SPEED400AT.TBL_LEASING_CAB tlc 
+      FROM SPEED400AT.TBLCONTRATO_CAB tc
+      LEFT JOIN SPEED400AT.TBL_LEASING_CAB tlc
       ON TC.ID = TLC.ID_CONTRATO AND TLC.TIPCON LIKE '%P%'
       WHERE TLC.TIPCON LIKE '%P%' ${clienteId ? "AND TC.ID_CLIENTE = ?" : ""}
       ORDER BY TC.NRO_CONTRATO
     `;
 
-    const result = await cn.query(sql, clienteId ? [clienteId] : []);
+      const result = await cn.query(sql, clienteId ? [clienteId] : []);
 
-    const cleanedResult = result.map(row => ({
-      nroContrato: row.NRO_CONTRATO.trim(),
-      fechaFirma: row.FECHA_FIRMA_CONTRATO,
-      fechaFinContrato: row.FECHA_FIN_CONTRATO,
-      aniosContrato: row.PLAZO_ANIOS_CONTRATO,
-      nroLeasing: row.NRO_LEASING.trim(),
-      fechaIniLeasing: row.FECHA_INICIO_LEASING,
-      fechaFinLeasing: row.FECHA_FIN_LEASING,
-      aniosLeasing: row.PLAZO_ANIOS_LEASING
-    }))
+      return result.map(row => ({
+        nroContrato: row.NRO_CONTRATO.trim(),
+        fechaFirma: row.FECHA_FIRMA_CONTRATO,
+        fechaFinContrato: row.FECHA_FIN_CONTRATO,
+        aniosContrato: row.PLAZO_ANIOS_CONTRATO,
+        nroLeasing: row.NRO_LEASING.trim(),
+        fechaIniLeasing: row.FECHA_INICIO_LEASING,
+        fechaFinLeasing: row.FECHA_FIN_LEASING,
+        aniosLeasing: row.PLAZO_ANIOS_LEASING
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -559,12 +538,6 @@ const diferenceContractLeasing = async (req, res) => {
         message:
           "Error al obtener reporte de diferencia entre contrato y lesing",
       });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -575,9 +548,6 @@ const listVehicleLeasingExpire = async (req, res) => {
     return res
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
-
-  const pool = await connection();
-  const cn = await pool.connect();
 
   try {
     let sentences;
@@ -604,7 +574,8 @@ const listVehicleLeasingExpire = async (req, res) => {
           .json({ success: false, message: "El label no es valido" });
     }
 
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT *
       FROM (
         SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
@@ -616,43 +587,44 @@ const listVehicleLeasingExpire = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
         ON V.IDMAR = M.ID
         LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
         LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
         ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY ID
     `;
 
-    const params = [];
+      const params = [];
 
-    if (clienteId) {
-      params.push(clienteId);
-    }
+      if (clienteId) {
+        params.push(clienteId);
+      }
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      placa: row.PLACA.trim(),
-      modelo: row.MODELO.trim(),
-      marca: row.MARCA.trim(),
-      nroLeasing: row.NRO_LEASING.trim(),
-      fechaIni: row.FECHA_INI.trim(),
-      fechaFin: row.FECHA_FIN.trim(),
-      cliente: row.CLIENTE.trim(),
-      clienteAsoc: row.CLIENTE_ASOCIADO
-        ? row.CLIENTE_ASOCIADO.trim()
-        : row.CLIENTE.trim(),
-    }));
+      return result.map((row) => ({
+        placa: row.PLACA.trim(),
+        modelo: row.MODELO.trim(),
+        marca: row.MARCA.trim(),
+        nroLeasing: row.NRO_LEASING.trim(),
+        fechaIni: row.FECHA_INI.trim(),
+        fechaFin: row.FECHA_FIN.trim(),
+        cliente: row.CLIENTE.trim(),
+        clienteAsoc: row.CLIENTE_ASOCIADO
+          ? row.CLIENTE_ASOCIADO.trim()
+          : row.CLIENTE.trim(),
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -661,12 +633,6 @@ const listVehicleLeasingExpire = async (req, res) => {
       success: false,
       message: "Error al obtener vehiculos por grafico",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -677,9 +643,6 @@ const listVehicleLeasingToExpire = async (req, res) => {
     return res
       .status(400)
       .json({ success: false, message: "El parametro label es obligatorio" });
-
-  const pool = await connection();
-  const cn = await pool.connect();
 
   try {
     let sentences;
@@ -706,7 +669,8 @@ const listVehicleLeasingToExpire = async (req, res) => {
           .json({ success: false, message: "El label no es valido" });
     }
 
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT *
       FROM (
         SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
@@ -718,43 +682,44 @@ const listVehicleLeasingToExpire = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
         ON V.IDMAR = M.ID
         LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
         ) C ON LC.ID_CLIENTE = C.IDCLI
         LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM 
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
         ) C2 ON LC.ID_CLIENTE_ASOCIADO = C2.IDCLI
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY ID
     `;
 
-    const params = [];
+      const params = [];
 
-    if (clienteId) {
-      params.push(clienteId);
-    }
+      if (clienteId) {
+        params.push(clienteId);
+      }
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      placa: row.PLACA.trim(),
-      modelo: row.MODELO.trim(),
-      marca: row.MARCA.trim(),
-      nroLeasing: row.NRO_LEASING.trim(),
-      fechaIni: row.FECHA_INI.trim(),
-      fechaFin: row.FECHA_FIN.trim(),
-      cliente: row.CLIENTE.trim(),
-      clienteAsoc: row.CLIENTE_ASOCIADO
-        ? row.CLIENTE_ASOCIADO.trim()
-        : row.CLIENTE.trim(),
-    }));
+      return result.map((row) => ({
+        placa: row.PLACA.trim(),
+        modelo: row.MODELO.trim(),
+        marca: row.MARCA.trim(),
+        nroLeasing: row.NRO_LEASING.trim(),
+        fechaIni: row.FECHA_INI.trim(),
+        fechaFin: row.FECHA_FIN.trim(),
+        cliente: row.CLIENTE.trim(),
+        clienteAsoc: row.CLIENTE_ASOCIADO
+          ? row.CLIENTE_ASOCIADO.trim()
+          : row.CLIENTE.trim(),
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -763,56 +728,48 @@ const listVehicleLeasingToExpire = async (req, res) => {
       success: false,
       message: "Error al obtener vehiculos por grafico",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const depecratedVehicleExpires = async (req, res) => {
   const { label, clienteId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const where = [];
+    const cleanedResult = await withConnection(async (cn) => {
+      const where = [];
 
-    switch (label) {
-      case "Menor 30 dias":
-        where.push("A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -30");
-        break;
-      case "Entre 30 y 45 dias":
-        where.push("A.DIFERENCIA_DIAS < -30 AND A.DIFERENCIA_DIAS >= -45");
-        break;
-      case "Entre 45 y 60 dias":
-        where.push("A.DIFERENCIA_DIAS < -45 AND A.DIFERENCIA_DIAS >= -60");
-        break;
-      case "Entre 60 y 90 dias":
-        where.push("A.DIFERENCIA_DIAS < -60 AND A.DIFERENCIA_DIAS >= -90");
-        break;
-      case "Entre 90 y 120 dias":
-        where.push("A.DIFERENCIA_DIAS < -90 AND A.DIFERENCIA_DIAS >= -120");
-        break;
-      default:
-        where.push("A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -120");
-    }
+      switch (label) {
+        case "Menor 30 dias":
+          where.push("A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -30");
+          break;
+        case "Entre 30 y 45 dias":
+          where.push("A.DIFERENCIA_DIAS < -30 AND A.DIFERENCIA_DIAS >= -45");
+          break;
+        case "Entre 45 y 60 dias":
+          where.push("A.DIFERENCIA_DIAS < -45 AND A.DIFERENCIA_DIAS >= -60");
+          break;
+        case "Entre 60 y 90 dias":
+          where.push("A.DIFERENCIA_DIAS < -60 AND A.DIFERENCIA_DIAS >= -90");
+          break;
+        case "Entre 90 y 120 dias":
+          where.push("A.DIFERENCIA_DIAS < -90 AND A.DIFERENCIA_DIAS >= -120");
+          break;
+        default:
+          where.push("A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -120");
+      }
 
-    if (clienteId) {
-      where.push("A.ID_CLIENTE = ?");
-    }
+      if (clienteId) {
+        where.push("A.ID_CLIENTE = ?");
+      }
 
-    const sql = `
-      SELECT 
+      const sql = `
+      SELECT
         A.ANO,
         SUM(A.PRECIO_BASE) AS PRECIO_BASE,
           CAST(
               SUM(
                 A.PRECIO_BASE * (
-                    1 - CASE 
+                    1 - CASE
                         WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                         ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                     END
@@ -823,7 +780,7 @@ const depecratedVehicleExpires = async (req, res) => {
               SUM(
                 A.PRECIO_BASE - (
                   A.PRECIO_BASE * (
-                      1 - CASE 
+                      1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                         END
@@ -835,7 +792,7 @@ const depecratedVehicleExpires = async (req, res) => {
               SUM(
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                         END
@@ -844,7 +801,7 @@ const depecratedVehicleExpires = async (req, res) => {
                 -
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20
                         END
@@ -856,7 +813,7 @@ const depecratedVehicleExpires = async (req, res) => {
               SUM(
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                         END
@@ -865,7 +822,7 @@ const depecratedVehicleExpires = async (req, res) => {
                 -
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20
                         END
@@ -900,7 +857,7 @@ const depecratedVehicleExpires = async (req, res) => {
             )
           AS DECIMAL(10,2)) AS VALOR_PROYECTADO_VENTA
       FROM (
-        SELECT 
+        SELECT
               TLD.ID,
               PV.ANO,
               DAYS(DATE(SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' || SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' || SUBSTR(TLC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS,
@@ -912,18 +869,18 @@ const depecratedVehicleExpires = async (req, res) => {
           INNER JOIN ${SCHEMA_BD}.PO_VEHICULO PV
               ON TLD.ID_VEH = PV.ID
           LEFT JOIN (
-              SELECT 
+              SELECT
                   TC.ID AS ID_REF,
                   TD.MODELO,
                   TD.PRECIO_VEH AS COSTO_VEHICULO,
                   'P' AS TIPO
               FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
               INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_DET TD
-                  ON TC.ID = TD.ID_CON_CAB    
+                  ON TC.ID = TD.ID_CON_CAB
 
               UNION ALL
 
-              SELECT 
+              SELECT
                   TDOC.ID AS ID_REF,
                   TDD.MODELO,
                   TDD.PRECIO_VEH AS COSTO_VEHICULO,
@@ -942,20 +899,21 @@ const depecratedVehicleExpires = async (req, res) => {
       ORDER BY A.ANO
     `;
 
-    const params = [];
+      const params = [];
 
-    if (clienteId) params.push(clienteId);
+      if (clienteId) params.push(clienteId);
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      anio: row.ANO,
-      precioBase: row.PRECIO_BASE,
-      valorDepreciado: row.VALOR_DEPRECIADO,
-      perdidaAcumulada: row.PERDIDA_ACUMULADA,
-      perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
-      ventaProyectada: row.VALOR_PROYECTADO_VENTA,
-    }));
+      return result.map((row) => ({
+        anio: row.ANO,
+        precioBase: row.PRECIO_BASE,
+        valorDepreciado: row.VALOR_DEPRECIADO,
+        perdidaAcumulada: row.PERDIDA_ACUMULADA,
+        perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
+        ventaProyectada: row.VALOR_PROYECTADO_VENTA,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -967,56 +925,48 @@ const depecratedVehicleExpires = async (req, res) => {
       success: false,
       message: "Error al obtener reporte de depreciación de vehiculos vencidos",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const depecratedVehicleToExpires = async (req, res) => {
   const { label, clienteId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const where = [];
+    const cleanedResult = await withConnection(async (cn) => {
+      const where = [];
 
-    switch (label) {
-      case "Menor 30 dias":
-        where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 30");
-        break;
-      case "Entre 30 y 45 dias":
-        where.push("A.DIFERENCIA_DIAS > 30 AND A.DIFERENCIA_DIAS <= 45");
-        break;
-      case "Entre 45 y 60 dias":
-        where.push("A.DIFERENCIA_DIAS > 45 AND A.DIFERENCIA_DIAS <= 60");
-        break;
-      case "Entre 60 y 90 dias":
-        where.push("A.DIFERENCIA_DIAS > 60 AND A.DIFERENCIA_DIAS <= 90");
-        break;
-      case "Entre 90 y 120 dias":
-        where.push("A.DIFERENCIA_DIAS > 90 AND A.DIFERENCIA_DIAS <= 120");
-        break;
-      default:
-        where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 120");
-    }
+      switch (label) {
+        case "Menor 30 dias":
+          where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 30");
+          break;
+        case "Entre 30 y 45 dias":
+          where.push("A.DIFERENCIA_DIAS > 30 AND A.DIFERENCIA_DIAS <= 45");
+          break;
+        case "Entre 45 y 60 dias":
+          where.push("A.DIFERENCIA_DIAS > 45 AND A.DIFERENCIA_DIAS <= 60");
+          break;
+        case "Entre 60 y 90 dias":
+          where.push("A.DIFERENCIA_DIAS > 60 AND A.DIFERENCIA_DIAS <= 90");
+          break;
+        case "Entre 90 y 120 dias":
+          where.push("A.DIFERENCIA_DIAS > 90 AND A.DIFERENCIA_DIAS <= 120");
+          break;
+        default:
+          where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 120");
+      }
 
-    if (clienteId) {
-      where.push("A.ID_CLIENTE = ?");
-    }
+      if (clienteId) {
+        where.push("A.ID_CLIENTE = ?");
+      }
 
-    const sql = `
-      SELECT 
+      const sql = `
+      SELECT
         A.ANO,
         SUM(A.PRECIO_BASE) AS PRECIO_BASE,
           CAST(
               SUM(
                 A.PRECIO_BASE * (
-                    1 - CASE 
+                    1 - CASE
                         WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                         ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                     END
@@ -1027,7 +977,7 @@ const depecratedVehicleToExpires = async (req, res) => {
               SUM(
                 A.PRECIO_BASE - (
                   A.PRECIO_BASE * (
-                      1 - CASE 
+                      1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                         END
@@ -1039,7 +989,7 @@ const depecratedVehicleToExpires = async (req, res) => {
               SUM(
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO) * 0.20
                         END
@@ -1048,7 +998,7 @@ const depecratedVehicleToExpires = async (req, res) => {
                 -
                 (
                     A.PRECIO_BASE * (
-                        1 - CASE 
+                        1 - CASE
                             WHEN (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20 > 1 THEN 1
                             ELSE (YEAR(CURRENT DATE) - A.ANO + 1) * 0.20
                         END
@@ -1083,7 +1033,7 @@ const depecratedVehicleToExpires = async (req, res) => {
             )
           AS DECIMAL(10,2)) AS VALOR_PROYECTADO_VENTA
       FROM (
-        SELECT 
+        SELECT
               TLD.ID,
               PV.ANO,
               DAYS(DATE(SUBSTR(TLC.FECHA_FIN, 1, 4) || '-' || SUBSTR(TLC.FECHA_FIN, 5, 2) || '-' || SUBSTR(TLC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS,
@@ -1095,18 +1045,18 @@ const depecratedVehicleToExpires = async (req, res) => {
           INNER JOIN ${SCHEMA_BD}.PO_VEHICULO PV
               ON TLD.ID_VEH = PV.ID
           LEFT JOIN (
-              SELECT 
+              SELECT
                   TC.ID AS ID_REF,
                   TD.MODELO,
                   TD.PRECIO_VEH AS COSTO_VEHICULO,
                   'P' AS TIPO
               FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
               INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_DET TD
-                  ON TC.ID = TD.ID_CON_CAB    
+                  ON TC.ID = TD.ID_CON_CAB
 
               UNION ALL
 
-              SELECT 
+              SELECT
                   TDOC.ID AS ID_REF,
                   TDD.MODELO,
                   TDD.PRECIO_VEH AS COSTO_VEHICULO,
@@ -1125,20 +1075,21 @@ const depecratedVehicleToExpires = async (req, res) => {
       ORDER BY A.ANO
     `;
 
-    const params = [];
+      const params = [];
 
-    if (clienteId) params.push(clienteId);
+      if (clienteId) params.push(clienteId);
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      anio: row.ANO,
-      precioBase: row.PRECIO_BASE,
-      valorDepreciado: row.VALOR_DEPRECIADO,
-      perdidaAcumulada: row.PERDIDA_ACUMULADA,
-      perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
-      ventaProyectada: row.VALOR_PROYECTADO_VENTA,
-    }));
+      return result.map((row) => ({
+        anio: row.ANO,
+        precioBase: row.PRECIO_BASE,
+        valorDepreciado: row.VALOR_DEPRECIADO,
+        perdidaAcumulada: row.PERDIDA_ACUMULADA,
+        perdidaProxAnio: row.PERDIDA_PROXIMO_ANIO,
+        ventaProyectada: row.VALOR_PROYECTADO_VENTA,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -1151,12 +1102,6 @@ const depecratedVehicleToExpires = async (req, res) => {
       message:
         "Error al obtener reporte de depreciación de vehiculos por vencer",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -1168,11 +1113,9 @@ const deprecatedVehicleById = async (req, res) => {
       .status(400)
       .json({ message: "El parametro id debe ser numérico" });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       WITH RECURSIVE ANIOS (ANIO) AS (
         SELECT MIN(PV.ANO)
         FROM ${SCHEMA_BD}.PO_VEHICULO PV
@@ -1184,13 +1127,13 @@ const deprecatedVehicleById = async (req, res) => {
         WHERE ANIO < YEAR(CURRENT DATE)
       )
 
-      SELECT 
+      SELECT
           A.ANIO,
           CAST(SUM(
               T.PRECIO_BASE * (1 - ((A.ANIO - T.ANO) * 0.20))
           ) AS DECIMAL(15,2)) AS TOTAL_VALOR_DEPRECIADO
       FROM (
-          SELECT 
+          SELECT
               TLD.ID AS ID_DET_LEA,
               PV.ANO,
 
@@ -1205,18 +1148,18 @@ const deprecatedVehicleById = async (req, res) => {
               ON TLD.ID_VEH = PV.ID
 
           LEFT JOIN (
-              SELECT 
+              SELECT
                   TC.ID AS ID_REF,
                   TD.MODELO,
                   TD.PRECIO_VEH AS COSTO_VEHICULO,
                   'P' AS TIPO
               FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
               INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_DET TD
-                  ON TC.ID = TD.ID_CON_CAB    
+                  ON TC.ID = TD.ID_CON_CAB
 
               UNION ALL
 
-              SELECT 
+              SELECT
                   TDOC.ID AS ID_REF,
                   TDD.MODELO,
                   TDD.PRECIO_VEH AS COSTO_VEHICULO,
@@ -1227,11 +1170,11 @@ const deprecatedVehicleById = async (req, res) => {
           ) COSTOS
               ON COSTOS.ID_REF = TLC.ID_CONTRATO
               AND COSTOS.TIPO = TLC.TIPCON
-              AND COSTOS.MODELO = PV.IDMOD 
+              AND COSTOS.MODELO = PV.IDMOD
 
           WHERE TLD.ID = ?
 
-          GROUP BY 
+          GROUP BY
               TLD.ID,
               PV.ANO
       ) T
@@ -1243,12 +1186,13 @@ const deprecatedVehicleById = async (req, res) => {
       ORDER BY A.ANIO
     `;
 
-    const result = await cn.query(sql, [id]);
+      const result = await cn.query(sql, [id]);
 
-    const cleanedResult = result.map((row) => ({
-      anio: row.ANIO,
-      total: row.TOTAL_VALOR_DEPRECIADO,
-    }));
+      return result.map((row) => ({
+        anio: row.ANIO,
+        total: row.TOTAL_VALOR_DEPRECIADO,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -1260,12 +1204,6 @@ const deprecatedVehicleById = async (req, res) => {
       success: false,
       message: "Error al obtener reporte de depreciación de vehiculos por id",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -1278,21 +1216,19 @@ const contVehiculeByClient = async (req, res) => {
       : [clientesId]
     : [];
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const valueQuery = listClient.map(() => "?");
+    const result = await withConnection(async (cn) => {
+      const valueQuery = listClient.map(() => "?");
 
-    const sql = `
+      const sql = `
       SELECT COUNT(*) AS TOTAL_VEH, C.IDCLI AS ID_CLIENTE, C.CLINOM AS CLIENTE FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
       LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
       ON LD.ID_LEA_CAB = LC.ID
       LEFT JOIN (
-        SELECT DISTINCT A.IDCLI, B.CLINOM 
-        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-        INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-        WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A
+        INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+        WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
         ORDER BY CLINOM ASC
       ) C
       ON LC.ID_CLIENTE = C.IDCLI
@@ -1301,7 +1237,8 @@ const contVehiculeByClient = async (req, res) => {
       ORDER BY TOTAL_VEH DESC
     `;
 
-    const result = await cn.query(sql, listClient);
+      return await cn.query(sql, listClient);
+    });
 
     return res.status(200).json(
       result.map((row) => ({
@@ -1316,12 +1253,6 @@ const contVehiculeByClient = async (req, res) => {
       success: false,
       message: "Error al obtener vehiculos por cliente",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -1334,12 +1265,10 @@ const contComparationDays = async (req, res) => {
       message: "Los parametros contractId y leasingId son obligatorios",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
-      SELECT 
+    const result = await withConnection(async (cn) => {
+      const sql = `
+      SELECT
       DATE(
       SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
       SUBSTR(C.FECHA_FIRMA, 5, 2) || '-' ||
@@ -1366,11 +1295,11 @@ const contComparationDays = async (req, res) => {
       SUBSTR(L.FECHA_FIN, 5, 2) || '-' ||
       SUBSTR(L.FECHA_FIN, 7, 2)
       ) AS FECHA_FIN_LEA,
-       
+
       DAYS(
       ADD_MONTHS(
       DATE(
-      SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' || 
+      SUBSTR(C.FECHA_FIRMA, 1, 4) || '-' ||
       SUBSTR(C.FECHA_FIRMA, 5, 2) || '-'  ||
       SUBSTR(C.FECHA_FIRMA, 7, 2)
       ),
@@ -1378,7 +1307,7 @@ const contComparationDays = async (req, res) => {
       )
       ) - DAYS (
       DATE(
-      SUBSTR(L.FECHA_FIN, 1, 4) || '-' || 
+      SUBSTR(L.FECHA_FIN, 1, 4) || '-' ||
       SUBSTR(L.FECHA_FIN, 5, 2) || '-'  ||
       SUBSTR(L.FECHA_FIN, 7, 2)
       )
@@ -1389,7 +1318,8 @@ const contComparationDays = async (req, res) => {
       WHERE C.ID = ? AND L.ID = ?
     `;
 
-    const result = await cn.query(sql, [contractId, leasingId]);
+      return await cn.query(sql, [contractId, leasingId]);
+    });
 
     return res.status(200).json({
       fechaIniCont: result[0] ? result[0].FECHA_INI_CON : "",
@@ -1404,12 +1334,6 @@ const contComparationDays = async (req, res) => {
       success: false,
       message: "Error al obtener la diferencia de dias",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
@@ -1420,9 +1344,6 @@ const contTotalPriceByModel = async (req, res) => {
     return res
       .status(400)
       .json("Los parametros modelId y fromYear son obligatorios");
-
-  const pool = await connection();
-  const cn = await pool.connect();
 
   try {
     const convertFromYear = `${fromYear}0101`;
@@ -1437,48 +1358,53 @@ const contTotalPriceByModel = async (req, res) => {
       convertToYear = `${Number(toYear) + 1}0101`;
     }
 
-    const sql = `
-      SELECT PM.DESCRIPCION AS MODELO, SUM(TD.PRECIO_VEH) AS TOTAL FROM ${SCHEMA_BD}.TBLCONTRATO_DET td 
-      JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
-      ON TC.ID = TD.ID_CON_CAB 
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm 
+    const { cleanedResult, total } = await withConnection(async (cn) => {
+      const sql = `
+      SELECT PM.DESCRIPCION AS MODELO, SUM(TD.PRECIO_VEH) AS TOTAL FROM ${SCHEMA_BD}.TBLCONTRATO_DET td
+      JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
+      ON TC.ID = TD.ID_CON_CAB
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm
       ON TD.MODELO = PM.ID
       WHERE PM.IDMODGEN = ? AND TC.FECHA_FIRMA >= ? AND TC.FECHA_FIRMA < ?
       GROUP BY PM.DESCRIPCION
       ORDER BY TOTAL DESC
     `;
 
-    const result = await cn.query(sql, [
-      modelId,
-      convertFromYear,
-      convertToYear,
-    ]);
+      const result = await cn.query(sql, [
+        modelId,
+        convertFromYear,
+        convertToYear,
+      ]);
 
-    const sqlTotal = `
+      const sqlTotal = `
       SELECT SUM(TOTAL) AS TOTAL FROM (
-        SELECT PM.DESCRIPCION AS MODELO, SUM(TD.PRECIO_VEH) AS TOTAL FROM ${SCHEMA_BD}.TBLCONTRATO_DET td 
-        JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
-        ON TC.ID = TD.ID_CON_CAB 
-        LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm 
+        SELECT PM.DESCRIPCION AS MODELO, SUM(TD.PRECIO_VEH) AS TOTAL FROM ${SCHEMA_BD}.TBLCONTRATO_DET td
+        JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
+        ON TC.ID = TD.ID_CON_CAB
+        LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm
         ON TD.MODELO = PM.ID
         WHERE PM.IDMODGEN = ? AND TC.FECHA_FIRMA >= ? AND TC.FECHA_FIRMA < ?
         GROUP BY PM.DESCRIPCION
       )
     `;
 
-    const resultTotal = await cn.query(sqlTotal, [
-      modelId,
-      convertFromYear,
-      convertToYear,
-    ]);
+      const resultTotal = await cn.query(sqlTotal, [
+        modelId,
+        convertFromYear,
+        convertToYear,
+      ]);
 
-    const cleanedResult = result.map((row) => ({
-      MODELO: row.MODELO.trim(),
-      T_PRECIO_VEH: row.TOTAL,
-    }));
+      return {
+        cleanedResult: result.map((row) => ({
+          MODELO: row.MODELO.trim(),
+          T_PRECIO_VEH: row.TOTAL,
+        })),
+        total: resultTotal[0].TOTAL ? resultTotal[0].TOTAL : 0,
+      };
+    });
 
     return res.status(200).json({
-      TOTAL: resultTotal[0].TOTAL ? resultTotal[0].TOTAL : 0,
+      TOTAL: total,
       LIST: cleanedResult,
     });
   } catch (error) {
@@ -1486,27 +1412,19 @@ const contTotalPriceByModel = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Error al obtener costos por modelo" });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const contTotalVehicleMap = async (req, res) => {
   const { clienteId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sentences = clienteId ? "WHERE TAC.ID_CLIENTE = ?" : "";
-    const params = clienteId ? [clienteId] : [];
+    const mapResult = await withConnection(async (cn) => {
+      const sentences = clienteId ? "WHERE TAC.ID_CLIENTE = ?" : "";
+      const params = clienteId ? [clienteId] : [];
 
-    const sql = `
-      SELECT 
+      const sql = `
+      SELECT
         COALESCE(TUO.DEPARTAMENTO, 'NO IDENT') AS DEPARTAMENTO,
         COUNT(*) AS TOTAL_PLACAS,
         COUNT(DISTINCT PO.ID) AS TOTAL_OPERACIONES
@@ -1514,7 +1432,7 @@ const contTotalVehicleMap = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
         ON TAD.ID_OPE = PO.ID
       LEFT JOIN ${SCHEMA_BD}.TBL_UBICACION_OPE TUO
-        ON PO.ID = TUO.ID_OPE 
+        ON PO.ID = TUO.ID_OPE
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
         ON TAD.ID_ASIGNACION = TAC.ID
       ${sentences}
@@ -1522,16 +1440,17 @@ const contTotalVehicleMap = async (req, res) => {
       ORDER BY DEPARTAMENTO
     `;
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const mapResult = result.reduce((acc, row) => {
-      acc[row.DEPARTAMENTO] = {
-        vehiculos: Number(row.TOTAL_PLACAS),
-        operaciones: Number(row.TOTAL_OPERACIONES),
-      };
+      return result.reduce((acc, row) => {
+        acc[row.DEPARTAMENTO] = {
+          vehiculos: Number(row.TOTAL_PLACAS),
+          operaciones: Number(row.TOTAL_OPERACIONES),
+        };
 
-      return acc;
-    }, {});
+        return acc;
+      }, {});
+    });
 
     return res.status(200).json(mapResult);
   } catch (error) {
@@ -1540,23 +1459,15 @@ const contTotalVehicleMap = async (req, res) => {
       success: false,
       message: "Error al obtener total de vehiculos para mapa",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 
 const notifications = async (req, res) => {
   const {id: idUser, roleId} = req.user;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    let sql = `
+    const result = await withConnection(async (cn) => {
+      let sql = `
       SELECT
       (
           SELECT COUNT(*)
@@ -1571,12 +1482,12 @@ const notifications = async (req, res) => {
       (
           SELECT COUNT(*)
           FROM (
-              SELECT 
+              SELECT
                   TAD.ID
               FROM SPEED400AT.TBL_ASIGNACION_DET TAD
 
               JOIN (
-                  SELECT 
+                  SELECT
                       IDVEH,
                       SECOPE,
                       ROW_NUMBER() OVER (
@@ -1594,31 +1505,31 @@ const notifications = async (req, res) => {
       FROM SYSIBM.SYSDUMMY1
     `;
 
-    if(roleId != 1 && roleId != 2) {
-      sql = `
+      if(roleId != 1 && roleId != 2) {
+        sql = `
         SELECT
           (
               SELECT COUNT(*)
                 FROM SPEED400AT.TBLCONTRATO_CAB TC
                 LEFT JOIN (
                   SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
                   LEFT JOIN (
                     SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM SPEED400AT.PO_OPERACIONES A 
-                    INNER JOIN SPEED400AT.TCLIE B 
-                    ON A.IDCLI = B.CLICVE 
-                    WHERE A.ID <> 86 
+                    FROM SPEED400AT.PO_OPERACIONES A
+                    INNER JOIN SPEED400AT.TCLIE B
+                    ON A.IDCLI = B.CLICVE
+                    WHERE A.ID <> 86
                     AND B.CLINOM <> '*** ANULADO ***'
                   )PO
                   ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN SPEED400AT.T_US_GC tug 
+                  LEFT JOIN SPEED400AT.T_US_GC tug
                   ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN SPEED400AT.T_RL_GC trg 
+                  LEFT JOIN SPEED400AT.T_RL_GC trg
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
                 ) CL
-                ON TC.ID_CLIENTE = CL.IDCLI 
+                ON TC.ID_CLIENTE = CL.IDCLI
                 WHERE TC.NRO_CONTRATO LIKE 'CPEN-%' AND CL.ID_USU = ${idUser}
             ) AS TOTAL_CONTRATOS,
             (
@@ -1626,19 +1537,19 @@ const notifications = async (req, res) => {
                 FROM SPEED400AT.TBLDOCUMENTO_CAB TD
                 LEFT JOIN (
                   SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
                   LEFT JOIN (
                     SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM SPEED400AT.PO_OPERACIONES A 
-                    INNER JOIN SPEED400AT.TCLIE B 
-                    ON A.IDCLI = B.CLICVE 
-                    WHERE A.ID <> 86 
+                    FROM SPEED400AT.PO_OPERACIONES A
+                    INNER JOIN SPEED400AT.TCLIE B
+                    ON A.IDCLI = B.CLICVE
+                    WHERE A.ID <> 86
                     AND B.CLINOM <> '*** ANULADO ***'
                   )PO
                   ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN SPEED400AT.T_US_GC tug 
+                  LEFT JOIN SPEED400AT.T_US_GC tug
                   ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN SPEED400AT.T_RL_GC trg 
+                  LEFT JOIN SPEED400AT.T_RL_GC trg
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
                 ) CL
@@ -1648,32 +1559,32 @@ const notifications = async (req, res) => {
             (
                 SELECT COUNT(*)
                 FROM (
-                  SELECT 
+                  SELECT
                     TAD.ID
                     FROM SPEED400AT.TBL_ASIGNACION_DET TAD
                     LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB TAC
                     ON TAD.ID_ASIGNACION = TAC.ID
                     LEFT JOIN (
                       SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                    FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
+                    FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
                     LEFT JOIN (
                       SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                      FROM SPEED400AT.PO_OPERACIONES A 
-                      INNER JOIN SPEED400AT.TCLIE B 
-                      ON A.IDCLI = B.CLICVE 
-                      WHERE A.ID <> 86 
+                      FROM SPEED400AT.PO_OPERACIONES A
+                      INNER JOIN SPEED400AT.TCLIE B
+                      ON A.IDCLI = B.CLICVE
+                      WHERE A.ID <> 86
                       AND B.CLINOM <> '*** ANULADO ***'
                     )PO
                     ON MOXU.IDOPERACION = PO.ID
-                    LEFT JOIN SPEED400AT.T_US_GC tug 
+                    LEFT JOIN SPEED400AT.T_US_GC tug
                     ON MOXU.CH_CODI_USUARIO = TUG.USU
-                    LEFT JOIN SPEED400AT.T_RL_GC trg 
+                    LEFT JOIN SPEED400AT.T_RL_GC trg
                     ON TUG.ID_RL = TRG.ID
                     WHERE TUG.USU IS NOT NULL
                     ) CL
                     ON TAC.ID_CLIENTE = CL.IDCLI
                   JOIN (
-                    SELECT 
+                    SELECT
                     IDVEH,
                     SECOPE,
                     ROW_NUMBER() OVER (
@@ -1689,9 +1600,10 @@ const notifications = async (req, res) => {
           ) AS TOTAL_REASIGNACIONES
         FROM SYSIBM.SYSDUMMY1
       `
-    }
+      }
 
-    const result = await cn.query(sql);
+      return await cn.query(sql);
+    });
 
     return res.status(200).json({
       totalContratos: result[0].TOTAL_CONTRATOS,
@@ -1704,12 +1616,6 @@ const notifications = async (req, res) => {
       success: false,
       message: "Error al obtener lista de notificaciones",
     });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
   }
 };
 

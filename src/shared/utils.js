@@ -1,6 +1,30 @@
 const iconv = require("iconv-lite");
 const { SCHEMA_BD } = require("./conf.js");
-// const connection = require("../shared/connect.js")
+const conDb = require("./connect.js");
+
+const NETWORK_ERROR_CODES = [10054, 10060, 10061];
+
+const withConnection = async (fn) => {
+  const pool = await conDb();
+  let cn;
+  try {
+    cn = await pool.connect();
+    return await fn(cn);
+  } catch (err) {
+    const isNetworkError = err?.odbcErrors?.some((e) =>
+      NETWORK_ERROR_CODES.includes(e.code)
+    );
+    if (isNetworkError) {
+      console.warn("[withConnection] Error de red, reintentando...");
+      if (cn) await cn.close().catch(() => {});
+      cn = await pool.connect();
+      return await fn(cn);
+    }
+    throw err;
+  } finally {
+    if (cn) await cn.close().catch(() => {});
+  }
+};
 
 const decodeString = (str) => {
   return iconv.decode(Buffer.from(str, "binary"), "latin1"); // Decodifica desde latin1
@@ -64,5 +88,6 @@ module.exports = {
   obtenerUltimoIdDoc,
   obtenerUltimoIdLea,
   obtenerUltimoIdAsigna,
-  transformType
+  transformType,
+  withConnection,
 };

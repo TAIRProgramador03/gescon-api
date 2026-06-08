@@ -5,26 +5,25 @@ const {
   funcionParteVar,
   obtenerUltimoIdLea,
   transformType,
+  withConnection,
 } = require("../../shared/utils.js");
-const connection = require("../../shared/connect.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile } = require("../../shared/service/aws-s3.js");
 
 const listLeasing = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const result = await cn.query(
-      `SELECT ID, NRO_LEASING FROM ${SCHEMA_BD}.TBL_LEASING_CAB ORDER BY NRO_LEASING ASC`,
-    );
+    const cleanedResult = await withConnection(async (cn) => {
+      const result = await cn.query(
+        `SELECT ID, NRO_LEASING FROM ${SCHEMA_BD}.TBL_LEASING_CAB ORDER BY NRO_LEASING ASC`,
+      );
 
-    // Decodificar los resultados desde latin1
-    const cleanedResult = result.map((row) => {
-      return {
-        ID: String(row.ID).trim(),
-        NRO_LEASING: decodeString(row.NRO_LEASING.trim()),
-      };
+      // Decodificar los resultados desde latin1
+      return result.map((row) => {
+        return {
+          ID: String(row.ID).trim(),
+          NRO_LEASING: decodeString(row.NRO_LEASING.trim()),
+        };
+      });
     });
 
     res.json(cleanedResult);
@@ -33,61 +32,54 @@ const listLeasing = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener leasing" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
 const listLeasingAdi = async (req, res) => {
   const { clienteId, contratoId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const conditions = [];
-    const params = [];
+    const cleanedResult = await withConnection(async (cn) => {
+      const conditions = [];
+      const params = [];
 
-    if (clienteId) {
-      conditions.push("ID_CLIENTE = ?");
+      if (clienteId) {
+        conditions.push("ID_CLIENTE = ?");
 
-      params.push(clienteId);
-    }
+        params.push(clienteId);
+      }
 
-    if (contratoId) {
-      const [tipCon, idCon] = contratoId.split("_");
+      if (contratoId) {
+        const [tipCon, idCon] = contratoId.split("_");
 
-      conditions.push("ID_CONTRATO = ?");
+        conditions.push("ID_CONTRATO = ?");
 
-      conditions.push("TIPCON = ?");
+        conditions.push("TIPCON = ?");
 
-      params.push(idCon, tipCon);
-    }
+        params.push(idCon, tipCon);
+      }
 
-    const whereClause = conditions.length
-      ? `WHERE ${conditions.join(" AND ")}`
-      : "";
+      const whereClause = conditions.length
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
 
-    const result = await cn.query(
-      `
+      const result = await cn.query(
+        `
     SELECT ID, NRO_LEASING
     FROM ${SCHEMA_BD}.TBL_LEASING_CAB
     ${whereClause}
     ORDER BY NRO_LEASING ASC
     `,
-      params,
-    );
+        params,
+      );
 
-    // Decodificar los resultados desde latin1
-    const cleanedResult = result.map((row) => {
-      return {
-        ID: String(row.ID).trim(),
-        NRO_LEASING: decodeString(row.NRO_LEASING.trim()),
-      };
+      // Decodificar los resultados desde latin1
+      return result.map((row) => {
+        return {
+          ID: String(row.ID).trim(),
+          NRO_LEASING: decodeString(row.NRO_LEASING.trim()),
+        };
+      });
     });
 
     res.json(cleanedResult);
@@ -96,12 +88,6 @@ const listLeasingAdi = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener leasing" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -110,102 +96,82 @@ const listAllLeasing = async (req, res) => {
 
   const { bank, clientId, contractId, typeContract } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // let sql = `
-    //   SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON
-    //   FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    // `;
-    let filtros = "";
-    const params = [];
-    const condiciones = [];
+    const cleanedResult = await withConnection(async (cn) => {
+      // let sql = `
+      //   SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON
+      //   FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
+      // `;
+      let filtros = "";
+      const params = [];
+      const condiciones = [];
 
-    // 🟢 BANCO (independiente)
-    if (bank) {
-      condiciones.push("L.BANCO = ?");
-      params.push(bank);
-    }
-
-    // 🟢 CLIENTE (independiente)
-    if (clientId) {
-      condiciones.push("L.ID_CLIENTE = ?");
-      params.push(clientId);
-    }
-
-    // 🔵 CONTRATO
-    if (contractId) {
-      condiciones.push("L.ID_CONTRATO = ?");
-      params.push(contractId);
-
-      if (typeContract === "P") {
-        condiciones.push("L.TIPCON = 'P'");
-      } else if (typeContract === "H") {
-        condiciones.push("L.TIPCON = 'H'");
+      // 🟢 BANCO (independiente)
+      if (bank) {
+        condiciones.push("L.BANCO = ?");
+        params.push(bank);
       }
-    }
 
-    // 🔥 armar WHERE dinámico
-    if (condiciones.length > 0) {
-      filtros = " WHERE " + condiciones.join(" AND ");
-    }
+      // 🟢 CLIENTE (independiente)
+      if (clientId) {
+        condiciones.push("L.ID_CLIENTE = ?");
+        params.push(clientId);
+      }
 
-    // let sql = `
-    //   SELECT * FROM (
-    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO
-    //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    //     LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
-    //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
-    //     WHERE L.TIPCON = 'P'
-    //     UNION ALL
-    //     SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH AS CANTIDAD, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.TIPCON, tc.NRO_DOC AS NRO_CONTRATO, L.ID_CLIENTE, L.ID_CONTRATO
-    //     FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    //     LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc
-    //     ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'H'
-    //     WHERE L.TIPCON = 'H'
-    //   ) L
-    //   ${filtros}
-    //   ORDER BY L.ID ASC
-    // `;
+      // 🔵 CONTRATO
+      if (contractId) {
+        condiciones.push("L.ID_CONTRATO = ?");
+        params.push(contractId);
 
-    let sql = `
-      SELECT 
-        L.ID, 
-        L.NRO_LEASING, 
-        L.BANCO, 
-        L.CANT_VEH AS CANTIDAD, 
-        L.FECHA_INI, 
-        L.FECHA_FIN, 
-        L.PERIODO_GRACIA, 
-        L.PDF, 
-        L.TIPCON, 
-        COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO, 
-        L.ID_CLIENTE, 
-        L.ID_CONTRATO, 
-        COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO, 
-        CL.CLINOM AS CLIENTE, 
+        if (typeContract === "P") {
+          condiciones.push("L.TIPCON = 'P'");
+        } else if (typeContract === "H") {
+          condiciones.push("L.TIPCON = 'H'");
+        }
+      }
+
+      // 🔥 armar WHERE dinámico
+      if (condiciones.length > 0) {
+        filtros = " WHERE " + condiciones.join(" AND ");
+      }
+
+      let sql = `
+      SELECT
+        L.ID,
+        L.NRO_LEASING,
+        L.BANCO,
+        L.CANT_VEH AS CANTIDAD,
+        L.FECHA_INI,
+        L.FECHA_FIN,
+        L.PERIODO_GRACIA,
+        L.PDF,
+        L.TIPCON,
+        COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO,
+        L.ID_CLIENTE,
+        L.ID_CONTRATO,
+        COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO,
+        CL.CLINOM AS CLIENTE,
         COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
       ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
-      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2
       ON L.ID_CONTRATO = TC2.ID AND L.TIPCON = 'H'
       LEFT JOIN (
-        SELECT DISTINCT A.IDCLI, B.CLINOM 
-        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-        INNER JOIN ${SCHEMA_BD}.TCLIE B 
-        ON A.IDCLI = B.CLICVE 
-        WHERE A.ID <> 86 
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A
+        INNER JOIN ${SCHEMA_BD}.TCLIE B
+        ON A.IDCLI = B.CLICVE
+        WHERE A.ID <> 86
         AND B.CLINOM <> '*** ANULADO ***'
       ) CL
-      ON CL.IDCLI = L.ID_CLIENTE 
+      ON CL.IDCLI = L.ID_CLIENTE
       LEFT JOIN (
-        SELECT DISTINCT A.IDCLI, B.CLINOM 
-        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-        INNER JOIN ${SCHEMA_BD}.TCLIE B 
-        ON A.IDCLI = B.CLICVE 
-        WHERE A.ID <> 86 
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A
+        INNER JOIN ${SCHEMA_BD}.TCLIE B
+        ON A.IDCLI = B.CLICVE
+        WHERE A.ID <> 86
         AND B.CLINOM <> '*** ANULADO ***'
       ) CLA
       ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO
@@ -213,68 +179,68 @@ const listAllLeasing = async (req, res) => {
       ORDER BY L.ID ASC
     `;
 
-    if (roleId != 1 && roleId != 2) {
-      if (condiciones.length > 0) {
-        filtros = " AND " + condiciones.join(" AND ");
-      }
+      if (roleId != 1 && roleId != 2) {
+        if (condiciones.length > 0) {
+          filtros = " AND " + condiciones.join(" AND ");
+        }
 
-      sql = `
-        SELECT 
-          L.ID, 
-          L.NRO_LEASING, 
-          L.BANCO, 
-          L.CANT_VEH AS CANTIDAD, 
-          L.FECHA_INI, 
-          L.FECHA_FIN, 
-          L.PERIODO_GRACIA, 
-          L.PDF, 
-          L.TIPCON, 
-          COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO, 
-          L.ID_CLIENTE, 
-          L.ID_CONTRATO, 
-          COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO, 
-          CL.CLINOM AS CLIENTE, 
+        sql = `
+        SELECT
+          L.ID,
+          L.NRO_LEASING,
+          L.BANCO,
+          L.CANT_VEH AS CANTIDAD,
+          L.FECHA_INI,
+          L.FECHA_FIN,
+          L.PERIODO_GRACIA,
+          L.PDF,
+          L.TIPCON,
+          COALESCE(tc.NRO_CONTRATO, tc2.NRO_DOC) AS NRO_CONTRATO,
+          L.ID_CLIENTE,
+          L.ID_CONTRATO,
+          COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO,
+          CL.CLINOM AS CLIENTE,
           COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN,
           CL.ID_USU
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
         ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2
         ON L.ID_CONTRATO = TC2.ID AND L.TIPCON = 'H'
         LEFT JOIN (
           SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
           LEFT JOIN (
             SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-            INNER JOIN ${SCHEMA_BD}.TCLIE B 
-            ON A.IDCLI = B.CLICVE 
-            WHERE A.ID <> 86 
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B
+            ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86
             AND B.CLINOM <> '*** ANULADO ***'
           )PO
           ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
           ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
           ON TUG.ID_RL = TRG.ID
           WHERE TUG.USU IS NOT NULL
         ) CL
-        ON CL.IDCLI = L.ID_CLIENTE 
+        ON CL.IDCLI = L.ID_CLIENTE
         LEFT JOIN (
           SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
           LEFT JOIN (
             SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-            INNER JOIN ${SCHEMA_BD}.TCLIE B 
-            ON A.IDCLI = B.CLICVE 
-            WHERE A.ID <> 86 
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B
+            ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86
             AND B.CLINOM <> '*** ANULADO ***'
           )PO
           ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
           ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
           ON TUG.ID_RL = TRG.ID
           WHERE TUG.USU IS NOT NULL
         ) CLA
@@ -282,36 +248,37 @@ const listAllLeasing = async (req, res) => {
         WHERE CL.ID_USU = ${idUser} ${filtros}
         ORDER BY L.ID ASC
       `;
-    }
+      }
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      id: row.ID,
-      nroLeasing: row.NRO_LEASING.trim(),
-      banco: transformType(row.BANCO.trim(), {
-        1: "BANBIF",
-        2: "BBVA",
-        3: "BCP",
-        4: "HSBC",
-        5: "INTERBANK",
-        6: "SCOTIABANK",
-        7: "TAIR",
-        8: "SANTANDER",
-      }),
-      cantidad: row.CANTIDAD,
-      fechaIni: String(row.FECHA_INI),
-      fechaFin: String(row.FECHA_FIN),
-      perGracia: row.PERIODO_GRACIA,
-      archivoPdf: row.PDF.trim(),
-      tipoCon: transformType(row.TIPCON.trim(), {
-        P: "Contrato",
-        H: "Documento",
-      }),
-      nroContrato: row.NRO_CONTRATO.trim(),
-      cliente: row.CLIENTE.trim(),
-      clienteOrigen: row.CLIENTE_ORIGEN ? row.CLIENTE_ORIGEN.trim() : "",
-    }));
+      return result.map((row) => ({
+        id: row.ID,
+        nroLeasing: row.NRO_LEASING.trim(),
+        banco: transformType(row.BANCO.trim(), {
+          1: "BANBIF",
+          2: "BBVA",
+          3: "BCP",
+          4: "HSBC",
+          5: "INTERBANK",
+          6: "SCOTIABANK",
+          7: "TAIR",
+          8: "SANTANDER",
+        }),
+        cantidad: row.CANTIDAD,
+        fechaIni: String(row.FECHA_INI),
+        fechaFin: String(row.FECHA_FIN),
+        perGracia: row.PERIODO_GRACIA,
+        archivoPdf: row.PDF.trim(),
+        tipoCon: transformType(row.TIPCON.trim(), {
+          P: "Contrato",
+          H: "Documento",
+        }),
+        nroContrato: row.NRO_CONTRATO.trim(),
+        cliente: row.CLIENTE.trim(),
+        clienteOrigen: row.CLIENTE_ORIGEN ? row.CLIENTE_ORIGEN.trim() : "",
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -320,12 +287,6 @@ const listAllLeasing = async (req, res) => {
       success: false,
       message: "Error al obtener la lista de leasings",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -340,30 +301,29 @@ const listLeasingOfClient = async (req, res) => {
     });
   }
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const query = `
-        SELECT ID, NRO_LEASING 
-        FROM ${SCHEMA_BD}.TBL_LEASING_CAB 
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `
+        SELECT ID, NRO_LEASING
+        FROM ${SCHEMA_BD}.TBL_LEASING_CAB
         WHERE ID_CLIENTE = ? ORDER BY NRO_LEASING ASC
       `;
 
-    const result = await cn.query(query, [idCli]);
+      const result = await cn.query(query, [idCli]);
 
-    // Decodificar los resultados desde latin1
-    const cleanedResult = result.map((row) => {
-      return {
-        ID:
-          row.ID !== null && row.ID !== undefined
-            ? String(row.ID).trim()
-            : null,
-        NRO_LEASING:
-          row.NRO_LEASING !== null && row.NRO_LEASING !== undefined
-            ? decodeString(row.NRO_LEASING.trim())
-            : null,
-      };
+      // Decodificar los resultados desde latin1
+      return result.map((row) => {
+        return {
+          ID:
+            row.ID !== null && row.ID !== undefined
+              ? String(row.ID).trim()
+              : null,
+          NRO_LEASING:
+            row.NRO_LEASING !== null && row.NRO_LEASING !== undefined
+              ? decodeString(row.NRO_LEASING.trim())
+              : null,
+        };
+      });
     });
 
     res.json(cleanedResult);
@@ -372,47 +332,40 @@ const listLeasingOfClient = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener leasing" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
 const listLeasingByContract = async (req, res) => {
   const { contratoId, clienteId, tipoCon } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT A.ID, A.NRO_LEASING, A.CANT_VEH, A.FECHA_INI, A.FECHA_FIN, A.ID_CONTRATO, A.ID_CLIENTE
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
       ${contratoId && tipoCon && clienteId ? `WHERE A.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND TIPCON = ?` : contratoId && tipoCon ? `WHERE A.ID_CONTRATO = ? AND TIPCON = ?` : clienteId ? `WHERE A.ID_CLIENTE = ?` : ""}
     `;
 
-    const params = [];
+      const params = [];
 
-    if (contratoId && clienteId && tipoCon) {
-      params.push(clienteId, contratoId, tipoCon);
-    } else if (contratoId && tipoCon) {
-      params.push(contratoId, tipoCon);
-    } else if (clienteId) {
-      params.push(clienteId);
-    }
+      if (contratoId && clienteId && tipoCon) {
+        params.push(clienteId, contratoId, tipoCon);
+      } else if (contratoId && tipoCon) {
+        params.push(contratoId, tipoCon);
+      } else if (clienteId) {
+        params.push(clienteId);
+      }
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      id: row.ID,
-      nroLeasing: row.NRO_LEASING ? row.NRO_LEASING.trim() : "",
-      fechaInicio: row.FECHA_INI ? row.FECHA_INI.toString().trim() : "",
-      fechaFin: row.FECHA_FIN ? row.FECHA_FIN.toString().trim() : "",
-      cantVehi: row.CANT_VEH,
-    }));
+      return result.map((row) => ({
+        id: row.ID,
+        nroLeasing: row.NRO_LEASING ? row.NRO_LEASING.trim() : "",
+        fechaInicio: row.FECHA_INI ? row.FECHA_INI.toString().trim() : "",
+        fechaFin: row.FECHA_FIN ? row.FECHA_FIN.toString().trim() : "",
+        cantVehi: row.CANT_VEH,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -421,12 +374,6 @@ const listLeasingByContract = async (req, res) => {
       success: false,
       message: "Error al listar leasings por contrato",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -439,25 +386,24 @@ const listLeasingByDocument = async (req, res) => {
       message: "El parametro documentoId son obligatorio",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT A.ID, A.NRO_LEASING, A.CANT_VEH, A.FECHA_INI, A.FECHA_FIN, A.ID_CONTRATO, A.ID_CLIENTE
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
       WHERE A.ID_CONTRATO = ? AND TIPCON = 'H'
     `;
 
-    const result = await cn.query(sql, [documentoId]);
+      const result = await cn.query(sql, [documentoId]);
 
-    const cleanedResult = result.map((row) => ({
-      id: row.ID,
-      nroLeasing: row.NRO_LEASING ? row.NRO_LEASING.trim() : "",
-      fechaInicio: row.FECHA_INI ? row.FECHA_INI.toString().trim() : "",
-      fechaFin: row.FECHA_FIN ? row.FECHA_FIN.toString().trim() : "",
-      cantVehi: row.CANT_VEH,
-    }));
+      return result.map((row) => ({
+        id: row.ID,
+        nroLeasing: row.NRO_LEASING ? row.NRO_LEASING.trim() : "",
+        fechaInicio: row.FECHA_INI ? row.FECHA_INI.toString().trim() : "",
+        fechaFin: row.FECHA_FIN ? row.FECHA_FIN.toString().trim() : "",
+        cantVehi: row.CANT_VEH,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -466,12 +412,6 @@ const listLeasingByDocument = async (req, res) => {
       success: false,
       message: "Error al listar leasings por contrato",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -480,155 +420,141 @@ const listLeasingGeneral = async (req, res) => {
 
   const { contratoId, clienteId } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    let initWhere = "";
-    let filtroA = "";
-    let filtroB = "";
+    const result = await withConnection(async (cn) => {
+      let initWhere = "";
+      let filtroA = "";
+      let filtroB = "";
 
-    if (contratoId || clienteId) {
-      initWhere = "WHERE";
-    }
+      if (contratoId || clienteId) {
+        initWhere = "WHERE";
+      }
 
-    if (contratoId && !clienteId) {
-      filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P'";
-      filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H'";
-    } else if (!contratoId && clienteId) {
-      filtroA += "A.ID_CLIENTE = ?";
-      filtroB += "A.ID_CLIENTE = ?";
-    } else if (contratoId && clienteId) {
-      filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P' AND A.ID_CLIENTE = ?";
-      filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H' AND A.ID_CLIENTE = ?";
-    }
+      if (contratoId && !clienteId) {
+        filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P'";
+        filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H'";
+      } else if (!contratoId && clienteId) {
+        filtroA += "A.ID_CLIENTE = ?";
+        filtroB += "A.ID_CLIENTE = ?";
+      } else if (contratoId && clienteId) {
+        filtroA += "A.ID_CONTRATO = ? AND TIPCON = 'P' AND A.ID_CLIENTE = ?";
+        filtroB += "A.ID_CONTRATO = ? AND TIPCON = 'H' AND A.ID_CLIENTE = ?";
+      }
 
-    let sqlContract = `
+      let sqlContract = `
       SELECT A.ID, A.NRO_LEASING
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
       ${initWhere} ${filtroA}
     `;
 
-    let sqlDocument = `
+      let sqlDocument = `
       SELECT A.ID, A.NRO_LEASING
-      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A 
+      FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
       ${initWhere} ${filtroB}
     `;
 
-    if (roleId != 1 && roleId != 2) {
-      if (contratoId || clienteId) {
-        initWhere = "AND";
-      }
+      if (roleId != 1 && roleId != 2) {
+        if (contratoId || clienteId) {
+          initWhere = "AND";
+        }
 
-      sqlContract = `
+        sqlContract = `
         SELECT A.ID, A.NRO_LEASING
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
         LEFT JOIN (
           SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
           LEFT JOIN (
             SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-            INNER JOIN ${SCHEMA_BD}.TCLIE B 
-            ON A.IDCLI = B.CLICVE 
-            WHERE A.ID <> 86 
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B
+            ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86
             AND B.CLINOM <> '*** ANULADO ***'
           )PO
           ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
           ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
           ON TUG.ID_RL = TRG.ID
           WHERE TUG.USU IS NOT NULL
         ) TU
-        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI 
+        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
         WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroA}
       `;
 
-      sqlDocument = `
+        sqlDocument = `
         SELECT A.ID, A.NRO_LEASING
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
         LEFT JOIN (
           SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
           LEFT JOIN (
             SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-            INNER JOIN ${SCHEMA_BD}.TCLIE B 
-            ON A.IDCLI = B.CLICVE 
-            WHERE A.ID <> 86 
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B
+            ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86
             AND B.CLINOM <> '*** ANULADO ***'
           )PO
           ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
           ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
           ON TUG.ID_RL = TRG.ID
           WHERE TUG.USU IS NOT NULL
         ) TU
-        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI 
+        ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
         WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroB}
       `;
-    }
+      }
 
-    let typeDoc = "";
-    let idDoc;
-    const params = [];
+      let typeDoc = "";
+      let idDoc;
+      const params = [];
 
-    if (contratoId && !clienteId) {
-      typeDoc = contratoId.split("_")[0];
-      idDoc = contratoId.split("_")[1];
+      if (contratoId && !clienteId) {
+        typeDoc = contratoId.split("_")[0];
+        idDoc = contratoId.split("_")[1];
 
-      params.push(idDoc);
-    } else if (!contratoId && clienteId) {
-      params.push(clienteId);
-    } else if (contratoId && clienteId) {
-      typeDoc = contratoId.split("_")[0];
-      idDoc = contratoId.split("_")[1];
+        params.push(idDoc);
+      } else if (!contratoId && clienteId) {
+        params.push(clienteId);
+      } else if (contratoId && clienteId) {
+        typeDoc = contratoId.split("_")[0];
+        idDoc = contratoId.split("_")[1];
 
-      params.push(idDoc, clienteId);
-    }
+        params.push(idDoc, clienteId);
+      }
 
-    if (typeDoc == "H") {
-      const result = await cn.query(sqlDocument, params);
-
-      return res.status(200).json(
-        result.map((row) => ({
+      if (typeDoc == "H") {
+        const rows = await cn.query(sqlDocument, params);
+        return rows.map((row) => ({
           ID: row.ID,
           NRO_LEASING: row.NRO_LEASING.trim(),
-        })),
-      );
-    } else if (typeDoc == "P") {
-      const result = await cn.query(sqlContract, params);
-
-      return res.status(200).json(
-        result.map((row) => ({
+        }));
+      } else if (typeDoc == "P") {
+        const rows = await cn.query(sqlContract, params);
+        return rows.map((row) => ({
           ID: row.ID,
           NRO_LEASING: row.NRO_LEASING.trim(),
-        })),
-      );
-    } else {
-      const result = await cn.query(sqlContract, params);
-
-      return res.status(200).json(
-        result.map((row) => ({
+        }));
+      } else {
+        const rows = await cn.query(sqlContract, params);
+        return rows.map((row) => ({
           ID: row.ID,
           NRO_LEASING: row.NRO_LEASING.trim(),
-        })),
-      );
-    }
+        }));
+      }
+    });
+
+    return res.status(200).json(result);
   } catch (error) {
     console.error("Error al listar leasing por contrato o documento: ", error);
     return res.status(500).json({
       success: false,
       message: "Error al listar leasing por contrato o documento",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -642,57 +568,44 @@ const detailLeasing = async (req, res) => {
         "El parametro leasingId y clienteId son obligatorios",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // const sql = `
-    //   SELECT L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, COUNT(A.ID) AS CANT_ASIGN , L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON
-    //   FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
-    //   LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET A
-    //   ON L.NRO_LEASING = A.LEASING
-    //   LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-    //   ON AC.ID = A.ID_ASIGNACION
-    //   WHERE L.ID = ? AND A.LEASING = ? AND AC.ID_CLIENTE = ? AND A.ID_CONTRATO = ? AND A.CLASE_CONTRATO = ?
-    //   GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON
-    // `;
-
-    const sql = `
-      SELECT 
-        L.ID, 
-        L.BANCO, 
-        L.CANT_VEH, 
-        COUNT(A.ID) AS CANT_ASIGN, 
-        L.FECHA_INI, 
-        L.FECHA_FIN, 
-        L.PERIODO_GRACIA, 
-        L.PDF, 
-        L.DESCRIPCION, 
-        C.CLINOM AS CLIENTE, 
+    const data = await withConnection(async (cn) => {
+      const sql = `
+      SELECT
+        L.ID,
+        L.BANCO,
+        L.CANT_VEH,
+        COUNT(A.ID) AS CANT_ASIGN,
+        L.FECHA_INI,
+        L.FECHA_FIN,
+        L.PERIODO_GRACIA,
+        L.PDF,
+        L.DESCRIPCION,
+        C.CLINOM AS CLIENTE,
         C2.CLINOM AS CLIENTE_ASOCIADO
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
       LEFT JOIN (
-      	SELECT TAD.* FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
-      	LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
+      	SELECT TAD.* FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+      	LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
       	ON TAD.ID_ASIGNACION = TAC.ID
       	WHERE TAC.ID_CLIENTE = ?
       ) A
-      ON L.NRO_LEASING = A.LEASING 
+      ON L.NRO_LEASING = A.LEASING
       LEFT JOIN (
         SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-          WHERE A.ID <> 86 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B
+          ON A.IDCLI = B.CLICVE
+          WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) C
       ON L.ID_CLIENTE = C.IDCLI
       LEFT JOIN (
         SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-          WHERE A.ID <> 86 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B
+          ON A.IDCLI = B.CLICVE
+          WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) C2
       ON L.ID_CLIENTE_ASOCIADO = C2.IDCLI
@@ -700,17 +613,20 @@ const detailLeasing = async (req, res) => {
       GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON, C.CLINOM, C2.CLINOM
     `;
 
-    const result = await cn.query(sql, [
-      clienteId,
-      leasingId
-    ]);
+      const result = await cn.query(sql, [
+        clienteId,
+        leasingId
+      ]);
 
-    if (result.length == 0 || !result[0])
+      return result;
+    });
+
+    if (data.length == 0 || !data[0])
       return res
         .status(404)
         .json({ success: false, message: "No se encontro el leasing" });
 
-    const findLeasing = result[0];
+    const findLeasing = data[0];
 
     return res.status(200).json({
       id: findLeasing.ID,
@@ -741,12 +657,6 @@ const detailLeasing = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Error al obtener detalle de leasing" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -759,11 +669,9 @@ const detailVehByLeasing = async (req, res) => {
       message: "El parametro leasingId es obligatorio",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT L.MODELO, L.PLACA, L.CANTIDAD, L.TIPO_TERRENO, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, COALESCE(A.CONDICION, '3') AS CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET L
       LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
@@ -779,27 +687,28 @@ const detailVehByLeasing = async (req, res) => {
       WHERE ID_LEA_CAB = ?
     `;
 
-    const result = await cn.query(sql, [leasingId]);
+      const result = await cn.query(sql, [leasingId]);
 
-    const cleanedResult = result.map((row) => ({
-      modelo: row.MODELO.trim() ?? "",
-      placa: row.PLACA.trim() ?? "",
-      cantidad: row.CANTIDAD,
-      terreno: row.TIPO_TERRENO.trim() ?? "",
-      año: row.ANO,
-      color: row.COLOR.trim() ?? "",
-      marca: row.MARCA.trim() ?? "",
-      operacion: row.OPERACION.trim() ?? "",
-      condicion: transformType(row.CONDICION.trim(), {
-        0: "Titular",
-        1: "Retén",
-        2: "Logística",
-        3: "Pendiente",
-      }),
-      nroLeasing: row.NRO_LEASING.trim() ?? "",
-      fechaIni: `${row.FECHA_INI}`,
-      fechaFin: `${row.FECHA_FIN}`,
-    }));
+      return result.map((row) => ({
+        modelo: row.MODELO.trim() ?? "",
+        placa: row.PLACA.trim() ?? "",
+        cantidad: row.CANTIDAD,
+        terreno: row.TIPO_TERRENO.trim() ?? "",
+        año: row.ANO,
+        color: row.COLOR.trim() ?? "",
+        marca: row.MARCA.trim() ?? "",
+        operacion: row.OPERACION.trim() ?? "",
+        condicion: transformType(row.CONDICION.trim(), {
+          0: "Titular",
+          1: "Retén",
+          2: "Logística",
+          3: "Pendiente",
+        }),
+        nroLeasing: row.NRO_LEASING.trim() ?? "",
+        fechaIni: `${row.FECHA_INI}`,
+        fechaFin: `${row.FECHA_FIN}`,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -808,12 +717,6 @@ const detailVehByLeasing = async (req, res) => {
       success: false,
       message: "Error al obtener vehiculos por leasing",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -827,13 +730,11 @@ const detailAssignByLeasing = async (req, res) => {
         "Los parametros nroLeasing, clienteId, contratoId y tipoCont son obligatorios",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
-      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD 
+      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
       ON AC.ID = AD.ID_ASIGNACION
       LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
@@ -844,44 +745,45 @@ const detailAssignByLeasing = async (req, res) => {
       ON V.IDMAR = M.ID
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
       ON V.SECOPE = O.ID
-      LEFT JOIN (        
+      LEFT JOIN (
       	SELECT DISTINCT NRO_LEASING, FECHA_INI, FECHA_FIN FROM ${SCHEMA_BD}.TBL_LEASING_CAB
       ) LC
       ON LC.NRO_LEASING = AD.LEASING
       WHERE  AD.LEASING = ? AND  AC.ID_CLIENTE = ? AND AD.ID_CONTRATO = ? AND CLASE_CONTRATO = ?
     `;
 
-    const result = await cn.query(sql, [
-      nroLeasing,
-      clienteId,
-      contratoId,
-      tipoCont,
-    ]);
+      const result = await cn.query(sql, [
+        nroLeasing,
+        clienteId,
+        contratoId,
+        tipoCont,
+      ]);
 
-    const cleanedResult = result.map((row) => ({
-      modelo: row.MODELO.trim() ?? "",
-      placa: row.PLACA.trim() ?? "",
-      terreno: transformType(row.TERRENO, {
-        0: "SUPERFICIE",
-        1: "SOCAVON",
-        2: "CIUDAD",
-        3: "SEVERO",
-        4: "PENDIENTE",
-      }),
-      año: row.ANO,
-      color: row.COLOR.trim() ?? "",
-      marca: row.MARCA.trim() ?? "",
-      operacion: row.OPERACION.trim() ?? "",
-      condicion: transformType(row.CONDICION.trim(), {
-        0: "Titular",
-        1: "Retén",
-        2: "Logística",
-        3: "Pendiente",
-      }),
-      nroLeasing: row.NRO_LEASING.trim() ?? "",
-      fechaIni: `${row.FECHA_INI}`,
-      fechaFin: `${row.FECHA_FIN}`,
-    }));
+      return result.map((row) => ({
+        modelo: row.MODELO.trim() ?? "",
+        placa: row.PLACA.trim() ?? "",
+        terreno: transformType(row.TERRENO, {
+          0: "SUPERFICIE",
+          1: "SOCAVON",
+          2: "CIUDAD",
+          3: "SEVERO",
+          4: "PENDIENTE",
+        }),
+        año: row.ANO,
+        color: row.COLOR.trim() ?? "",
+        marca: row.MARCA.trim() ?? "",
+        operacion: row.OPERACION.trim() ?? "",
+        condicion: transformType(row.CONDICION.trim(), {
+          0: "Titular",
+          1: "Retén",
+          2: "Logística",
+          3: "Pendiente",
+        }),
+        nroLeasing: row.NRO_LEASING.trim() ?? "",
+        fechaIni: `${row.FECHA_INI}`,
+        fechaFin: `${row.FECHA_FIN}`,
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -890,7 +792,6 @@ const detailAssignByLeasing = async (req, res) => {
       success: false,
       message: "Error al obtener asignaciones por leasing",
     });
-  } finally {
   }
 };
 
@@ -920,66 +821,65 @@ const insertLeasing = async (req, res) => {
   const oldKey = archivoPdf;
   const newKey = oldKey.replace(/^temp\//, "");
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const queryCabecera = `
-              INSERT INTO ${SCHEMA_BD}.TBL_LEASING_CAB 
+    await withConnection(async (cn) => {
+      const queryCabecera = `
+              INSERT INTO ${SCHEMA_BD}.TBL_LEASING_CAB
               (ID_CLIENTE, NRO_LEASING, BANCO, CANT_VEH, FECHA_INI, FECHA_FIN, PERIODO_GRACIA, PDF, ID_CONTRATO, TIPCON, ID_CLIENTE_ASOCIADO, CREADO_POR, ACTUALIZADO_POR)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
-    const result = await cn.query(queryCabecera, [
-      idCliente,
-      nroLeasing,
-      banco,
-      cantVehiculos,
-      fechaIniDB,
-      fechaFinDB,
-      periGracia,
-      newKey,
-      funcionNumerica(idContrato),
-      funcionParteVar(idContrato),
-      validAsoc,
-      user,
-      user,
-    ]);
+      const result = await cn.query(queryCabecera, [
+        idCliente,
+        nroLeasing,
+        banco,
+        cantVehiculos,
+        fechaIniDB,
+        fechaFinDB,
+        periGracia,
+        newKey,
+        funcionNumerica(idContrato),
+        funcionParteVar(idContrato),
+        validAsoc,
+        user,
+        user,
+      ]);
 
-    await moveFile(oldKey, newKey);
+      await moveFile(oldKey, newKey);
 
-    const idLeasingCab = result.insertId || (await obtenerUltimoIdLea(cn));
+      const idLeasingCab = result.insertId || (await obtenerUltimoIdLea(cn));
 
-    const queryDetalle = `
-              INSERT INTO ${SCHEMA_BD}.TBL_LEASING_DET 
+      const queryDetalle = `
+              INSERT INTO ${SCHEMA_BD}.TBL_LEASING_DET
               (ID_LEA_CAB, ID_VEH, SEC_CON, MODELO, TIPO_TERRENO, PLACA, CODINI, CANTIDAD, CREADO_POR, ACTUALIZADO_POR)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
-    const queryUpdateVehiculo = `
-              UPDATE ${SCHEMA_BD}.PO_VEHICULO 
-              SET INIVAL1 = '1' 
+      const queryUpdateVehiculo = `
+              UPDATE ${SCHEMA_BD}.PO_VEHICULO
+              SET INIVAL1 = '1'
               WHERE ID = ?
           `;
 
-    if (detalles && detalles.length > 0) {
-      for (const detalle of detalles) {
-        await cn.query(queryDetalle, [
-          idLeasingCab,
-          detalle.idpla,
-          detalle.secCon,
-          detalle.modelo,
-          detalle.tipoTerreno,
-          detalle.numpla,
-          detalle.codini,
-          detalle.cantidad,
-          user,
-          user,
-        ]);
+      if (detalles && detalles.length > 0) {
+        for (const detalle of detalles) {
+          await cn.query(queryDetalle, [
+            idLeasingCab,
+            detalle.idpla,
+            detalle.secCon,
+            detalle.modelo,
+            detalle.tipoTerreno,
+            detalle.numpla,
+            detalle.codini,
+            detalle.cantidad,
+            user,
+            user,
+          ]);
 
-        await cn.query(queryUpdateVehiculo, [detalle.idpla]);
+          await cn.query(queryUpdateVehiculo, [detalle.idpla]);
+        }
       }
-    }
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -987,12 +887,6 @@ const insertLeasing = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al insertar Leasing" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
