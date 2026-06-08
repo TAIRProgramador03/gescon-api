@@ -29,6 +29,8 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+RUN rm -rf node_modules/odbc && npm install odbc --legacy-peer-deps
+
 # Usuario no-root por seguridad
 RUN useradd -m appuser && chown -R appuser:appuser /gescon-api
 USER appuser
