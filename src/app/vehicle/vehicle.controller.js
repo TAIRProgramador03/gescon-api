@@ -3,18 +3,17 @@ const {
   decodeString,
   convertirFecha,
   transformType,
+  withConnection,
 } = require("../../shared/utils.js");
-const connection = require("../../shared/connect.js");
 
 const listVehicles = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // Consulta los contratos asociados al cliente
-    // A.INIVAL1='0' AND
-    const query = `SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO FROM ${SCHEMA_BD}.PO_VEHICULO A LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC`;
-    const result = await cn.query(query);
+    const result = await withConnection(async (cn) => {
+      // Consulta los contratos asociados al cliente
+      // A.INIVAL1='0' AND
+      const query = `SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO FROM ${SCHEMA_BD}.PO_VEHICULO A LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC`;
+      return await cn.query(query);
+    });
 
     // Devuelve los contratos como respuesta
     res.json(result);
@@ -23,60 +22,29 @@ const listVehicles = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener los datos" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
 const tableVehicles = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // Consulta los contratos asociados al cliente
-    // A.INIVAL1='0' AND
-    // const query = `
-    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO
-    //   FROM ${SCHEMA_BD}.PO_VEHICULO A
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID AND A.IDMODGEN=B.IDMODGEN
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID
-    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA
-    //   LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_DET E ON A.ID=E.ID_VEH
-    //   WHERE E.ID_VEH IS NULL ORDER BY A.ID DESC
-    // `;
-
-    // const query = `
-    //   SELECT A.ID, A.CODINI AS CODINI, A.NUMPLA AS PLACA, C.DESCRIPCION AS MARCA, B.DESCRIPCION AS MODELO, B.DESMODGEN AS GENERICO, D.DESCRIP AS TERRENO
-    //   FROM ${SCHEMA_BD}.PO_VEHICULO A
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MODELO B ON A.IDMOD=B.ID
-    //   LEFT JOIN ${SCHEMA_BD}.PO_MARCA C ON A.IDMAR=C.ID
-    //   LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D ON A.TP_TRABAJO=D.TPTRA
-    //   LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-    //   ON A.ID = tad.ID_VEH
-    //   WHERE tad.ID_OPE IS NULL AND A.SECOPE NOT IN (211, 238, 109, 162) ORDER BY A.ID DESC
-    // `
-
-    const query = `
-      SELECT 
-        A.ID, 
-        A.CODINI AS CODINI, 
-        A.NUMPLA AS PLACA, 
-        C.DESCRIPCION AS MARCA, 
-        B.DESCRIPCION AS MODELO, 
-        B.DESMODGEN AS GENERICO, 
-        D.DESCRIP AS TERRENO 
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `
+      SELECT
+        A.ID,
+        A.CODINI AS CODINI,
+        A.NUMPLA AS PLACA,
+        C.DESCRIPCION AS MARCA,
+        B.DESCRIPCION AS MODELO,
+        B.DESMODGEN AS GENERICO,
+        D.DESCRIP AS TERRENO
       FROM ${SCHEMA_BD}.PO_VEHICULO A
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO B 
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO B
         ON A.IDMOD = B.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_MARCA C 
-        ON A.IDMAR = C.ID 
-      LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D 
-        ON A.TP_TRABAJO = D.TPTRA 
-      WHERE 
+      LEFT JOIN ${SCHEMA_BD}.PO_MARCA C
+        ON A.IDMAR = C.ID
+      LEFT JOIN ${SCHEMA_BD}.PO_TERRENO D
+        ON A.TP_TRABAJO = D.TPTRA
+      WHERE
         NOT EXISTS (
           SELECT 1
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
@@ -91,39 +59,40 @@ const tableVehicles = async (req, res) => {
       ORDER BY A.ID DESC
     `;
 
-    const result = await cn.query(query);
+      const result = await cn.query(query);
 
-    const cleanedResult = result.map((row) => {
-      return {
-        ID:
-          row.ID !== null && row.ID !== undefined
-            ? row.ID.toString().trim()
-            : null,
-        CODINI:
-          row.CODINI !== null && row.CODINI !== undefined
-            ? decodeString(row.CODINI.toString().trim())
-            : null,
-        PLACA:
-          row.PLACA !== null && row.PLACA !== undefined
-            ? decodeString(row.PLACA.toString().trim())
-            : null,
-        MARCA:
-          row.MARCA !== null && row.MARCA !== undefined
-            ? decodeString(row.MARCA.toString().trim())
-            : null,
-        MODELO:
-          row.MODELO !== null && row.MODELO !== undefined
-            ? row.MODELO.toString().trim()
-            : null,
-        GENERICO:
-          row.GENERICO !== null && row.GENERICO !== undefined
-            ? decodeString(row.GENERICO.toString().trim())
-            : null,
-        TERRENO:
-          row.TERRENO !== null && row.TERRENO !== undefined
-            ? decodeString(row.TERRENO.toString().trim())
-            : null,
-      };
+      return result.map((row) => {
+        return {
+          ID:
+            row.ID !== null && row.ID !== undefined
+              ? row.ID.toString().trim()
+              : null,
+          CODINI:
+            row.CODINI !== null && row.CODINI !== undefined
+              ? decodeString(row.CODINI.toString().trim())
+              : null,
+          PLACA:
+            row.PLACA !== null && row.PLACA !== undefined
+              ? decodeString(row.PLACA.toString().trim())
+              : null,
+          MARCA:
+            row.MARCA !== null && row.MARCA !== undefined
+              ? decodeString(row.MARCA.toString().trim())
+              : null,
+          MODELO:
+            row.MODELO !== null && row.MODELO !== undefined
+              ? row.MODELO.toString().trim()
+              : null,
+          GENERICO:
+            row.GENERICO !== null && row.GENERICO !== undefined
+              ? decodeString(row.GENERICO.toString().trim())
+              : null,
+          TERRENO:
+            row.TERRENO !== null && row.TERRENO !== undefined
+              ? decodeString(row.TERRENO.toString().trim())
+              : null,
+        };
+      });
     });
 
     // Devuelve los contratos como respuesta
@@ -133,35 +102,28 @@ const tableVehicles = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener los datos" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
 const contVehicles = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // Consulta los contratos asociados al cliente
-    const query = `SELECT*FROM (SELECT MODELO, PRECIO_VEH FROM ${SCHEMA_BD}.TBLCONTRATO_DET) UNION (SELECT MODELO, PRECIO_VEH FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB A LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_DET B ON A.ID=B.ID_CON_CAB) ORDER BY PRECIO_VEH ASC`;
-    const result = await cn.query(query);
+    const cleanedResult = await withConnection(async (cn) => {
+      // Consulta los contratos asociados al cliente
+      const query = `SELECT*FROM (SELECT MODELO, PRECIO_VEH FROM ${SCHEMA_BD}.TBLCONTRATO_DET) UNION (SELECT MODELO, PRECIO_VEH FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB A LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_DET B ON A.ID=B.ID_CON_CAB) ORDER BY PRECIO_VEH ASC`;
+      const result = await cn.query(query);
 
-    const cleanedResult = result.map((row) => {
-      return {
-        MODELO:
-          row.MODELO !== null && row.MODELO !== undefined
-            ? decodeString(row.MODELO.toString().trim())
-            : null,
-        PRECIO_VEH:
-          row.PRECIO_VEH !== null && row.PRECIO_VEH !== undefined
-            ? row.PRECIO_VEH.toString().trim()
-            : null,
-      };
+      return result.map((row) => {
+        return {
+          MODELO:
+            row.MODELO !== null && row.MODELO !== undefined
+              ? decodeString(row.MODELO.toString().trim())
+              : null,
+          PRECIO_VEH:
+            row.PRECIO_VEH !== null && row.PRECIO_VEH !== undefined
+              ? row.PRECIO_VEH.toString().trim()
+              : null,
+        };
+      });
     });
 
     // Devuelve los contratos como respuesta
@@ -171,12 +133,6 @@ const contVehicles = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Error al obtener los datos" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -185,30 +141,25 @@ const vehicleLeasing = async (req, res) => {
   let query = "";
   let params = [];
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    if (nroLeasing === "all") {
-      query = `SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  FROM (SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID = B.ID_LEA_CAB) A LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C ON A.ID_VEH = C.ID LEFT JOIN ${SCHEMA_BD}.PO_MARCA D ON C.IDMAR = D.ID LEFT JOIN (SELECT * FROM (SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A LEFT JOIN (SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B ON A.ID=B.ID_ASIGNACION) B ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH) E ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
+    const data = await withConnection(async (cn) => {
+      if (nroLeasing === "all") {
+        query = `SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  FROM (SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID = B.ID_LEA_CAB) A LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C ON A.ID_VEH = C.ID LEFT JOIN ${SCHEMA_BD}.PO_MARCA D ON C.IDMAR = D.ID LEFT JOIN (SELECT * FROM (SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A LEFT JOIN (SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B ON A.ID=B.ID_ASIGNACION) B ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH) E ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
               WHERE (A.ID_CLIENTE = ?) AND E.VEHICULO IS NULL GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA`;
 
-      params = [idCli];
-    } else if (nroLeasing) {
-      query = `SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  FROM (SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID = B.ID_LEA_CAB) A LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C ON A.ID_VEH = C.ID LEFT JOIN ${SCHEMA_BD}.PO_MARCA D ON C.IDMAR = D.ID LEFT JOIN (SELECT * FROM (SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A LEFT JOIN (SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B ON A.ID=B.ID_ASIGNACION) B ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH) E ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
+        params = [idCli];
+      } else if (nroLeasing) {
+        query = `SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  FROM (SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID = B.ID_LEA_CAB) A LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C ON A.ID_VEH = C.ID LEFT JOIN ${SCHEMA_BD}.PO_MARCA D ON C.IDMAR = D.ID LEFT JOIN (SELECT * FROM (SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A LEFT JOIN (SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B ON A.ID=B.ID_ASIGNACION) B ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH) E ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
               WHERE (A.ID = ? AND A.ID_CLIENTE = ?) AND E.VEHICULO IS NULL GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA`;
 
-      params = [nroLeasing, idCli];
-    }
+        params = [nroLeasing, idCli];
+      }
 
-    // Consulta los detalles del contrato
-    // const query = `
-    //         SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING  FROM (SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID = B.ID_LEA_CAB) A LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C ON A.ID_VEH = C.ID LEFT JOIN ${SCHEMA_BD}.PO_MARCA D ON C.IDMAR = D.ID LEFT JOIN (SELECT * FROM (SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO FROM ${SCHEMA_BD}.TBL_LEASING_CAB A INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A LEFT JOIN (SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B ON A.ID=B.ID_ASIGNACION) B ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH) E ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
-    //         WHERE (A.NRO_LEASING = '${nroLeasing}' AND A.ID_CLIENTE = '${idCli}') AND E.VEHICULO IS NULL GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA`;
+      // Consulta los detalles del contrato
+      return await cn.query(query, params);
+    });
 
-    const result = await cn.query(query, params);
-
-    if (result.length === 0) {
+    if (data.length === 0) {
       return res
         .status(404)
         .json({ success: false, message: "Contrato no encontrado" });
@@ -216,7 +167,7 @@ const vehicleLeasing = async (req, res) => {
 
     res.json({
       success: true,
-      data: result.map((row) => ({
+      data: data.map((row) => ({
         codini: row.CODINI,
         placa: row.PLACA,
         marca: row.MARCA,
@@ -230,12 +181,6 @@ const vehicleLeasing = async (req, res) => {
       success: false,
       message: "Error al obtener los detalles del contrato",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -248,11 +193,9 @@ const listVehiclesByContract = async (req, res) => {
       message: "Los parametros contratoId y clienteId son obligatorio",
     });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
       SELECT A.ID AS CONTRATO, A.ID_CLIENTE AS CLIENTE, CAST(NULL AS INT) AS DOCUMENTO, A.CANT_VEHI AS CANTIDAD, A.CLASE AS CLASE, B.ID AS ID_DET, B.TIPO_TERRENO AS TERRENO, B.CANTIDAD AS CANT_DET, C.DESCRIPCION AS MODELO, B.TARIFA AS TARIFA
       FROM ${SCHEMA_BD}.TBLCONTRATO_CAB A
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_DET B
@@ -272,26 +215,27 @@ const listVehiclesByContract = async (req, res) => {
       WHERE A.ID_CLIENTE = ? AND A.ID_PADRE = ?
     `;
 
-    const result = await cn.query(sql, [
-      clienteId,
-      contratoId,
-      clienteId,
-      contratoId,
-    ]);
+      const result = await cn.query(sql, [
+        clienteId,
+        contratoId,
+        clienteId,
+        contratoId,
+      ]);
 
-    const cleanedResult = result.map((row) => {
-      return {
-        idContrato: row.CONTRATO,
-        idCliente: row.CLIENTE,
-        idDocumento: row.DOCUMENTO,
-        cantidadVeh: row.CANTIDAD,
-        clase: row.CLASE.trim(),
-        idDetalle: row.ID_DET,
-        terreno: row.TERRENO,
-        cantVehDet: row.CANT_DET,
-        modelo: row.MODELO.trim(),
-        tarifa: row.TARIFA,
-      };
+      return result.map((row) => {
+        return {
+          idContrato: row.CONTRATO,
+          idCliente: row.CLIENTE,
+          idDocumento: row.DOCUMENTO,
+          cantidadVeh: row.CANTIDAD,
+          clase: row.CLASE.trim(),
+          idDetalle: row.ID_DET,
+          terreno: row.TERRENO,
+          cantVehDet: row.CANT_DET,
+          modelo: row.MODELO.trim(),
+          tarifa: row.TARIFA,
+        };
+      });
     });
 
     return res.status(200).json(cleanedResult);
@@ -301,30 +245,24 @@ const listVehiclesByContract = async (req, res) => {
       success: false,
       message: "Error al obtener lista de vehiculos por contrato",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
 const listModelGen = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
   try {
-    const sql = `
-      SELECT DISTINCT UPPER(PM.DESMODGEN) AS DESMODGEN, PM.IDMODGEN 
-      FROM ${SCHEMA_BD}.PO_MODELO PM 
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT DISTINCT UPPER(PM.DESMODGEN) AS DESMODGEN, PM.IDMODGEN
+      FROM ${SCHEMA_BD}.PO_MODELO PM
       ORDER BY DESMODGEN
     `;
-    const result = await cn.query(sql);
+      const result = await cn.query(sql);
 
-    const cleanedResult = result.map((row) => ({
-      id: row.IDMODGEN,
-      description: row.DESMODGEN.trim(),
-    }));
+      return result.map((row) => ({
+        id: row.IDMODGEN,
+        description: row.DESMODGEN.trim(),
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -332,12 +270,6 @@ const listModelGen = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Error al listar modelos genericos" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -349,21 +281,21 @@ const listYearByModelGen = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro modelId es obligatorio" });
 
-  const pool = await connection();
-  const cn = await pool.connect();
   try {
-    const sql = `
-      SELECT DISTINCT CAST(SUBSTRING(TC.FECHA_FIRMA, 1, 4) AS INT) AS ANIOS FROM ${SCHEMA_BD}.TBLCONTRATO_DET td 
-      JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
-      ON TC.ID = TD.ID_CON_CAB 
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm 
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT DISTINCT CAST(SUBSTRING(TC.FECHA_FIRMA, 1, 4) AS INT) AS ANIOS FROM ${SCHEMA_BD}.TBLCONTRATO_DET td
+      JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
+      ON TC.ID = TD.ID_CON_CAB
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm
       ON TD.MODELO = PM.ID
       WHERE PM.IDMODGEN = ?
       ORDER BY ANIOS
     `;
-    const result = await cn.query(sql, [modelId]);
+      const result = await cn.query(sql, [modelId]);
 
-    const cleanedResult = result.map((row) => row.ANIOS);
+      return result.map((row) => row.ANIOS);
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -371,12 +303,6 @@ const listYearByModelGen = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Error al listar años por modelo" });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -385,133 +311,106 @@ const listPlateTraceability = async (req, res) => {
 
   const { idContrato, idCliente, idLeasing, tipoTerr, status } = req.query;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const statusArray = typeof status === "string" ? status.split(",") : [];
+    const convertResult = await withConnection(async (cn) => {
+      const statusArray = typeof status === "string" ? status.split(",") : [];
 
-    let filtrosA = "";
-    let filtrosB = "";
-    let params = [];
+      let filtrosA = "";
+      let filtrosB = "";
+      let params = [];
 
-    let typeDoc = "";
-    let idDoc;
+      let typeDoc = "";
+      let idDoc;
 
-    // filtro obligatorio
-    if (idCliente) {
-      filtrosA += " AND AC.ID_CLIENTE = ?";
-      filtrosB += " AND AC.ID_CLIENTE = ?";
-      params.push(idCliente);
-    }
-
-    // opcionales
-    if (idContrato) {
-      typeDoc = idContrato.split("_")[0];
-      idDoc = idContrato.split("_")[1];
-
-      if (typeDoc == "P") {
-        filtrosA += " AND CC.ID = ?";
-        filtrosB += " AND CC.ID = ?";
-      } else {
-        filtrosA += "";
-        filtrosB += " AND DC.ID = ?";
+      // filtro obligatorio
+      if (idCliente) {
+        filtrosA += " AND AC.ID_CLIENTE = ?";
+        filtrosB += " AND AC.ID_CLIENTE = ?";
+        params.push(idCliente);
       }
 
-      params.push(idDoc);
-    }
+      // opcionales
+      if (idContrato) {
+        typeDoc = idContrato.split("_")[0];
+        idDoc = idContrato.split("_")[1];
 
-    if (idLeasing) {
-      filtrosA += " AND AD.LEASING = ?";
-      filtrosB += " AND AD.LEASING = ?";
-      params.push(idLeasing);
-    }
+        if (typeDoc == "P") {
+          filtrosA += " AND CC.ID = ?";
+          filtrosB += " AND CC.ID = ?";
+        } else {
+          filtrosA += "";
+          filtrosB += " AND DC.ID = ?";
+        }
 
-    if (tipoTerr) {
-      filtrosA += " AND AD.TP_TERRENO = ?";
-      filtrosB += " AND AD.TP_TERRENO = ?";
-      params.push(tipoTerr);
-    }
-
-    // if (status) {
-    //   if (status == "A") {
-    //     filtrosA += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-    //     filtrosB += " AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-    //   } else if (status == "I") {
-    //     filtrosA +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
-    //     filtrosB +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE";
-    //   } else if (status == "PR") {
-    //     filtrosA +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-    //     filtrosB +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-    //   } else if (status == "PA") {
-    //     filtrosA +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-    //     filtrosB +=
-    //       " AND O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(DC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE";
-    //   } else if (status == "V") {
-    //     filtrosA += " AND V.ID_OPE = 109";
-    //     filtrosB += " AND V.ID_OPE = 109";
-    //   }
-    // }
-
-    if (status?.length) {
-      const conditions = [];
-
-      if (statusArray.includes("A")) {
-        conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
+        params.push(idDoc);
       }
 
-      if (statusArray.includes("I")) {
-        conditions.push(
-          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
-        );
+      if (idLeasing) {
+        filtrosA += " AND AD.LEASING = ?";
+        filtrosB += " AND AD.LEASING = ?";
+        params.push(idLeasing);
       }
 
-      if (statusArray.includes("PR")) {
-        conditions.push(
-          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
-        );
+      if (tipoTerr) {
+        filtrosA += " AND AD.TP_TERRENO = ?";
+        filtrosB += " AND AD.TP_TERRENO = ?";
+        params.push(tipoTerr);
       }
 
-      if (statusArray.includes("PA")) {
-        conditions.push(
-          "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
-        );
+      if (status?.length) {
+        const conditions = [];
+
+        if (statusArray.includes("A")) {
+          conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
+        }
+
+        if (statusArray.includes("I")) {
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
+          );
+        }
+
+        if (statusArray.includes("PR")) {
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+          );
+        }
+
+        if (statusArray.includes("PA")) {
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+          );
+        }
+
+        if (statusArray.includes("V")) {
+          conditions.push("(V.ID_OPE = 109)");
+        }
+
+        if (conditions.length) {
+          const filter = ` AND (${conditions.join(" OR ")})`;
+
+          filtrosA += filter;
+          filtrosB += filter;
+        }
       }
 
-      if (statusArray.includes("V")) {
-        conditions.push("(V.ID_OPE = 109)");
-      }
-
-      if (conditions.length) {
-        const filter = ` AND (${conditions.join(" OR ")})`;
-
-        filtrosA += filter;
-        filtrosB += filter;
-      }
-    }
-
-    let sql = `
+      let sql = `
     SELECT *
     FROM (
-      SELECT 
+      SELECT
         T.*,
         ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
       FROM (
-        SELECT 
+        SELECT
           DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE, 
+          C.CLINOM AS CLIENTE,
           CC.ID_CLIENTE AS ID_CLIENTE_CONT,
           V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES, 
+          O.DESCRIPCION AS OPERACIONES,
           V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL, 
-          AD.PLACA, 
+          V.OPERACIONES AS OPERACION_ACTUAL,
+          AD.PLACA,
           V.ANO,
           V.COLOR,
           MA.DESCRIPCION AS MARCA,
@@ -520,10 +419,10 @@ const listPlateTraceability = async (req, res) => {
           AD.LEASING,
           LC.FECHA_INI AS FECHA_INI_LEASING,
           LC.FECHA_FIN AS FECHA_FIN_LEASING,
-          CC.NRO_CONTRATO AS CONTRATO, 
-          CC.DURACION AS PLAZO, 
-          AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+          CC.NRO_CONTRATO AS CONTRATO,
+          CC.DURACION AS PLAZO,
+          AD.FECHA_INI AS FECHA_ENTREGA,
+          AD.FECHA_FIN AS FECHA_DEVOLUCION,
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -538,17 +437,17 @@ const listPlateTraceability = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
         ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
         LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM 
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+          SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
           ORDER BY CLINOM ASC
         ) C
         ON CC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
-          SELECT 
+          SELECT
             V.ID,
             V.ANO,
             V.COLOR,
@@ -570,16 +469,16 @@ const listPlateTraceability = async (req, res) => {
 
         UNION ALL
 
-        SELECT 
+        SELECT
           DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE, 
+          C.CLINOM AS CLIENTE,
           DC.ID_CLIENTE AS ID_CLIENTE_CONT,
           V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES, 
+          O.DESCRIPCION AS OPERACIONES,
           V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL, 
-          AD.PLACA, 
+          V.OPERACIONES AS OPERACION_ACTUAL,
+          AD.PLACA,
           V.ANO,
           V.COLOR,
           MA.DESCRIPCION AS MARCA,
@@ -589,9 +488,9 @@ const listPlateTraceability = async (req, res) => {
           LC.FECHA_INI AS FECHA_INI_LEASING,
           LC.FECHA_FIN AS FECHA_FIN_LEASING,
           DC.NRO_DOC AS CONTRATO,
-          DC.DURACION AS PLAZO, 
-          AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+          DC.DURACION AS PLAZO,
+          AD.FECHA_INI AS FECHA_ENTREGA,
+          AD.FECHA_FIN AS FECHA_DEVOLUCION,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -608,17 +507,17 @@ const listPlateTraceability = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
         ON DC.ID_PADRE = CC.ID
         LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM 
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+          SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
           ORDER BY CLINOM ASC
         ) C
         ON DC.ID_CLIENTE = C.IDCLI
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
-          SELECT 
+          SELECT
             V.ID,
             V.ANO,
             V.COLOR,
@@ -642,23 +541,23 @@ const listPlateTraceability = async (req, res) => {
       WHERE RN = 1
     `;
 
-    let sqlDoc = `
+      let sqlDoc = `
     SELECT *
     FROM (
-      SELECT 
+      SELECT
         T.*,
         ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
       FROM (
-        SELECT 
+        SELECT
           DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE, 
+          C.CLINOM AS CLIENTE,
           DC.ID_CLIENTE AS ID_CLIENTE_CONT,
           V.IDCLI AS ID_CLIENTE_OPE,
           O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES, 
+          O.DESCRIPCION AS OPERACIONES,
           V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL, 
-          AD.PLACA, 
+          V.OPERACIONES AS OPERACION_ACTUAL,
+          AD.PLACA,
           V.ANO,
           V.COLOR,
           MA.DESCRIPCION AS MARCA,
@@ -668,9 +567,9 @@ const listPlateTraceability = async (req, res) => {
           LC.FECHA_INI AS FECHA_INI_LEASING,
           LC.FECHA_FIN AS FECHA_FIN_LEASING,
           DC.NRO_DOC AS CONTRATO,
-          DC.DURACION AS PLAZO, 
-          AD.FECHA_INI AS FECHA_ENTREGA, 
-          AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+          DC.DURACION AS PLAZO,
+          AD.FECHA_INI AS FECHA_ENTREGA,
+          AD.FECHA_FIN AS FECHA_DEVOLUCION,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -687,17 +586,17 @@ const listPlateTraceability = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
         ON DC.ID_PADRE = CC.ID
         LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM 
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
+          SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
           ORDER BY CLINOM ASC
         ) C
         ON DC.ID_CLIENTE
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON O.ID = AD.ID_OPE
         LEFT JOIN (
-          SELECT 
+          SELECT
             V.ID,
             V.ANO,
             V.COLOR,
@@ -721,27 +620,27 @@ const listPlateTraceability = async (req, res) => {
       WHERE RN = 1
     `;
 
-    if (roleId != 1 && roleId != 2) {
-      filtrosA += ` AND C.ID_USU = ${idUser}`;
-      filtrosB += ` AND C.ID_USU = ${idUser}`;
+      if (roleId != 1 && roleId != 2) {
+        filtrosA += ` AND C.ID_USU = ${idUser}`;
+        filtrosB += ` AND C.ID_USU = ${idUser}`;
 
-      sql = `
+        sql = `
         SELECT *
         FROM (
-          SELECT 
+          SELECT
             T.*,
             ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
           FROM (
-            SELECT 
+            SELECT
               DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE, 
+              C.CLINOM AS CLIENTE,
               CC.ID_CLIENTE AS ID_CLIENTE_CONT,
               V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES, 
+              O.DESCRIPCION AS OPERACIONES,
               V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL, 
-              AD.PLACA, 
+              V.OPERACIONES AS OPERACION_ACTUAL,
+              AD.PLACA,
               V.ANO,
               V.COLOR,
               MA.DESCRIPCION AS MARCA,
@@ -750,10 +649,10 @@ const listPlateTraceability = async (req, res) => {
               AD.LEASING,
               LC.FECHA_INI AS FECHA_INI_LEASING,
               LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              CC.NRO_CONTRATO AS CONTRATO, 
-              CC.DURACION AS PLAZO, 
-              AD.FECHA_INI AS FECHA_ENTREGA, 
-              AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+              CC.NRO_CONTRATO AS CONTRATO,
+              CC.DURACION AS PLAZO,
+              AD.FECHA_INI AS FECHA_ENTREGA,
+              AD.FECHA_FIN AS FECHA_DEVOLUCION,
               DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
               DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -769,19 +668,19 @@ const listPlateTraceability = async (req, res) => {
             ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
               LEFT JOIN (
                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-                INNER JOIN ${SCHEMA_BD}.TCLIE B 
-                ON A.IDCLI = B.CLICVE 
-                WHERE A.ID <> 86 
+                FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                INNER JOIN ${SCHEMA_BD}.TCLIE B
+                ON A.IDCLI = B.CLICVE
+                WHERE A.ID <> 86
                 AND B.CLINOM <> '*** ANULADO ***'
               )PO
               ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
               ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
@@ -789,7 +688,7 @@ const listPlateTraceability = async (req, res) => {
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
-              SELECT 
+              SELECT
                 V.ID,
                 V.ANO,
                 V.COLOR,
@@ -811,16 +710,16 @@ const listPlateTraceability = async (req, res) => {
 
             UNION ALL
 
-            SELECT 
+            SELECT
               DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE, 
+              C.CLINOM AS CLIENTE,
               DC.ID_CLIENTE AS ID_CLIENTE_CONT,
               V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES, 
+              O.DESCRIPCION AS OPERACIONES,
               V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL, 
-              AD.PLACA, 
+              V.OPERACIONES AS OPERACION_ACTUAL,
+              AD.PLACA,
               V.ANO,
               V.COLOR,
               MA.DESCRIPCION AS MARCA,
@@ -830,9 +729,9 @@ const listPlateTraceability = async (req, res) => {
               LC.FECHA_INI AS FECHA_INI_LEASING,
               LC.FECHA_FIN AS FECHA_FIN_LEASING,
               DC.NRO_DOC AS CONTRATO,
-              DC.DURACION AS PLAZO, 
-              AD.FECHA_INI AS FECHA_ENTREGA, 
-              AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+              DC.DURACION AS PLAZO,
+              AD.FECHA_INI AS FECHA_ENTREGA,
+              AD.FECHA_FIN AS FECHA_DEVOLUCION,
               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -850,19 +749,19 @@ const listPlateTraceability = async (req, res) => {
             ON DC.ID_PADRE = CC.ID
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
               LEFT JOIN (
                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-                INNER JOIN ${SCHEMA_BD}.TCLIE B 
-                ON A.IDCLI = B.CLICVE 
-                WHERE A.ID <> 86 
+                FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                INNER JOIN ${SCHEMA_BD}.TCLIE B
+                ON A.IDCLI = B.CLICVE
+                WHERE A.ID <> 86
                 AND B.CLINOM <> '*** ANULADO ***'
               )PO
               ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
               ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
@@ -870,7 +769,7 @@ const listPlateTraceability = async (req, res) => {
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
-              SELECT 
+              SELECT
                 V.ID,
                 V.ANO,
                 V.COLOR,
@@ -894,23 +793,23 @@ const listPlateTraceability = async (req, res) => {
           WHERE RN = 1
       `;
 
-      sqlDoc = `
+        sqlDoc = `
         SELECT *
         FROM (
-          SELECT 
+          SELECT
             T.*,
             ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
           FROM (
-            SELECT 
+            SELECT
               DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE, 
+              C.CLINOM AS CLIENTE,
               DC.ID_CLIENTE AS ID_CLIENTE_CONT,
               V.IDCLI AS ID_CLIENTE_OPE,
               O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES, 
+              O.DESCRIPCION AS OPERACIONES,
               V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL, 
-              AD.PLACA, 
+              V.OPERACIONES AS OPERACION_ACTUAL,
+              AD.PLACA,
               V.ANO,
               V.COLOR,
               MA.DESCRIPCION AS MARCA,
@@ -920,9 +819,9 @@ const listPlateTraceability = async (req, res) => {
               LC.FECHA_INI AS FECHA_INI_LEASING,
               LC.FECHA_FIN AS FECHA_FIN_LEASING,
               DC.NRO_DOC AS CONTRATO,
-              DC.DURACION AS PLAZO, 
-              AD.FECHA_INI AS FECHA_ENTREGA, 
-              AD.FECHA_FIN AS FECHA_DEVOLUCION, 
+              DC.DURACION AS PLAZO,
+              AD.FECHA_INI AS FECHA_ENTREGA,
+              AD.FECHA_FIN AS FECHA_DEVOLUCION,
               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
@@ -940,19 +839,19 @@ const listPlateTraceability = async (req, res) => {
             ON DC.ID_PADRE = CC.ID
             LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO_ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu 
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
               LEFT JOIN (
                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-                INNER JOIN ${SCHEMA_BD}.TCLIE B 
-                ON A.IDCLI = B.CLICVE 
-                WHERE A.ID <> 86 
+                FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                INNER JOIN ${SCHEMA_BD}.TCLIE B
+                ON A.IDCLI = B.CLICVE
+                WHERE A.ID <> 86
                 AND B.CLINOM <> '*** ANULADO ***'
               )PO
               ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug 
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
               ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg 
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
               ON TUG.ID_RL = TRG.ID
               WHERE TUG.USU IS NOT NULL
             ) C
@@ -960,7 +859,7 @@ const listPlateTraceability = async (req, res) => {
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
             ON O.ID = AD.ID_OPE
             LEFT JOIN (
-              SELECT 
+              SELECT
                 V.ID,
                 V.ANO,
                 V.COLOR,
@@ -983,12 +882,9 @@ const listPlateTraceability = async (req, res) => {
           ) X
           WHERE RN = 1
       `;
-    }
+      }
 
-    if (typeDoc == "H") {
-      const result = await cn.query(sqlDoc, [...params]);
-
-      const convertResult = result.map((row) => ({
+      const mapRow = (row) => ({
         idAssing: row.ID,
         cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
         idCliCont: row.ID_CLIENTE_CONT,
@@ -1022,102 +918,27 @@ const listPlateTraceability = async (req, res) => {
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
         condicion: row.CONDICION ? row.CONDICION : "",
-      }));
+      });
 
-      return res.status(200).json(convertResult);
-    } else if (typeDoc == "P") {
-      const result = await cn.query(sql, [...params, ...params]);
+      if (typeDoc == "H") {
+        const result = await cn.query(sqlDoc, [...params]);
+        return result.map(mapRow);
+      } else if (typeDoc == "P") {
+        const result = await cn.query(sql, [...params, ...params]);
+        return result.map(mapRow);
+      } else {
+        const result = await cn.query(sql, [...params, ...params]);
+        return result.map(mapRow);
+      }
+    });
 
-      const convertResult = result.map((row) => ({
-        idAssing: row.ID,
-        cliente: row.CLIENTE.trim(),
-        idCliCont: row.ID_CLIENTE_CONT,
-        idCliOpe: row.ID_CLIENTE_OPE.trim(),
-        idOpe: row.ID_OPE,
-        operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
-        idOpeActual: row.ID_OPE_ACTUAL,
-        opeActual: row.OPERACION_ACTUAL
-          ? row.OPERACION_ACTUAL.trim()
-          : "Sin operacion",
-        placa: row.PLACA ? row.PLACA.trim() : "Sin placa",
-        año: row.ANO,
-        color: row.COLOR ? row.COLOR.trim() : "Sin color",
-        marca: row.MARCA ? row.MARCA.trim() : "Sin marca",
-        modelo: row.MODELO ? row.MODELO.trim() : "Sin modelo",
-        terreno: row.TERRENO,
-        leasing: row.LEASING ? row.LEASING.trim() : "Sin leasing",
-        fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
-        fechaFinLea: convertirFecha(row.FECHA_FIN_LEASING),
-        contrato: row.CONTRATO ? row.CONTRATO.trim() : "Sin contrato",
-        plazo: row.PLAZO,
-        fechaIni: row.FECHA_ENTREGA
-          ? convertirFecha(row.FECHA_ENTREGA.trim())
-          : "Sin fecha",
-        fechaFin: row.FECHA_DEVOLUCION
-          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
-          : "Sin fecha",
-        fechaIniCon: row.FECHA_INI_CONTRATO,
-        fechaFinCon: row.FECHA_FIN_CONTRATO,
-        tarifa: row.TARIFA,
-        moneda: row.MONEDA,
-        archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-        condicion: row.CONDICION ? row.CONDICION : "",
-      }));
-
-      return res.status(200).json(convertResult);
-    } else {
-      const result = await cn.query(sql, [...params, ...params]);
-
-      const convertResult = result.map((row) => ({
-        idAssing: row.ID,
-        cliente: row.CLIENTE.trim(),
-        idCliCont: row.ID_CLIENTE_CONT,
-        idCliOpe: row.ID_CLIENTE_OPE.trim(),
-        idOpe: row.ID_OPE,
-        operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
-        idOpeActual: row.ID_OPE_ACTUAL,
-        opeActual: row.OPERACION_ACTUAL
-          ? row.OPERACION_ACTUAL.trim()
-          : "Sin operacion",
-        placa: row.PLACA ? row.PLACA.trim() : "Sin placa",
-        año: row.ANO,
-        color: row.COLOR ? row.COLOR.trim() : "Sin color",
-        marca: row.MARCA ? row.MARCA.trim() : "Sin marca",
-        modelo: row.MODELO ? row.MODELO.trim() : "Sin modelo",
-        terreno: row.TERRENO,
-        leasing: row.LEASING ? row.LEASING.trim() : "Sin leasing",
-        fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
-        fechaFinLea: convertirFecha(row.FECHA_FIN_LEASING),
-        contrato: row.CONTRATO ? row.CONTRATO.trim() : "Sin contrato",
-        plazo: row.PLAZO,
-        fechaIni: row.FECHA_ENTREGA
-          ? convertirFecha(row.FECHA_ENTREGA.trim())
-          : "Sin fecha",
-        fechaFin: row.FECHA_DEVOLUCION
-          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
-          : "Sin fecha",
-        fechaIniCon: row.FECHA_INI_CONTRATO,
-        fechaFinCon: row.FECHA_FIN_CONTRATO,
-        tarifa: row.TARIFA,
-        moneda: row.MONEDA,
-        archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
-        condicion: row.CONDICION ? row.CONDICION : "",
-      }));
-
-      return res.status(200).json(convertResult);
-    }
+    return res.status(200).json(convertResult);
   } catch (error) {
     console.error("Error al listar asignaciones de un contrato", error);
     return res.status(500).json({
       success: false,
       message: "Error al listar asignaciones de un contrato",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 
@@ -1129,78 +950,77 @@ const listPlateByRegion = async (req, res) => {
       .status(400)
       .json({ success: false, message: "El parametro region es obligatorio" });
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    const sql = `
-      SELECT 
-        TAD.PLACA, 
-        PM.DESCRIPCION AS MARCA, 
-        PM2.DESCRIPCION AS MODELO, 
-        TAD.TP_TERRENO AS TERRENO, 
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT
+        TAD.PLACA,
+        PM.DESCRIPCION AS MARCA,
+        PM2.DESCRIPCION AS MODELO,
+        TAD.TP_TERRENO AS TERRENO,
         TAD.CONDICION AS CONDICION,
         PV.ANO AS ANIO,
-        TAD.FECHA_INI AS FECHA_INICIO, 
+        TAD.FECHA_INI AS FECHA_INICIO,
         TAD.FECHA_FIN AS FECHA_FIN,
         PO.DESCRIPCION AS OPERACION,
         CL.CLINOM AS CLIENTE
-      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD 
+      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
       LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
         ON TAD.ID_OPE = PO.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_UBICACION_OPE tuo 
+      LEFT JOIN ${SCHEMA_BD}.TBL_UBICACION_OPE tuo
         ON TUO.ID_OPE = PO.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac 
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
         ON TAD.ID_ASIGNACION = TAC.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO pv 
+      LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO pv
         ON TAD.ID_VEH = PV.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_MARCA pm 
+      LEFT JOIN ${SCHEMA_BD}.PO_MARCA pm
         ON PV.IDMAR = PM.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm2 
+      LEFT JOIN ${SCHEMA_BD}.PO_MODELO pm2
         ON PV.IDMOD = PM2.ID
       LEFT JOIN (
-        SELECT DISTINCT A.IDCLI, B.CLINOM 
-        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-        INNER JOIN ${SCHEMA_BD}.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-        WHERE A.ID <> 86 
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A
+        INNER JOIN ${SCHEMA_BD}.TCLIE B
+          ON A.IDCLI = B.CLICVE
+        WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) CL
         ON TAC.ID_CLIENTE = CL.IDCLI
       WHERE TUO.DEPARTAMENTO = ? ${clienteId ? "AND TAC.ID_CLIENTE = ?" : ""}
     `;
 
-    const params = [region.toUpperCase()];
+      const params = [region.toUpperCase()];
 
-    if (clienteId) {
-      params.push(clienteId);
-    }
+      if (clienteId) {
+        params.push(clienteId);
+      }
 
-    const result = await cn.query(sql, params);
+      const result = await cn.query(sql, params);
 
-    const cleanedResult = result.map((row) => ({
-      placa: row.PLACA.trim(),
-      marca: row.MARCA.trim(),
-      modelo: row.MODELO.trim(),
-      terreno: transformType(row.TERRENO, {
-        0: "Superficie",
-        1: "Socavón",
-        2: "Ciudad",
-        3: "Severo",
-        4: "Pendiente",
-      }),
-      condicion: transformType(row.CONDICION, {
-        0: "Titular",
-        1: "Retén",
-        2: "Logística",
-        3: "Pendiente",
-      }),
-      anio: row.ANIO,
-      fechaIni: row.FECHA_INICIO.trim(),
-      fechaFin: row.FECHA_FIN.trim(),
-      operacion: row.OPERACION.trim(),
-      cliente: row.CLIENTE.trim(),
-    }));
+      return result.map((row) => ({
+        placa: row.PLACA.trim(),
+        marca: row.MARCA.trim(),
+        modelo: row.MODELO.trim(),
+        terreno: transformType(row.TERRENO, {
+          0: "Superficie",
+          1: "Socavón",
+          2: "Ciudad",
+          3: "Severo",
+          4: "Pendiente",
+        }),
+        condicion: transformType(row.CONDICION, {
+          0: "Titular",
+          1: "Retén",
+          2: "Logística",
+          3: "Pendiente",
+        }),
+        anio: row.ANIO,
+        fechaIni: row.FECHA_INICIO.trim(),
+        fechaFin: row.FECHA_FIN.trim(),
+        operacion: row.OPERACION.trim(),
+        cliente: row.CLIENTE.trim(),
+      }));
+    });
 
     return res.status(200).json(cleanedResult);
   } catch (error) {
@@ -1209,12 +1029,6 @@ const listPlateByRegion = async (req, res) => {
       success: false,
       message: "Error al obtener vehiculos por region",
     });
-  } finally {
-    try {
-      if (cn) await cn.close();
-    } catch (err) {
-      console.error(err);
-    }
   }
 };
 

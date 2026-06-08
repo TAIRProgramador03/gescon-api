@@ -1,5 +1,13 @@
 require("dotenv").config(); // Esto carga las variables del archivo .env
 
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] Unhandled Rejection — servidor estable:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[server] Uncaught Exception — servidor estable:", error);
+});
+
 const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
@@ -30,8 +38,6 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true }); // ← sin server ni path
 
 wss.on("connection", (ws, req) => {
-  console.log("[WS] ✅ Cliente conectado:", req.socket.remoteAddress);
-
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());

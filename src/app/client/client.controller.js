@@ -1,179 +1,104 @@
-const { decodeString } = require("../../shared/utils.js");
-const connection = require("../../shared/connect.js");
+const { decodeString, withConnection } = require("../../shared/utils.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listClient = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    let sql = `
-      SELECT DISTINCT A.IDCLI, B.CLINOM 
-      FROM ${SCHEMA_BD}.PO_OPERACIONES A 
-      INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE 
-      WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' 
-      ORDER BY CLINOM ASC
-    `;
+    const cleanedResult = await withConnection(async (cn) => {
+      let sql = `
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A
+        INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+        WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+        ORDER BY CLINOM ASC
+      `;
 
-    if(roleId != 1 && roleId != 2) {
-      sql = `
-        SELECT DISTINCT PO.IDCLI, PO.CLINOM
-        FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu 
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-          FROM SPEED400AT.PO_OPERACIONES A 
-          INNER JOIN SPEED400AT.TCLIE B 
-          ON A.IDCLI = B.CLICVE 
-          WHERE A.ID <> 86 
-          AND B.CLINOM <> '*** ANULADO ***'
-        )PO
-        ON MOXU.IDOPERACION = PO.ID
-        LEFT JOIN SPEED400AT.T_US_GC tug 
-        ON MOXU.CH_CODI_USUARIO = TUG.USU
-        LEFT JOIN SPEED400AT.T_RL_GC trg 
-        ON TUG.ID_RL = TRG.ID
-        WHERE TUG.USU IS NOT NULL AND TUG.ID = ${idUser}
-      `
-    }
+      if (roleId != 1 && roleId != 2) {
+        sql = `
+          SELECT DISTINCT PO.IDCLI, PO.CLINOM
+          FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+          LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+            FROM SPEED400AT.PO_OPERACIONES A
+            INNER JOIN SPEED400AT.TCLIE B
+            ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86
+            AND B.CLINOM <> '*** ANULADO ***'
+          )PO
+          ON MOXU.IDOPERACION = PO.ID
+          LEFT JOIN SPEED400AT.T_US_GC tug
+          ON MOXU.CH_CODI_USUARIO = TUG.USU
+          LEFT JOIN SPEED400AT.T_RL_GC trg
+          ON TUG.ID_RL = TRG.ID
+          WHERE TUG.USU IS NOT NULL AND TUG.ID = ${idUser}
+        `;
+      }
 
-    const result = await cn.query(sql);
-
-    // Decodificar los resultados desde latin1
-    const cleanedResult = result.map((row) => {
-      return {
+      const result = await cn.query(sql);
+      return result.map((row) => ({
         IDCLI: row.IDCLI.trim(),
         CLINOM: decodeString(row.CLINOM.trim()),
-      };
+      }));
     });
 
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los clientes:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error al obtener clientes" });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
+    res.status(500).json({ success: false, message: "Error al obtener clientes" });
   }
 };
 
 const tableClient = async (req, res) => {
-  const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
+  const { idCli } = req.query;
 
   if (!idCli) {
-    return res
-      .status(400)
-      .json({ success: false, message: "El idCli es obligatorio" });
+    return res.status(400).json({ success: false, message: "El idCli es obligatorio" });
   }
 
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // Consulta los contratos asociados al cliente
-    const query = `
-      SELECT ID, NRO_CONTRATO AS DESCRIPCION, FECHA_FIRMA AS FECHACREA, CANT_VEHI AS TOTVEH, DURACION 
-      FROM ${SCHEMA_BD}.TBLCONTRATO_CAB 
-      WHERE ID_CLIENTE = ?
-    `;
-    const result = await cn.query(query, [idCli]);
-
-    const cleanedResult = result.map((row) => {
-      return {
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `
+        SELECT ID, NRO_CONTRATO AS DESCRIPCION, FECHA_FIRMA AS FECHACREA, CANT_VEHI AS TOTVEH, DURACION
+        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
+        WHERE ID_CLIENTE = ?
+      `;
+      const result = await cn.query(query, [idCli]);
+      return result.map((row) => ({
         ID: row.ID,
-        DESCRIPCION:
-          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
-            ? decodeString(row.DESCRIPCION.toString().trim())
-            : null,
-        FECHACREA:
-          row.FECHACREA !== null && row.FECHACREA !== undefined
-            ? row.FECHACREA.toString().trim()
-            : null,
-        TOTVEH:
-          row.TOTVEH !== null && row.TOTVEH !== undefined
-            ? row.TOTVEH.toString().trim()
-            : null,
-        DURACION:
-          row.DURACION !== null && row.DURACION !== undefined
-            ? row.DURACION.toString().trim()
-            : null,
-      };
+        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
+        FECHACREA: row.FECHACREA !== null && row.FECHACREA !== undefined ? row.FECHACREA.toString().trim() : null,
+        TOTVEH: row.TOTVEH !== null && row.TOTVEH !== undefined ? row.TOTVEH.toString().trim() : null,
+        DURACION: row.DURACION !== null && row.DURACION !== undefined ? row.DURACION.toString().trim() : null,
+      }));
     });
 
-    // Devuelve los contratos como respuesta
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los datos:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error al obtener los datos" });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
+    res.status(500).json({ success: false, message: "Error al obtener los datos" });
   }
 };
 
 const tableClientLea = async (req, res) => {
-  const pool = await connection();
-  const cn = await pool.connect();
-
   try {
-    // Consulta los contratos asociados al cliente
-    const query = `SELECT DISTINCT A.IDCLI, B.CLINOM, B.CLIRUC, B.CLIABR, B.CLIDIR FROM ${SCHEMA_BD}.PO_OPERACIONES A INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' ORDER BY CLINOM ASC`;
-    const result = await cn.query(query);
-
-    const cleanedResult = result.map((row) => {
-      return {
-        IDCLI:
-          row.IDCLI !== null && row.IDCLI !== undefined
-            ? row.IDCLI.toString().trim()
-            : null,
-        CLINOM:
-          row.CLINOM !== null && row.CLINOM !== undefined
-            ? decodeString(row.CLINOM.toString().trim())
-            : null,
-        CLIRUC:
-          row.CLIRUC !== null && row.CLIRUC !== undefined
-            ? row.CLIRUC.toString().trim()
-            : null,
-        CLIABR:
-          row.CLIABR !== null && row.CLIABR !== undefined
-            ? row.CLIABR.toString().trim()
-            : null,
-        CLIDIR:
-          row.CLIDIR !== null && row.CLIDIR !== undefined
-            ? decodeString(row.CLIDIR.toString().trim())
-            : null,
-      };
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `SELECT DISTINCT A.IDCLI, B.CLINOM, B.CLIRUC, B.CLIABR, B.CLIDIR FROM ${SCHEMA_BD}.PO_OPERACIONES A INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***' ORDER BY CLINOM ASC`;
+      const result = await cn.query(query);
+      return result.map((row) => ({
+        IDCLI: row.IDCLI !== null && row.IDCLI !== undefined ? row.IDCLI.toString().trim() : null,
+        CLINOM: row.CLINOM !== null && row.CLINOM !== undefined ? decodeString(row.CLINOM.toString().trim()) : null,
+        CLIRUC: row.CLIRUC !== null && row.CLIRUC !== undefined ? row.CLIRUC.toString().trim() : null,
+        CLIABR: row.CLIABR !== null && row.CLIABR !== undefined ? row.CLIABR.toString().trim() : null,
+        CLIDIR: row.CLIDIR !== null && row.CLIDIR !== undefined ? decodeString(row.CLIDIR.toString().trim()) : null,
+      }));
     });
 
-    // Devuelve los contratos como respuesta
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los datos:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Error al obtener los datos" });
-  } finally {
-    try {
-        if(cn) await cn.close();
-    } catch(err) {
-        console.error(err);
-    }
+    res.status(500).json({ success: false, message: "Error al obtener los datos" });
   }
 };
 
-module.exports = {
-  listClient,
-  tableClient,
-  tableClientLea,
-};
+module.exports = { listClient, tableClient, tableClientLea };
