@@ -38,6 +38,8 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true }); // ← sin server ni path
 
 wss.on("connection", (ws, req) => {
+  console.log("[WS] ✅ Cliente conectado:", req.socket.remoteAddress);
+
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
@@ -49,6 +51,7 @@ wss.on("connection", (ws, req) => {
     }
   });
 
+  ws.on("close", () => console.log("[WS] Cliente desconectado"));
   ws.on("error", (err) => console.error("[WS] error:", err));
 });
 
