@@ -8,7 +8,7 @@ const {
   withConnection,
 } = require("../../shared/utils.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
-const { moveFile } = require("../../shared/service/aws-s3.js");
+const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
 
 const listLeasing = async (req, res) => {
   try {
@@ -559,13 +559,12 @@ const listLeasingGeneral = async (req, res) => {
 };
 
 const detailLeasing = async (req, res) => {
-  const { leasingId,  clienteId } = req.query;
+  const { leasingId, clienteId } = req.query;
 
   if (!leasingId || !clienteId)
     return res.status(400).json({
       success: false,
-      message:
-        "El parametro leasingId y clienteId son obligatorios",
+      message: "El parametro leasingId y clienteId son obligatorios",
     });
 
   try {
@@ -613,10 +612,7 @@ const detailLeasing = async (req, res) => {
       GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON, C.CLINOM, C2.CLINOM
     `;
 
-      const result = await cn.query(sql, [
-        clienteId,
-        leasingId
-      ]);
+      const result = await cn.query(sql, [clienteId, leasingId]);
 
       return result;
     });
@@ -631,14 +627,14 @@ const detailLeasing = async (req, res) => {
     return res.status(200).json({
       id: findLeasing.ID,
       banco: transformType(findLeasing.BANCO.trim(), {
-        "1": "BANBIF",
-        "2": "BBVA",
-        "3": "BCP",
-        "4": "HSBC",
-        "5": "INTERBANK",
-        "6": "SCOTIABANK",
-        "7": "TAIR",
-        "8": "SANTANDER"
+        1: "BANBIF",
+        2: "BBVA",
+        3: "BCP",
+        4: "HSBC",
+        5: "INTERBANK",
+        6: "SCOTIABANK",
+        7: "TAIR",
+        8: "SANTANDER",
       }),
       cantVehi: findLeasing.CANT_VEH,
       cantAsign: findLeasing.CANT_ASIGN,
@@ -650,7 +646,96 @@ const detailLeasing = async (req, res) => {
         ? findLeasing.DESCRIPCION.trim()
         : "",
       cliente: findLeasing.CLIENTE.trim(),
-      clienteAsoc: findLeasing.CLIENTE_ASOCIADO ? findLeasing.CLIENTE_ASOCIADO.trim() : findLeasing.CLIENTE.trim()
+      clienteAsoc: findLeasing.CLIENTE_ASOCIADO
+        ? findLeasing.CLIENTE_ASOCIADO.trim()
+        : findLeasing.CLIENTE.trim(),
+    });
+  } catch (error) {
+    console.error("Error al obtener detalle de leasing: ", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener detalle de leasing" });
+  }
+};
+
+const getLeasingById = async (req, res) => {
+  const leasingId = Number(req.params.id);
+
+  if (isNaN(leasingId))
+    return res.status(400).json({
+      success: false,
+      message: "El parametro leasingId debe ser numerico",
+    });
+
+  try {
+    const data = await withConnection(async (cn) => {
+      const result = await cn.query(
+        `
+          SELECT 
+            TLC.*,
+            TC_DOC.ID AS ID_CONTRATO_ASOC
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB TLC
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
+            ON TDC.ID = TLC.ID_CONTRATO 
+            AND TLC.TIPCON = 'H'
+          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC_DOC
+            ON TC_DOC.ID = TDC.ID_PADRE
+          WHERE TLC.ID = ?
+        `,
+        [leasingId],
+      );
+
+      if (result.length == 0) return null;
+
+      const resultDet = await cn.query(
+        `
+          SELECT 
+            TLD.*,
+            CASE 
+              WHEN TAD.ID_VEH IS NOT NULL THEN 1
+              ELSE 0
+            END AS ASIGNADO
+          FROM ${SCHEMA_BD}.TBL_LEASING_DET TLD
+          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+            ON TLD.ID_VEH = TAD.ID_VEH
+          WHERE TLD.ID_LEA_CAB = ?
+        `,
+        [leasingId],
+      );
+
+      return { result, resultDet };
+    });
+
+    if (!data)
+      return res
+        .status(404)
+        .json({ success: false, message: "No se encontro el leasing" });
+
+    const { result, resultDet } = data;
+
+    return res.status(200).json({
+      idCliente: result[0].ID_CLIENTE,
+      nroLeasing: result[0].NRO_LEASING.trim(),
+      banco: result[0].BANCO.trim(),
+      cantVehi: result[0].CANT_VEH,
+      fechaIni: String(result[0].FECHA_INI),
+      fechaFin: String(result[0].FECHA_FIN),
+      perGracia: result[0].PERIODO_GRACIA,
+      archivoPdf: result[0].PDF.trim(),
+      idContrato: result[0].ID_CONTRATO.trim(),
+      idContratoAsoc: result[0].ID_CONTRATO_ASOC,
+      tipContrato: result[0].TIPCON.trim(),
+      idClienteAsoc: result[0].ID_CLIENTE_ASOCIADO,
+      detalles: resultDet.map((row) => ({
+        id: row.ID,
+        idVeh: row.ID_VEH,
+        secCon: row.SEC_CON,
+        modelo: row.MODELO.trim(),
+        terreno: row.TIPO_TERRENO.trim(),
+        placa: row.PLACA.trim(),
+        codini: row.CODINI.trim(),
+        isAssign: row.ASIGNADO ? true : false,
+      })),
     });
   } catch (error) {
     console.error("Error al obtener detalle de leasing: ", error);
@@ -890,6 +975,183 @@ const insertLeasing = async (req, res) => {
   }
 };
 
+const updateLeasing = async (req, res) => {
+  const { user } = req.user;
+  const leasingId = Number(req.params.id);
+
+  if (isNaN(leasingId))
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+
+  const {
+    idCliente,
+    idClienteAsoc,
+    nroLeasing,
+    banco,
+    cantVehiculos,
+    fechaIni,
+    fechaFin,
+    periGracia,
+    idContrato,
+    detalles,
+    archivoPdf,
+  } = req.body;
+
+  const fechaIniDB = convertirFecha(fechaIni);
+  const fechaFinDB = convertirFecha(fechaFin);
+  const validAsoc = idCliente == idClienteAsoc ? null : idClienteAsoc;
+
+  // Manejo de key del archivo — igual que updateContract/updateDocument
+  const oldKey = archivoPdf;
+  let newKey = oldKey;
+
+  try {
+    await withConnection(async (cn) => {
+      // Verificar que existe
+      const findLeasing = await cn.query(
+        `SELECT ID FROM ${SCHEMA_BD}.TBL_LEASING_CAB WHERE ID = ?`,
+        [leasingId],
+      );
+
+      if (findLeasing.length === 0) {
+        const err = new Error("No se encontró el leasing solicitado");
+        err.statusCode = 404;
+        throw err;
+      }
+
+      // Si el key viene de temp/, es un archivo nuevo → mover
+      if (oldKey.startsWith("temp/")) {
+        newKey = oldKey.replace(/^temp\//, "");
+        const isExistInTemp = await fileExists(oldKey);
+        if (isExistInTemp) await moveFile(oldKey, newKey);
+      }
+
+      // Actualizar cabecera
+      await cn.query(
+        `UPDATE ${SCHEMA_BD}.TBL_LEASING_CAB
+         SET ID_CLIENTE = ?, NRO_LEASING = ?, BANCO = ?, CANT_VEH = ?,
+             FECHA_INI = ?, FECHA_FIN = ?, PERIODO_GRACIA = ?, PDF = ?,
+             ID_CONTRATO = ?, TIPCON = ?, ID_CLIENTE_ASOCIADO = ?,
+             ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
+         WHERE ID = ?`,
+        [
+          idCliente,
+          nroLeasing,
+          banco,
+          cantVehiculos,
+          fechaIniDB,
+          fechaFinDB,
+          periGracia,
+          newKey,
+          funcionNumerica(idContrato),
+          funcionParteVar(idContrato),
+          validAsoc,
+          user,
+          leasingId,
+        ],
+      );
+
+      // ── Lógica de detalles ──────────────────────────────────────────
+      // Separar la lista entrante en tres grupos:
+      //   detailNew   → isAssign=false y sin id → INSERT
+      //   idsToKeep   → todos los que tienen id (asignados o no) → no tocar
+      // Los registros en DB que no están en idsToKeep Y no están asignados → DELETE
+
+      const detailNew = [];
+      const idsToKeep = [];
+
+      if (detalles && detalles.length > 0) {
+        for (const det of detalles) {
+          if (det.isAssign) {
+            // Vehiculo asignado → no se toca; solo preservar su id
+            if (det.id) idsToKeep.push(det.id);
+          } else if (det.id) {
+            // Ya registrado, no asignado → mantener
+            idsToKeep.push(det.id);
+          } else {
+            // Nuevo
+            detailNew.push(det);
+          }
+        }
+      }
+
+      // Encontrar registros a eliminar:
+      // Existentes en DB, no asignados, cuyo id no está en idsToKe
+      const existingDet = await cn.query(
+        `SELECT TLD.ID, TLD.ID_VEH
+         FROM ${SCHEMA_BD}.TBL_LEASING_DET TLD
+         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+           ON TLD.ID_VEH = TAD.ID_VEH
+         WHERE TLD.ID_LEA_CAB = ?
+           AND TAD.ID_VEH IS NULL`,
+        [leasingId],
+      );
+
+      const toDelete = existingDet
+        .filter((row) => !idsToKeep.includes(row.ID))
+        .map((row) => row);
+
+      // Eliminar detalles que salieron de la lista
+      if (toDelete.length > 0) {
+        const placeholders = toDelete.map(() => "?").join(",");
+        const ids = toDelete.map((r) => r.ID);
+        const idVehs = toDelete.map((r) => r.ID_VEH);
+
+        await cn.query(
+          `DELETE FROM ${SCHEMA_BD}.TBL_LEASING_DET WHERE ID IN (${placeholders})`,
+          ids,
+        );
+
+        // Resetear flag de leasing en el vehiculo
+        for (const idVeh of idVehs) {
+          await cn.query(
+            `UPDATE ${SCHEMA_BD}.PO_VEHICULO SET INIVAL1 = '0' WHERE ID = ?`,
+            [idVeh],
+          );
+        }
+      }
+
+      // Insertar detalles nuevos
+      const queryDetalle = `
+        INSERT INTO ${SCHEMA_BD}.TBL_LEASING_DET
+        (ID_LEA_CAB, ID_VEH, SEC_CON, MODELO, TIPO_TERRENO, PLACA, CODINI, CANTIDAD, CREADO_POR, ACTUALIZADO_POR)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      for (const det of detailNew) {
+        await cn.query(queryDetalle, [
+          leasingId,
+          det.idpla,
+          det.secCon,
+          det.modelo,
+          det.tipoTerreno,
+          det.numpla,
+          det.codini,
+          det.cantidad,
+          user,
+          user,
+        ]);
+
+        await cn.query(
+          `UPDATE ${SCHEMA_BD}.PO_VEHICULO SET INIVAL1 = '1' WHERE ID = ?`,
+          [det.idpla],
+        );
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    if (error.statusCode === 404)
+      return res.status(404).json({ success: false, message: error.message });
+
+    console.error("Error al actualizar Leasing:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error al actualizar Leasing" });
+  }
+};
+
 module.exports = {
   listLeasing,
   listLeasingAdi,
@@ -899,7 +1161,9 @@ module.exports = {
   listLeasingByDocument,
   listLeasingGeneral,
   detailLeasing,
+  getLeasingById,
   detailVehByLeasing,
   detailAssignByLeasing,
   insertLeasing,
+  updateLeasing
 };
