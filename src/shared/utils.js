@@ -2,10 +2,16 @@ const iconv = require("iconv-lite");
 const { SCHEMA_BD } = require("./conf.js");
 const conDb = require("./connect.js");
 
-const NETWORK_ERROR_CODES = [10054, 10060, 10061];
+// ← agrega 8413 (timeout de transferencia) y estados ODBC
+const NETWORK_ERROR_CODES = [10054, 10060, 10061, 8413];
+const NETWORK_ERROR_STATES = ["08S01", "08003", "HYT00"];
 
 const isNetworkError = (err) =>
-  err?.odbcErrors?.some((e) => NETWORK_ERROR_CODES.includes(e.code));
+  err?.odbcErrors?.some(
+    (e) =>
+      NETWORK_ERROR_CODES.includes(e.code) ||
+      NETWORK_ERROR_STATES.includes(e.state) // ← nuevo
+  );
 
 const withConnection = async (fn) => {
   let cn;
@@ -17,12 +23,10 @@ const withConnection = async (fn) => {
     if (isNetworkError(err)) {
       console.warn("[withConnection] Error de red, invalidando pool y reintentando...");
 
-      // Cerrar la conexión muerta y destruir el pool completo
       if (cn) await cn.close().catch(() => {});
       cn = undefined;
       conDb.invalidatePool();
 
-      // Crear pool nuevo y reintentar con conexión fresca
       try {
         const freshPool = await conDb();
         cn = await freshPool.connect();
@@ -38,8 +42,9 @@ const withConnection = async (fn) => {
   }
 };
 
+// resto del archivo sin cambios...
 const decodeString = (str) => {
-  return iconv.decode(Buffer.from(str, "binary"), "latin1"); // Decodifica desde latin1
+  return iconv.decode(Buffer.from(str, "binary"), "latin1");
 };
 
 function convertirFecha(fecha) {
@@ -53,7 +58,6 @@ function funcionNumerica(valor) {
   return partes.length === 2 ? parseInt(partes[1], 10) : null;
 }
 
-// 🔠 Devuelve la primera letra (antes del "_")
 function funcionParteVar(valor) {
   if (!valor) return null;
   return valor.charAt(0);
