@@ -43,4 +43,9 @@ const startKeepAlive = () => {
   }, 4 * 60 * 1000);
 };
 
+const invalidatePool = () => {
+  pool = null;
+};
+
 module.exports = conDb;
+module.exports.invalidatePool = invalidatePool;

@@ -4,21 +4,33 @@ const conDb = require("./connect.js");
 
 const NETWORK_ERROR_CODES = [10054, 10060, 10061];
 
+const isNetworkError = (err) =>
+  err?.odbcErrors?.some((e) => NETWORK_ERROR_CODES.includes(e.code));
+
 const withConnection = async (fn) => {
-  const pool = await conDb();
   let cn;
   try {
+    const pool = await conDb();
     cn = await pool.connect();
     return await fn(cn);
   } catch (err) {
-    const isNetworkError = err?.odbcErrors?.some((e) =>
-      NETWORK_ERROR_CODES.includes(e.code)
-    );
-    if (isNetworkError) {
-      console.warn("[withConnection] Error de red, reintentando...");
+    if (isNetworkError(err)) {
+      console.warn("[withConnection] Error de red, invalidando pool y reintentando...");
+
+      // Cerrar la conexión muerta y destruir el pool completo
       if (cn) await cn.close().catch(() => {});
-      cn = await pool.connect();
-      return await fn(cn);
+      cn = undefined;
+      conDb.invalidatePool();
+
+      // Crear pool nuevo y reintentar con conexión fresca
+      try {
+        const freshPool = await conDb();
+        cn = await freshPool.connect();
+        return await fn(cn);
+      } catch (retryErr) {
+        console.error("[withConnection] Reintento fallido:", retryErr.message);
+        throw retryErr;
+      }
     }
     throw err;
   } finally {
