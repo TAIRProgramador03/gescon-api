@@ -1119,9 +1119,9 @@ const getContractAdiById = async (req, res) => {
     const data = await withConnection(async (cn) => {
       let sql = "";
       if (type == "P") {
-        sql = `SELECT ID, tc.NRO_CONTRATO, DURACION FROM SPEED400AT.TBLCONTRATO_CAB tc WHERE ID = ?;`;
+        sql = `SELECT ID, tc.NRO_CONTRATO, DURACION FROM SPEED400AT.TBLCONTRATO_CAB tc WHERE ID = ?`;
       } else if (type == "H") {
-        sql = `SELECT ID, tc.NRO_DOC AS NRO_CONTRATO, DURACION FROM SPEED400AT.TBLDOCUMENTO_CAB tc WHERE ID = ?;`;
+        sql = `SELECT ID, tc.NRO_DOC AS NRO_CONTRATO, DURACION FROM SPEED400AT.TBLDOCUMENTO_CAB tc WHERE ID = ?`;
       }
       const result = await cn.query(sql, [contractId]);
       return result[0] || null;
