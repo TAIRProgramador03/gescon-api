@@ -119,6 +119,14 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+if (process.env.NODE_ENV !== "production") {
+  app.post("/dev/kill-pool", (req, res) => {
+    const conDb = require("./src/shared/connect.js");
+    conDb.invalidatePool();
+    res.json({ message: "Pool invalidado" });
+  });
+}
+
 // Iniciar servidor IP_LOCAL/
 server.listen(port, () => {
   console.log(`Servidor corriendo en https://${IP_LOCAL}:${port}`);
