@@ -49,12 +49,18 @@ const createPool = async () => {
 
   poolCreationPromise = (async () => {
     try {
-      pool = await odbc.pool({
-        connectionString: `DRIVER={IBM i Access ODBC Driver};SYSTEM=${IP_ODBC_BD};UID=${DB_USER};PWD=${DB_PASSWORD};NAM=1;DBQ=${SCHEMA_BD};CCSID=1208;UNICODE=UCS-2;TIMEOUT=5;`,
-        initialSize: 2,
-        maxSize: 20,
-        incrementSize: 2,
-      });
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("[db] Timeout creando pool — IBM i no responde")), 20_000)
+      );
+      pool = await Promise.race([
+        odbc.pool({
+          connectionString: `DRIVER={IBM i Access ODBC Driver};SYSTEM=${IP_ODBC_BD};UID=${DB_USER};PWD=${DB_PASSWORD};NAM=1;DBQ=${SCHEMA_BD};CCSID=1208;UNICODE=UCS-2;TIMEOUT=5;`,
+          initialSize: 2,
+          maxSize: 20,
+          incrementSize: 2,
+        }),
+        timeout,
+      ]);
       console.log("Pool de conexiones creada");
       recordSuccess();
       startKeepAlive();
