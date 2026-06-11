@@ -504,8 +504,8 @@ const diferenceContractLeasing = async (req, res) => {
               )
           ) / 12
         ) AS PLAZO_ANIOS_LEASING
-      FROM SPEED400AT.TBLCONTRATO_CAB tc
-      LEFT JOIN SPEED400AT.TBL_LEASING_CAB tlc
+      FROM ${SCHEMA_BD}.TBLCONTRATO_CAB tc
+      LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB tlc
       ON TC.ID = TLC.ID_CONTRATO AND TLC.TIPCON LIKE '%P%'
       WHERE TLC.TIPCON LIKE '%P%' ${clienteId ? "AND TC.ID_CLIENTE = ?" : ""}
       ORDER BY TC.NRO_CONTRATO
@@ -1420,24 +1420,28 @@ const contTotalVehicleMap = async (req, res) => {
 
   try {
     const mapResult = await withConnection(async (cn) => {
-      const sentences = clienteId ? "WHERE TAC.ID_CLIENTE = ?" : "";
+      const sentences = clienteId ? "AND C.IDCLI = ?" : "";
       const params = clienteId ? [clienteId] : [];
 
       const sql = `
-      SELECT
-        COALESCE(TUO.DEPARTAMENTO, 'NO IDENT') AS DEPARTAMENTO,
-        COUNT(*) AS TOTAL_PLACAS,
-        COUNT(DISTINCT PO.ID) AS TOTAL_OPERACIONES
-      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
-        ON TAD.ID_OPE = PO.ID
-      LEFT JOIN ${SCHEMA_BD}.TBL_UBICACION_OPE TUO
-        ON PO.ID = TUO.ID_OPE
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
-        ON TAD.ID_ASIGNACION = TAC.ID
-      ${sentences}
-      GROUP BY COALESCE(TUO.DEPARTAMENTO, 'NO IDENT')
-      ORDER BY DEPARTAMENTO
+      SELECT TUO.DEPARTAMENTO AS DEPARTAMENTO, COUNT(DISTINCT PO.ID) AS TOTAL_OPERACIONES, COUNT(TAD.ID) AS TOTAL_PLACAS
+      FROM ${SCHEMA_BD}.TBL_UBICACION_OPE tuo 
+      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+      ON TUO.ID_OPE = PO."ID" 
+      LEFT JOIN (
+        SELECT DISTINCT A.IDCLI, B.CLINOM
+        FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+        INNER JOIN ${SCHEMA_BD}.TCLIE B 
+        ON A.IDCLI = B.CLICVE 
+        WHERE A.ID <> 86 
+        AND B.CLINOM <> '*** ANULADO ***'
+      ) C
+      ON PO.IDCLI = C.IDCLI 
+      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+      ON TUO.ID_OPE = TAD.ID_OPE 
+      WHERE TUO.DEPARTAMENTO IS NOT NULL ${sentences}
+      GROUP BY TUO.DEPARTAMENTO
+      ORDER BY TUO.DEPARTAMENTO
     `;
 
       const result = await cn.query(sql, params);
@@ -1471,12 +1475,12 @@ const notifications = async (req, res) => {
       SELECT
       (
           SELECT COUNT(*)
-          FROM SPEED400AT.TBLCONTRATO_CAB TC
+          FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
           WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
       ) AS TOTAL_CONTRATOS,
       (
           SELECT COUNT(*)
-          FROM SPEED400AT.TBLDOCUMENTO_CAB TD
+          FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
           WHERE TD.NRO_DOC LIKE 'DPEN-%'
       ) AS TOTAL_DOCUMENTOS,
       (
@@ -1484,7 +1488,7 @@ const notifications = async (req, res) => {
           FROM (
               SELECT
                   TAD.ID
-              FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+              FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
 
               JOIN (
                   SELECT
@@ -1494,7 +1498,7 @@ const notifications = async (req, res) => {
                           PARTITION BY IDVEH
                           ORDER BY ID DESC
                       ) AS RN
-                  FROM SPEED400AT.PO_ASIGNACION
+                  FROM ${SCHEMA_BD}.PO_ASIGNACION
               ) PA
                   ON TAD.ID_VEH = PA.IDVEH
 
@@ -1510,22 +1514,22 @@ const notifications = async (req, res) => {
         SELECT
           (
               SELECT COUNT(*)
-                FROM SPEED400AT.TBLCONTRATO_CAB TC
+                FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
                 LEFT JOIN (
                   SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
                   LEFT JOIN (
                     SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM SPEED400AT.PO_OPERACIONES A
-                    INNER JOIN SPEED400AT.TCLIE B
+                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                    INNER JOIN ${SCHEMA_BD}.TCLIE B
                     ON A.IDCLI = B.CLICVE
                     WHERE A.ID <> 86
                     AND B.CLINOM <> '*** ANULADO ***'
                   )PO
                   ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN SPEED400AT.T_US_GC tug
+                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
                   ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN SPEED400AT.T_RL_GC trg
+                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
                 ) CL
@@ -1534,22 +1538,22 @@ const notifications = async (req, res) => {
             ) AS TOTAL_CONTRATOS,
             (
                 SELECT COUNT(*)
-                FROM SPEED400AT.TBLDOCUMENTO_CAB TD
+                FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
                 LEFT JOIN (
                   SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
                   LEFT JOIN (
                     SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM SPEED400AT.PO_OPERACIONES A
-                    INNER JOIN SPEED400AT.TCLIE B
+                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                    INNER JOIN ${SCHEMA_BD}.TCLIE B
                     ON A.IDCLI = B.CLICVE
                     WHERE A.ID <> 86
                     AND B.CLINOM <> '*** ANULADO ***'
                   )PO
                   ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN SPEED400AT.T_US_GC tug
+                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
                   ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN SPEED400AT.T_RL_GC trg
+                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
                 ) CL
@@ -1561,24 +1565,24 @@ const notifications = async (req, res) => {
                 FROM (
                   SELECT
                     TAD.ID
-                    FROM SPEED400AT.TBL_ASIGNACION_DET TAD
-                    LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB TAC
+                    FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+                    LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
                     ON TAD.ID_ASIGNACION = TAC.ID
                     LEFT JOIN (
                       SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                    FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+                    FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
                     LEFT JOIN (
                       SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                      FROM SPEED400AT.PO_OPERACIONES A
-                      INNER JOIN SPEED400AT.TCLIE B
+                      FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                      INNER JOIN ${SCHEMA_BD}.TCLIE B
                       ON A.IDCLI = B.CLICVE
                       WHERE A.ID <> 86
                       AND B.CLINOM <> '*** ANULADO ***'
                     )PO
                     ON MOXU.IDOPERACION = PO.ID
-                    LEFT JOIN SPEED400AT.T_US_GC tug
+                    LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
                     ON MOXU.CH_CODI_USUARIO = TUG.USU
-                    LEFT JOIN SPEED400AT.T_RL_GC trg
+                    LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
                     ON TUG.ID_RL = TRG.ID
                     WHERE TUG.USU IS NOT NULL
                     ) CL
@@ -1591,7 +1595,7 @@ const notifications = async (req, res) => {
                       PARTITION BY IDVEH
                     ORDER BY ID DESC
                     ) AS RN
-                  FROM SPEED400AT.PO_ASIGNACION
+                  FROM ${SCHEMA_BD}.PO_ASIGNACION
                   ) PA
                   ON TAD.ID_VEH = PA.IDVEH
                   WHERE PA.RN = 1 AND CL.ID_USU = ${idUser}
