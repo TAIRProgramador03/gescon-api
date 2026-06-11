@@ -67,8 +67,7 @@ const listAssingByContract = async (req, res) => {
 
   try {
     const convertResult = await withConnection(async (cn) => {
-      const statusArray =
-        typeof status === "string" ? status.split(",") : [];
+      const statusArray = typeof status === "string" ? status.split(",") : [];
 
       let filtrosA = "";
       let filtrosB = "";
@@ -106,15 +105,21 @@ const listAssingByContract = async (req, res) => {
         }
 
         if (statusArray.includes("I")) {
-          conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)");
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
+          );
         }
 
         if (statusArray.includes("PR")) {
-          conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)");
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+          );
         }
 
         if (statusArray.includes("PA")) {
-          conditions.push("(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)");
+          conditions.push(
+            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+          );
         }
 
         if (statusArray.includes("V")) {
@@ -492,6 +497,63 @@ const listAssingByContract = async (req, res) => {
   }
 };
 
+const getOperationsByRegion = async (req, res) => {
+  const { clienteId } = req.query;
+
+  try {
+    await withConnection(async (cn) => {
+      const sql = `
+        SELECT TUO.DEPARTAMENTO, PO.DESCRIPCION AS OPERACION, COUNT(TAD.ID) AS TOTAL_VEHICULOS 
+        FROM ${SCHEMA_BD}.TBL_UBICACION_OPE tuo 
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+          ON TUO.ID_OPE = PO."ID" 
+        LEFT JOIN (
+          SELECT DISTINCT A.IDCLI, B.CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A 
+          INNER JOIN ${SCHEMA_BD}.TCLIE B 
+            ON A.IDCLI = B.CLICVE 
+          WHERE A.ID <> 86 
+            AND B.CLINOM <> '*** ANULADO ***'
+        ) C ON PO.IDCLI = C.IDCLI 
+        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET tad 
+          ON TUO.ID_OPE = TAD.ID_OPE 
+        WHERE TUO.DEPARTAMENTO IS NOT NULL 
+          ${clienteId ? "AND C.IDCLI = ?" : ""}
+        GROUP BY TUO.DEPARTAMENTO, PO.DESCRIPCION
+        ORDER BY TUO.DEPARTAMENTO
+      `;
+
+      const rows = await cn.query(sql, clienteId ? [clienteId] : []);
+
+      const grouped = rows.reduce((acc, row) => {
+        const { DEPARTAMENTO, OPERACION, TOTAL_VEHICULOS } = row;
+
+        let region = acc.find((r) => r.titulo === DEPARTAMENTO);
+
+        if (!region) {
+          region = { titulo: DEPARTAMENTO.trim(), operaciones: [] };
+          acc.push(region);
+        }
+
+        region.operaciones.push({
+          nombre: OPERACION.trim(),
+          total_vehiculos: TOTAL_VEHICULOS,
+        });
+
+        return acc;
+      }, []);
+
+      return res.status(200).json(grouped);
+    });
+  } catch (error) {
+    console.error("Error al obtener operaciones por region", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener operaciones por region",
+    });
+  }
+};
+
 const insertOperation = async (req, res) => {
   const { user } = req.user;
 
@@ -632,7 +694,9 @@ const valideAssign = async (req, res) => {
 
         if (!result || result.length === 0) {
           // Return early by throwing a special object that we catch outside
-          const err = new Error(`Contrato no encontrado: ${clase}_${idContrato}`);
+          const err = new Error(
+            `Contrato no encontrado: ${clase}_${idContrato}`,
+          );
           err.statusCode = 404;
           err.responseBody = {
             success: false,
@@ -657,7 +721,12 @@ const valideAssign = async (req, res) => {
             maximo: row.VEH_SUP,
             actual: row.SUPERFICIE,
           },
-          { tipo: "SOCAVÓN", cod: "1", maximo: row.VEH_SOC, actual: row.SOCAVON },
+          {
+            tipo: "SOCAVÓN",
+            cod: "1",
+            maximo: row.VEH_SOC,
+            actual: row.SOCAVON,
+          },
           { tipo: "CIUDAD", cod: "2", maximo: row.VEH_CIU, actual: row.CIUDAD },
           { tipo: "SEVERO", cod: "3", maximo: row.VEH_SEV, actual: row.SEVERO },
         ];
@@ -666,7 +735,9 @@ const valideAssign = async (req, res) => {
           let nuevos = contadorNuevo[v.cod] || 0;
 
           if (v.actual + nuevos > v.maximo) {
-            const err = new Error(`Límite excedido para terreno tipo ${v.tipo}`);
+            const err = new Error(
+              `Límite excedido para terreno tipo ${v.tipo}`,
+            );
             err.statusCode = 200;
             err.responseBody = {
               success: false,
@@ -726,7 +797,10 @@ const updateAssign = async (req, res) => {
       if (!findAssign[0]) {
         const err = new Error("No se encontro la asignación");
         err.statusCode = 404;
-        err.responseBody = { success: false, message: "No se encontro la asignación" };
+        err.responseBody = {
+          success: false,
+          message: "No se encontro la asignación",
+        };
         throw err;
       }
 
@@ -769,7 +843,10 @@ const updateAssign = async (req, res) => {
       if (fields.length === 0) {
         const err = new Error("No se detectaron campos para modificar");
         err.statusCode = 400;
-        err.responseBody = { success: false, message: "No se detectaron campos para modificar" };
+        err.responseBody = {
+          success: false,
+          message: "No se detectaron campos para modificar",
+        };
         throw err;
       }
 
@@ -1075,7 +1152,10 @@ const changeOperation = async (req, res) => {
       if (!findAssign[0] || findAssign.length === 0) {
         const err = new Error("No se encontro la asignación en el sistema");
         err.statusCode = 404;
-        err.responseBody = { success: false, message: "No se encontro la asignación en el sistema" };
+        err.responseBody = {
+          success: false,
+          message: "No se encontro la asignación en el sistema",
+        };
         throw err;
       }
 
@@ -1475,7 +1555,11 @@ const uploalMasiveRecords = async (req, res) => {
       if (files.length === notUpload.length) {
         const err = new Error("No se importo ningun archivo");
         err.statusCode = 200;
-        err.responseBody = { success: true, message: "No se importo ningun archivo", notUpload };
+        err.responseBody = {
+          success: true,
+          message: "No se importo ningun archivo",
+          notUpload,
+        };
         throw err;
       }
 
@@ -1507,4 +1591,5 @@ module.exports = {
   listReassign,
   getReassignById,
   uploalMasiveRecords,
+  getOperationsByRegion
 };

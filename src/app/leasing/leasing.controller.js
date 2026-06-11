@@ -377,6 +377,38 @@ const listLeasingByContract = async (req, res) => {
   }
 };
 
+const getLeasingByContract = async (req, res) => {
+  const { contratoId } = req.query;
+
+  if (!contratoId) {
+    return res.status(400).json({
+      success: false,
+      message: "El parametro contratoId debe ser obligatorio",
+    });
+  }
+
+  try {
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `SELECT ID, NRO_LEASING FROM SPEED400AT.TBL_LEASING_CAB tlc WHERE ID_CONTRATO = ? AND TIPCON = 'P'`;
+
+      const result = await cn.query(sql, [contratoId]);
+
+      return result.map((row) => ({
+        ID: row.ID,
+        NRO_LEASING: row.NRO_LEASING.trim(),
+      }));
+    });
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al listar leasings por contrato: ", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al listar leasings por contrato",
+    });
+  }
+};
+
 const listLeasingByDocument = async (req, res) => {
   const { documentoId } = req.query;
 
@@ -1158,6 +1190,7 @@ module.exports = {
   listAllLeasing,
   listLeasingOfClient,
   listLeasingByContract,
+  getLeasingByContract,
   listLeasingByDocument,
   listLeasingGeneral,
   detailLeasing,
@@ -1165,5 +1198,5 @@ module.exports = {
   detailVehByLeasing,
   detailAssignByLeasing,
   insertLeasing,
-  updateLeasing
+  updateLeasing,
 };
