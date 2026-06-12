@@ -40,6 +40,12 @@ const wss = new WebSocketServer({ noServer: true }); // ← sin server ni path
 wss.on("connection", (ws, req) => {
   console.log("[WS] ✅ Cliente conectado:", req.socket.remoteAddress);
 
+  const keepAlive = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      ws.ping(); // Frame nativo WS, no un mensaje JSON
+    }
+  }, 50_000);
+
   ws.on("message", (raw) => {
     try {
       const msg = JSON.parse(raw.toString());
@@ -51,20 +57,41 @@ wss.on("connection", (ws, req) => {
     }
   });
 
-  ws.on("close", () => console.log("[WS] Cliente desconectado"));
-  ws.on("error", (err) => console.error("[WS] error:", err));
+  ws.on("close", () => {
+    clearInterval(keepAlive); // ✅ Limpiar intervalo al desconectar
+    console.log("[WS] Cliente desconectado");
+  });
+
+  ws.on("error", (err) => {
+    clearInterval(keepAlive); // ✅ También limpiar en error
+    console.error("[WS] error:", err);
+  });
 });
 
 // Manejar el upgrade manualmente
 server.on("upgrade", (req, socket, head) => {
   console.log("[WS] Upgrade solicitado para:", req.url);
+  console.log("[WS] Headers:", req.headers); // ← Agregar temporalmente para debug
+
+  // ✅ NUEVO: validar que sea realmente un upgrade de WebSocket
+  const upgradeHeader = req.headers["upgrade"];
+  if (!upgradeHeader || upgradeHeader.toLowerCase() !== "websocket") {
+    console.warn(
+      "[WS] ⚠️ Upgrade rechazado, cabecera inválida:",
+      upgradeHeader,
+    );
+    socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
+    socket.destroy();
+    return;
+  }
 
   if (req.url === "/ws/heartbeat") {
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws, req);
     });
   } else {
-    socket.destroy(); // rechazar paths desconocidos
+    socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+    socket.destroy();
   }
 });
 
