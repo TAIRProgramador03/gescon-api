@@ -197,7 +197,9 @@ const detailContract = async (req, res) => {
           ON AD.ID_ASIGNACION = AC.ID
           LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
           ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-          WHERE AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P'
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+          ON O.ID = AD.ID_OPE
+          WHERE O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P'
           ${contratoId ? "AND CC.ID = ?" : ""}
 
           UNION ALL
@@ -209,7 +211,9 @@ const detailContract = async (req, res) => {
           ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
           LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
           ON DC.ID_PADRE = CC.ID
-          WHERE AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H'
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+          ON O.ID = AD.ID_OPE
+          WHERE O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H'
           ${contratoId ? "AND CC.ID = ?" : ""}
         )
       `;
@@ -268,8 +272,8 @@ const detailContract = async (req, res) => {
         )
       `;
 
-      let filtrosA = " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      let filtrosB = " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+      let filtrosA = " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+      let filtrosB = " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
       const params = [clienteId];
 
       if (contratoId) {
