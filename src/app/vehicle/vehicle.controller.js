@@ -324,8 +324,8 @@ const listPlateTraceability = async (req, res) => {
 
       // filtro obligatorio
       if (idCliente) {
-        filtrosA += " AND AC.ID_CLIENTE = ?";
-        filtrosB += " AND AC.ID_CLIENTE = ?";
+        filtrosA += " AND O.IDCLI = ?";
+        filtrosB += " AND O.IDCLI = ?";
         params.push(idCliente);
       }
 
@@ -985,7 +985,7 @@ const listPlateByRegion = async (req, res) => {
         WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) CL
-        ON TAC.ID_CLIENTE = CL.IDCLI
+        ON PO.IDCLI = CL.IDCLI
       WHERE TUO.DEPARTAMENTO = ? ${clienteId ? "AND TAC.ID_CLIENTE = ?" : ""}
     `;
 

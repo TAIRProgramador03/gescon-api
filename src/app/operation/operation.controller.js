@@ -74,8 +74,8 @@ const listAssingByContract = async (req, res) => {
       let params = [];
 
       // filtro obligatorio
-      filtrosA += " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P'";
-      filtrosB += " AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H'";
+      filtrosA += " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P'";
+      filtrosB += " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H'";
       params.push(idCliente);
 
       // opcionales
