@@ -13,6 +13,16 @@ const modelRoutes = require("../../app/model/model.routes.js");
 const reportRoutes = require("../../app/report/report.routes.js");
 const userRoutes = require("../../app/user/user.routes.js");
 
+const idempotency = require("../middleware/idempotency.js");
+
+// Solo en métodos que mutan datos
+router.use((req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return idempotency(req, res, next);
+  }
+  next();
+});
+
 router.use(authRoutes);
 router.use(clientRoutes);
 router.use(contractRoutes);
