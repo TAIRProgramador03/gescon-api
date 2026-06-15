@@ -116,6 +116,31 @@ const contractNroAdi = async (req, res) => {
   }
 };
 
+const contractPending = async (req, res) => {
+  const { idCli } = req.query;
+
+  try {
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `
+        SELECT ID, NRO_CONTRATO AS DESCRIPCION
+        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
+        WHERE NRO_CONTRATO LIKE 'CPEN-%'
+        ${idCli ? `AND ID_CLIENTE = ?` : ""}
+      `;
+      const result = await cn.query(query, idCli ? [idCli] : []);
+      return result.map((row) => ({
+        ID: row.ID !== null && row.ID !== undefined ? row.ID.toString().trim() : null,
+        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
+      }));
+    });
+
+    res.json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener los contratos:", error);
+    res.status(500).json({ success: false, message: "Error al obtener contratos" });
+  }
+};
+
 const tableContract = async (req, res) => {
   const { idCli, id } = req.query;
 
@@ -1219,6 +1244,7 @@ const verifyContractsTemp = async (req, res) => {
 
 module.exports = {
   contractNro,
+  contractPending,
   contractNroAdi,
   tableContract,
   detailContract,
