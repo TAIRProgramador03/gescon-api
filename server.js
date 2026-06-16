@@ -86,22 +86,14 @@ server.on("upgrade", (req, socket, head) => {
 app.use(
   cors({
     origin: [
-      "http://localhost",
-      `http://${IP_LOCAL}`,
       "http://localhost:8080",
-      `http://${IP_LOCAL}:8080`,
-      "http://localhost:3000",
-      `http://${IP_LOCAL}:3000`,
-      `http://cdn.datatables.net`,
-      `http://192.168.5.25`,
-      `http://192.168.5.25:3000`,
-      `http://${IP_LOCAL}:5173`,
-      `http://locahost:5173`,
-      `http://${IP_LOCAL}:8080`,
-      `http://locahost:8080`,
-      "https://gescon.tair360.net",
-      "http://192.168.4.22",
+      "http://localhost:5173",
+      "http://192.168.4.22:8080",
       "http://192.168.4.22:5173",
+      "https://gescon.tair360.net",
+      "https://tair360.net",
+      "http://104.21.60.95",
+      "http://172.67.195.129"
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),
