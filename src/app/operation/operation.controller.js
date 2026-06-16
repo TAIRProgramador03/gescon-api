@@ -1137,8 +1137,6 @@ const changeOperation = async (req, res) => {
   const convertDate = convertirFecha(date);
   const validFile = file ? file.replace(/^temp\//, "") : null;
 
-  console.log(req.body);
-
   try {
     await withConnection(async (cn) => {
       const sqlFind = `

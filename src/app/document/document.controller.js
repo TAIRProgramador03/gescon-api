@@ -3,6 +3,7 @@ const {
   obtenerUltimoIdDoc,
   transformType,
   withConnection,
+  decodeString,
 } = require("../../shared/utils.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
 const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
@@ -80,6 +81,39 @@ const getDocumentByContract = async (req, res) => {
       success: false,
       message: "Error al listar documentos por contrato",
     });
+  }
+};
+
+const documentPending = async (req, res) => {
+  const { idCli } = req.query;
+
+  try {
+    const cleanedResult = await withConnection(async (cn) => {
+      const query = `
+        SELECT ID, NRO_DOC AS DESCRIPCION
+        FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB
+        WHERE NRO_DOC LIKE 'DPEN-%'
+        ${idCli ? `AND ID_CLIENTE = ?` : ""}
+      `;
+      const result = await cn.query(query, idCli ? [idCli] : []);
+      return result.map((row) => ({
+        id:
+          row.ID !== null && row.ID !== undefined
+            ? row.ID
+            : null,
+        nroDocumento:
+          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
+            ? decodeString(row.DESCRIPCION.toString().trim())
+            : null,
+      }));
+    });
+
+    res.json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener los contratos:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contratos" });
   }
 };
 
@@ -510,7 +544,8 @@ const updateDocument = async (req, res) => {
 
         // VALIDAR QUE NO SE DUPLIQUE UN NUMERO DE CONTRATO EN CASO SE PASE UNO NUEVO
         if (
-          findDocument[0].NRO_DOC.trim().toUpperCase() != nroContrato.toUpperCase()
+          findDocument[0].NRO_DOC.trim().toUpperCase() !=
+          nroContrato.toUpperCase()
         ) {
           const sqlSearchContract = `SELECT * FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB WHERE UPPER(NRO_DOC) = ?`;
 
@@ -781,6 +816,7 @@ module.exports = {
   insertDocument,
   listDocumentByNroContract,
   getDocumentByContract,
+  documentPending,
   detailVehByDocu,
   detailDocument,
   getDocumentById,

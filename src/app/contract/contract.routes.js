@@ -12,11 +12,13 @@ const {
   getContractAdiById,
   updateContract,
   verifyContractsTemp,
+  contractPending,
 } = require("./contract.controller.js");
 const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
 
 Router.get("/contratosNro", authenticateToken, validUser, contractNro);
+Router.get("/contratosPendientes", authenticateToken, validUser, contractPending);
 Router.get("/contratosNroAdi", authenticateToken, validUser, contractNroAdi);
 Router.get("/tablaContrato", authenticateToken, validUser, tableContract);
 Router.get("/contratoDetalle", authenticateToken, validUser, detailContract);
