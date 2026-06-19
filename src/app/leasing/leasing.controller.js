@@ -94,7 +94,7 @@ const listLeasingAdi = async (req, res) => {
 const listAllLeasing = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const { bank, clientId, contractId, typeContract } = req.query;
+  const { bank, clientId, contractId, typeContract, leasingId } = req.query;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -128,6 +128,11 @@ const listAllLeasing = async (req, res) => {
         } else if (typeContract === "H") {
           condiciones.push("L.TIPCON = 'H'");
         }
+      }
+
+      if (leasingId) {
+        condiciones.push("L.ID = ?");
+        params.push(leasingId);
       }
 
       // 🔥 armar WHERE dinámico
