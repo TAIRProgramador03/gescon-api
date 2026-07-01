@@ -386,17 +386,28 @@ const contVehicleLeasings = async (req, res) => {
 };
 
 const contLeasings = async (req, res) => {
-  const { clienteId } = req.query;
+  const { clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
 
   try {
-    const { resultVencidos, resultPorVencer } = await withConnection(async (cn) => {
-      const sqlVencidos = `
+    const { resultVencidos, resultPorVencer } = await withConnection(
+      async (cn) => {
+        // Condición dinámica para el último bucket
+        const condMayor90Vencidos = isAll
+          ? `DIFERENCIA_DIAS < -90`
+          : `DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120`;
+
+        const condMayor90PorVencer = isAll
+          ? `DIFERENCIA_DIAS > 90`
+          : `DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120`;
+
+        const sqlVencidos = `
       SELECT
         COUNT(CASE WHEN  DIFERENCIA_DIAS < 0 AND DIFERENCIA_DIAS >= -30 THEN 1 END) AS "MENOR_30_DIAS" ,
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -30 AND DIFERENCIA_DIAS >= -45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -45 AND DIFERENCIA_DIAS >= -60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
-        COUNT(CASE WHEN  DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120 THEN 1 END) AS "MAYOR_90_DIAS"
+        COUNT(CASE WHEN  ${condMayor90Vencidos} THEN 1 END) AS "MAYOR_90_DIAS"
       FROM (
       SELECT LC.ID_CLIENTE, LD.MODELO, LD.PLACA, LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
@@ -405,13 +416,13 @@ const contLeasings = async (req, res) => {
       ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
     `;
 
-      const sqlPorVencer = `
+        const sqlPorVencer = `
       SELECT
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 0 AND DIFERENCIA_DIAS <= 30 THEN 1 END) AS "MENOR_30_DIAS" ,
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 30 AND DIFERENCIA_DIAS <= 45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 45 AND DIFERENCIA_DIAS <= 60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
         COUNT(CASE WHEN  DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
-        COUNT(CASE WHEN  DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120 THEN 1 END) AS "MAYOR_90_DIAS"
+        COUNT(CASE WHEN  ${condMayor90PorVencer} THEN 1 END) AS "MAYOR_90_DIAS"
       FROM (
       SELECT LC.ID_CLIENTE, LD.MODELO, LD.PLACA, LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
       FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
@@ -420,15 +431,16 @@ const contLeasings = async (req, res) => {
       ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
     `;
 
-      const params = [];
+        const params = [];
 
-      if (clienteId) params.push(clienteId);
+        if (clienteId) params.push(clienteId);
 
-      const rv = await cn.query(sqlVencidos, params);
-      const rpv = await cn.query(sqlPorVencer, params);
+        const rv = await cn.query(sqlVencidos, params);
+        const rpv = await cn.query(sqlPorVencer, params);
 
-      return { resultVencidos: rv, resultPorVencer: rpv };
-    });
+        return { resultVencidos: rv, resultPorVencer: rpv };
+      },
+    );
 
     const clsVencidos = {
       menor30Dias: resultVencidos[0].MENOR_30_DIAS,
@@ -460,7 +472,7 @@ const contLeasings = async (req, res) => {
 };
 
 const diferenceContractLeasing = async (req, res) => {
-  const {clienteId} = req.query;
+  const { clienteId } = req.query;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -513,7 +525,7 @@ const diferenceContractLeasing = async (req, res) => {
 
       const result = await cn.query(sql, clienteId ? [clienteId] : []);
 
-      return result.map(row => ({
+      return result.map((row) => ({
         nroContrato: row.NRO_CONTRATO.trim(),
         fechaFirma: row.FECHA_FIRMA_CONTRATO,
         fechaFinContrato: row.FECHA_FIN_CONTRATO,
@@ -521,7 +533,7 @@ const diferenceContractLeasing = async (req, res) => {
         nroLeasing: row.NRO_LEASING.trim(),
         fechaIniLeasing: row.FECHA_INICIO_LEASING,
         fechaFinLeasing: row.FECHA_FIN_LEASING,
-        aniosLeasing: row.PLAZO_ANIOS_LEASING
+        aniosLeasing: row.PLAZO_ANIOS_LEASING,
       }));
     });
 
@@ -531,18 +543,16 @@ const diferenceContractLeasing = async (req, res) => {
       "Error al obtener reporte de diferencia entre contrato y lesing: ",
       error,
     );
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message:
-          "Error al obtener reporte de diferencia entre contrato y lesing",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener reporte de diferencia entre contrato y lesing",
+    });
   }
 };
 
 const listVehicleLeasingExpire = async (req, res) => {
-  const { label, clienteId } = req.query;
+  const { label, clienteId, all } = req.query;
+    const isAll = all === "true" || all === true;
 
   if (!label)
     return res
@@ -566,7 +576,9 @@ const listVehicleLeasingExpire = async (req, res) => {
         sentences = "DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90";
         break;
       case "Entre 90 y 120 dias":
-        sentences = "DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120";
+        sentences = isAll
+          ? "DIFERENCIA_DIAS < -90"
+          : "DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120";
         break;
       default:
         return res
@@ -637,7 +649,8 @@ const listVehicleLeasingExpire = async (req, res) => {
 };
 
 const listVehicleLeasingToExpire = async (req, res) => {
-  const { label, clienteId } = req.query;
+  const { label, clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
 
   if (!label)
     return res
@@ -661,7 +674,9 @@ const listVehicleLeasingToExpire = async (req, res) => {
         sentences = "DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90";
         break;
       case "Entre 90 y 120 dias":
-        sentences = "DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120";
+        sentences = isAll
+          ? "DIFERENCIA_DIAS > 90"
+          : "DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120";
         break;
       default:
         return res
@@ -732,7 +747,8 @@ const listVehicleLeasingToExpire = async (req, res) => {
 };
 
 const depecratedVehicleExpires = async (req, res) => {
-  const { label, clienteId } = req.query;
+  const { label, clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -752,10 +768,18 @@ const depecratedVehicleExpires = async (req, res) => {
           where.push("A.DIFERENCIA_DIAS < -60 AND A.DIFERENCIA_DIAS >= -90");
           break;
         case "Entre 90 y 120 dias":
-          where.push("A.DIFERENCIA_DIAS < -90 AND A.DIFERENCIA_DIAS >= -120");
+          where.push(
+            isAll
+              ? "A.DIFERENCIA_DIAS < -90"
+              : "A.DIFERENCIA_DIAS < -90 AND A.DIFERENCIA_DIAS >= -120",
+          );
           break;
         default:
-          where.push("A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -120");
+          where.push(
+            isAll
+              ? "A.DIFERENCIA_DIAS < 0"
+              : "A.DIFERENCIA_DIAS < 0 AND A.DIFERENCIA_DIAS >= -120",
+          );
       }
 
       if (clienteId) {
@@ -929,7 +953,8 @@ const depecratedVehicleExpires = async (req, res) => {
 };
 
 const depecratedVehicleToExpires = async (req, res) => {
-  const { label, clienteId } = req.query;
+  const { label, clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -949,10 +974,18 @@ const depecratedVehicleToExpires = async (req, res) => {
           where.push("A.DIFERENCIA_DIAS > 60 AND A.DIFERENCIA_DIAS <= 90");
           break;
         case "Entre 90 y 120 dias":
-          where.push("A.DIFERENCIA_DIAS > 90 AND A.DIFERENCIA_DIAS <= 120");
+          where.push(
+            isAll
+              ? "A.DIFERENCIA_DIAS > 90"
+              : "A.DIFERENCIA_DIAS > 90 AND A.DIFERENCIA_DIAS <= 120",
+          );
           break;
         default:
-          where.push("A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 120");
+          where.push(
+            isAll
+              ? "A.DIFERENCIA_DIAS >= 0"
+              : "A.DIFERENCIA_DIAS >= 0 AND A.DIFERENCIA_DIAS <= 120",
+          );
       }
 
       if (clienteId) {
@@ -1467,7 +1500,7 @@ const contTotalVehicleMap = async (req, res) => {
 };
 
 const notifications = async (req, res) => {
-  const {id: idUser, roleId} = req.user;
+  const { id: idUser, roleId } = req.user;
 
   try {
     const result = await withConnection(async (cn) => {
@@ -1509,7 +1542,7 @@ const notifications = async (req, res) => {
       FROM SYSIBM.SYSDUMMY1
     `;
 
-      if(roleId != 1 && roleId != 2) {
+      if (roleId != 1 && roleId != 2) {
         sql = `
         SELECT
           (
@@ -1603,7 +1636,7 @@ const notifications = async (req, res) => {
             ) X
           ) AS TOTAL_REASIGNACIONES
         FROM SYSIBM.SYSDUMMY1
-      `
+      `;
       }
 
       return await cn.query(sql);
