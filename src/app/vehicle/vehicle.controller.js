@@ -309,7 +309,7 @@ const listYearByModelGen = async (req, res) => {
 const listPlateTraceability = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const { idContrato, idCliente, idLeasing, tipoTerr, status } = req.query;
+  const { idContrato, idCliente, idLeasing, tipoTerr, status, fromDate, toDate } = req.query;
 
   try {
     const convertResult = await withConnection(async (cn) => {
@@ -392,6 +392,20 @@ const listPlateTraceability = async (req, res) => {
           filtrosA += filter;
           filtrosB += filter;
         }
+      }
+
+      if (fromDate && toDate) {
+        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') BETWEEN ? AND ?"
+        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') BETWEEN ? AND ?"
+        params.push(fromDate, toDate);
+      } else if (fromDate) {
+        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') >= ?"
+        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') >= ?"
+        params.push(fromDate);
+      } else if (toDate) {
+        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') <= ?"
+        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') <= ?"
+        params.push(toDate);
       }
 
       let sql = `
