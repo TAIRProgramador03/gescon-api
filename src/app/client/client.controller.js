@@ -17,19 +17,19 @@ const listClient = async (req, res) => {
       if (roleId != 1 && roleId != 2) {
         sql = `
           SELECT DISTINCT PO.IDCLI, PO.CLINOM
-          FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
           LEFT JOIN (
             SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM SPEED400AT.PO_OPERACIONES A
-            INNER JOIN SPEED400AT.TCLIE B
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B
             ON A.IDCLI = B.CLICVE
             WHERE A.ID <> 86
             AND B.CLINOM <> '*** ANULADO ***'
           )PO
           ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN SPEED400AT.T_US_GC tug
+          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
           ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN SPEED400AT.T_RL_GC trg
+          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
           ON TUG.ID_RL = TRG.ID
           WHERE TUG.USU IS NOT NULL AND TUG.ID = ${idUser}
         `;
@@ -142,13 +142,13 @@ const getClientsByContractPending = async (req, res) => {
       const sql = `
         SELECT DISTINCT C.IDCLI, C.CLINOM FROM (
           SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM SPEED400AT.PO_OPERACIONES A
-          INNER JOIN SPEED400AT.TCLIE B
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B
           ON A.IDCLI = B.CLICVE
           WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
         ) C
-        LEFT JOIN SPEED400AT.TBLCONTRATO_CAB tc 
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
         ON C.IDCLI = TC.ID_CLIENTE 
         WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
         ORDER BY C.CLINOM
@@ -168,12 +168,10 @@ const getClientsByContractPending = async (req, res) => {
       "Error al obtener los clientes con contratos pendiente:",
       error,
     );
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error al obtener clientes con contratos pendiente",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener clientes con contratos pendiente",
+    });
   }
 };
 
@@ -183,13 +181,13 @@ const getClientsByDocumentPending = async (req, res) => {
       const sql = `
         SELECT DISTINCT C.IDCLI, C.CLINOM FROM (
           SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM SPEED400AT.PO_OPERACIONES A
-          INNER JOIN SPEED400AT.TCLIE B
+          FROM ${SCHEMA_BD}.PO_OPERACIONES A
+          INNER JOIN ${SCHEMA_BD}.TCLIE B
           ON A.IDCLI = B.CLICVE
           WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
         ) C
-        LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB tc 
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc 
         ON C.IDCLI = TC.ID_CLIENTE 
         WHERE TC.NRO_DOC LIKE 'DPEN-%'
         ORDER BY C.CLINOM
@@ -209,12 +207,82 @@ const getClientsByDocumentPending = async (req, res) => {
       "Error al obtener los clientes con documentos pendiente:",
       error,
     );
-    res
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener clientes con documentos pendiente",
+    });
+  }
+};
+
+const getClientAbr = async (req, res) => {
+  const { onlyAbr } = req.query;
+  const isOnlyAbr = onlyAbr == "true" || onlyAbr == true
+
+  try {
+
+    const cleanedResult = await withConnection(async (cn) => {
+      let sql = `
+        SELECT T.ID, T.CORR, C.CLINOM, T.RUC, T.CONTACTO FROM ${SCHEMA_BD}.TBLCODINI t 
+        INNER JOIN (
+          SELECT DISTINCT PO.IDCLI, TC.CLINOM, TC.CLIRUC 
+          FROM ${SCHEMA_BD}.PO_OPERACIONES PO
+          INNER JOIN ${SCHEMA_BD}.TCLIE TC
+          ON PO.IDCLI = TC.CLICVE
+          WHERE PO.ID <> 86
+          AND TC.CLINOM <> '*** ANULADO ***'
+        ) C
+        ON T.CLIENTE = C.IDCLI
+        ${isOnlyAbr ? "WHERE T.CORR IS NOT NULL" : ""}
+      `;
+
+      const result = await cn.query(sql);
+      return result.map((row) => ({
+        id: row.ID,
+        abreviatura: row.CORR ? row.CORR.trim() : null,
+        cliente: row.CLINOM.trim(),
+        ruc: row.RUC.trim(),
+        contacto: row.CONTRACTO ? row.CONTRACTO.trim() : null,
+      }));
+    });
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener los clientes:", error);
+    return res
       .status(500)
-      .json({
-        success: false,
-        message: "Error al obtener clientes con documentos pendiente",
-      });
+      .json({ success: false, message: "Error al obtener clientes" });
+  }
+};
+
+const updateClientAbr = async (req, res) => {
+  const id = Number(req.params.id);
+
+  const { abreviature } = req.body;
+
+  if (isNaN(id))
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro id debe ser numerico" });
+
+  try {
+    await withConnection(async (cn) => {
+      const sql = `
+        UPDATE ${SCHEMA_BD}.TBLCODINI
+        SET CORR = ?
+        WHERE ID = ?
+      `;
+
+      await cn.query(sql, [abreviature, id]);
+    });
+
+    return res
+      .status(200)
+      .json({ success: true, message: "Cliente actualizado con éxito" });
+  } catch (error) {
+    console.error("Error al actualizar el cliente:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al actualizar el cliente" });
   }
 };
 
@@ -224,4 +292,6 @@ module.exports = {
   tableClientLea,
   getClientsByContractPending,
   getClientsByDocumentPending,
+  getClientAbr,
+  updateClientAbr,
 };
