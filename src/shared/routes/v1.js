@@ -12,6 +12,7 @@ const fileRoutes = require("../../app/file/file.routes.js");
 const modelRoutes = require("../../app/model/model.routes.js");
 const reportRoutes = require("../../app/report/report.routes.js");
 const userRoutes = require("../../app/user/user.routes.js");
+const testRoutes = require("../../app/test/test.js");
 
 const idempotency = require("../middleware/idempotency.js");
 
@@ -34,5 +35,6 @@ router.use(fileRoutes);
 router.use(modelRoutes);
 router.use(reportRoutes);
 router.use(userRoutes);
+router.use(testRoutes);
 
 module.exports = router;
