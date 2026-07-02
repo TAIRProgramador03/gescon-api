@@ -26,6 +26,8 @@ const listVehicles = async (req, res) => {
 };
 
 const tableVehicles = async (req, res) => {
+  const {abreviature} = req.query;
+
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
@@ -56,10 +58,11 @@ const tableVehicles = async (req, res) => {
           WHERE TLD.ID_VEH = A.ID
         )
         AND (A.SECOPE IS NULL OR A.SECOPE NOT IN (211, 238, 109, 162))
+        ${abreviature ? "AND A.CODINI LIKE ?" : ""}
       ORDER BY A.ID DESC
     `;
 
-      const result = await cn.query(query);
+      const result = await cn.query(query, abreviature ? [`${abreviature}-%`] : []);
 
       return result.map((row) => {
         return {

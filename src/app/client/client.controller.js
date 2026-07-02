@@ -233,6 +233,7 @@ const getClientAbr = async (req, res) => {
         ) C
         ON T.CLIENTE = C.IDCLI
         ${isOnlyAbr ? "WHERE T.CORR IS NOT NULL" : ""}
+        ORDER BY C.CLINOM ASC
       `;
 
       const result = await cn.query(sql);
