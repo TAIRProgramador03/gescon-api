@@ -216,10 +216,9 @@ const getClientsByDocumentPending = async (req, res) => {
 
 const getClientAbr = async (req, res) => {
   const { onlyAbr } = req.query;
-  const isOnlyAbr = onlyAbr == "true" || onlyAbr == true
+  const isOnlyAbr = onlyAbr == "true" || onlyAbr == true;
 
   try {
-
     const cleanedResult = await withConnection(async (cn) => {
       let sql = `
         SELECT T.ID, T.CORR, C.CLINOM, T.RUC, T.CONTACTO FROM ${SCHEMA_BD}.TBLCODINI t 
@@ -266,6 +265,19 @@ const updateClientAbr = async (req, res) => {
       .json({ success: false, message: "El parametro id debe ser numerico" });
 
   try {
+    const findAbr = await withConnection(async (cn) => {
+      let sql = `
+        SELECT T.CORR FROM ${SCHEMA_BD}.TBLCODINI T
+        WHERE T.CORR = ? AND T.ID <> ?
+      `;
+
+      const result = await cn.query(sql, [abreviature, id]);
+
+      return result[0] || result.length > 0 ? true : false
+    });
+
+    if(findAbr) return res.status(409).json({success: false, message: "La abreviatura enviada ya existe"})
+
     await withConnection(async (cn) => {
       const sql = `
         UPDATE ${SCHEMA_BD}.TBLCODINI
