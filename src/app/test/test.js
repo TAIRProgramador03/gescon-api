@@ -2,11 +2,14 @@ const multer = require("multer");
 const mime = require("mime-types");
 const router = require("express").Router();
 const { getContactById } = require("../../shared/service/keynua/require.js");
+const { fitForKeynua } = require("../../shared/pdfCompressor.js");
+
+const MAX_UPLOAD_BYTES = 60 * 1024 * 1024; // techo de entrada; fitForKeynua comprime hasta 4.5MB después
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 4.5 * 1024 * 1024, // 10MB en bytes
+    fileSize: MAX_UPLOAD_BYTES,
     files: 5, // máximo 5 archivos por request
   },
 });
@@ -62,7 +65,7 @@ router.post(
     upload.any()(req, res, (err) => {
       if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
         return res.status(400).json({
-          error: `El archivo excede el límite permitido de 4.5MB`,
+          error: `El archivo excede el límite permitido de ${MAX_UPLOAD_BYTES / 1024 / 1024}MB`,
         });
       }
       if (err) return res.status(500).json({ error: err.message });
@@ -117,21 +120,34 @@ router.post(
 
     const metadata = JSON.parse(req.body.metadata);
 
-    const documentos = req.files.map((file) => {
-      // Buscar la metadata que corresponde a este archivo
-      const meta = metadata.find((m) => m.fieldName === file.fieldname);
-      const ext = mime.extension(file.mimetype);
+    try {
+      const documentos = await Promise.all(
+        req.files.map(async (file) => {
+          // Buscar la metadata que corresponde a este archivo
+          const meta = metadata.find((m) => m.fieldName === file.fieldname);
+          const ext = mime.extension(file.mimetype);
 
-      return {
-        name: `${meta.nombre}.${ext}`,
-        base64: file.buffer.toString("base64"),
-      };
-    });
+          let finalBuffer = file.buffer;
+          if (file.mimetype === "application/pdf") {
+            const { buffer } = await fitForKeynua(file.buffer);
+            finalBuffer = buffer;
+          }
 
-    return res.status(200).json({
-      ...convertData,
-      documents: documentos,
-    });
+          return {
+            name: `${meta.nombre}.${ext}`,
+            base64: finalBuffer.toString("base64"),
+          };
+        }),
+      );
+
+      return res.status(200).json({
+        ...convertData,
+        documents: documentos,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({ error: error.message });
+    }
   },
 );
 
