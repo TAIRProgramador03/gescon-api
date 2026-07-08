@@ -778,6 +778,7 @@ const detailContract = async (req, res) => {
       success: true,
       data: {
         isTemp: contrato ? contrato.NRO_CONTRATO.trim().toUpperCase().startsWith("CPEN-") : false,
+        nroContrato: contrato ? contrato.NRO_CONTRATO.trim() : "",
         descripcion: contrato ? contrato.DESCRIPCION.trim() : "",
         fechaFirma: contrato ? contrato.FECHA_FIRMA : "",
         duracion: contrato ? contrato.DURACION.trim() : "",

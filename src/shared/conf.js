@@ -3,6 +3,7 @@ const IP_ODBC_BD = process.env.IP_ODBC_BD;
 const SCHEMA_BD = process.env.SCHEMA_BD;
 const DB_USER = process.env.DB_USER;
 const DB_PASSWORD = process.env.DB_PASSWORD;
+const DSN_DB = process.env.DSN_DB;
 
 const dbConfig = {
   DSN: `QDSN_${IP_ODBC_BD}`,
@@ -15,5 +16,6 @@ module.exports = {
   SCHEMA_BD,
   DB_USER,
   DB_PASSWORD,
-  IP_ODBC_BD
+  IP_ODBC_BD,
+  DSN_DB
 }
