@@ -3,12 +3,13 @@ const IP_ODBC_BD = process.env.IP_ODBC_BD;
 const SCHEMA_BD = process.env.SCHEMA_BD;
 const DB_USER = process.env.DB_USER;
 const DB_PASSWORD = process.env.DB_PASSWORD;
+const DSN_DB = process.env.DSN_DB;
 
-//keynua api
-const URI_BASE_KEYNUA_PROD = process.env.URI_BASE_KEYNUA_PROD;
-const URI_BASE_KEYNUA_TEST = process.env.URI_BASE_KEYNUA_TEST;
-const API_KEY_KEYNUA = process.env.API_KEY_KEYNUA;
-const API_TOKEN_KEYNUA = process.env.API_TOKEN_KEYNUA;
+//formeasy api
+const TOKEN_INTEGRATE = process.env.TOKEN_INTEGRATE;
+const URI_FIRMEASY = process.env.URI_FIRMEASY;
+const USER_FIRMEASY = process.env.USER_FIRMEASY;
+const PASS_FIRMEASY = process.env.PASS_FIRMEASY;
 
 const dbConfig = {
   DSN: `QDSN_${IP_ODBC_BD}`,
@@ -22,8 +23,9 @@ module.exports = {
   DB_USER,
   DB_PASSWORD,
   IP_ODBC_BD,
-  API_KEY_KEYNUA,
-  API_TOKEN_KEYNUA,
-  URI_BASE_KEYNUA_PROD,
-  URI_BASE_KEYNUA_TEST
+  TOKEN_INTEGRATE,
+  URI_FIRMEASY,
+  USER_FIRMEASY,
+  PASS_FIRMEASY,
+  DSN_DB
 }

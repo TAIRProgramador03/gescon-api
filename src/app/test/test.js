@@ -1,10 +1,13 @@
 const multer = require("multer");
 const mime = require("mime-types");
 const router = require("express").Router();
-const { getContactById } = require("../../shared/service/keynua/require.js");
 const { fitForKeynua } = require("../../shared/pdfCompressor.js");
+const { getToken } = require("../../shared/tokenManager.js");
+const { getOneDocument } = require("../../shared/service/firmeasy.js");
+const FirmEasySevice = require("../../shared/service/firmeasy.js");
+const { URI_FIRMEASY } = require("../../shared/conf.js");
 
-const MAX_UPLOAD_BYTES = 60 * 1024 * 1024; // techo de entrada; fitForKeynua comprime hasta 4.5MB después
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024; // techo de entrada
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -16,41 +19,6 @@ const upload = multer({
 
 router.get("/keynua-test-contract/:contractId", async (req, res) => {
   try {
-    const contractId = req.params.contractId;
-
-    const data = await getContactById(contractId);
-
-    const findItem = data.items.find((itm) => itm.type == "pdf");
-
-    const transformData = {
-      id: data.id,
-      accountId: data.accountId,
-      sentBy: data.sentBy,
-      templateId: data.templateId,
-      createdAt: data.createdAt,
-      startedAt: data.startedAt,
-      title: data.title,
-      description: data.description,
-      finishedAt: data.finishedAt,
-      deletedAt: data.deletedAt,
-      canceledAt: data.canceledAt,
-      expired: data.expired,
-      groups: data.groups,
-      users: data.users.map((user) => ({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        groups: user.groups,
-        token: user.token,
-        state: user.state,
-        documentNumber: user.documentNumber,
-      })),
-      items: findItem ?? null,
-      status: data.status,
-    };
-
-    return res.status(200).json(transformData);
   } catch (error) {
     console.log(error);
     return res
@@ -150,5 +118,153 @@ router.post(
     }
   },
 );
+
+router.get("/firmeasy-get-documents", async (req, res) => {
+  try {
+    const params = req.query;
+
+    const token = await getToken("firmeasy");
+
+    const firmeasy = new FirmEasySevice(token);
+
+    const getDocuments = await firmeasy.getDocuments(params);
+
+    return res.status(200).json(getDocuments);
+  } catch (error) {
+    if (error.response.data.errorType) {
+      console.log(
+        "[FIRMEASY] Error al obtener documentos: ",
+        error.response.data.message,
+      );
+      return res
+        .status(error.response.data.status)
+        .json({ success: false, message: error.response.data.message });
+    }
+
+    console.log("[FIRMEASY] Error al obtener documentos: ", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener documentos" });
+  }
+});
+
+router.get("/firmeasy-get-document/:documentId", async (req, res) => {
+  try {
+    const documentId = req.params.documentId;
+
+    const { include } = req.query;
+
+    const qInclude = Array.isArray(include) ? include : [include];
+
+    const token = await getToken("firmeasy");
+
+    const firmeasy = new FirmEasySevice(token);
+
+    const getDocument = await firmeasy.getOneDocument(documentId, qInclude);
+
+    return res.status(200).json(getDocument);
+  } catch (error) {
+    if (error.response.data.errorType) {
+      console.log(
+        "[FIRMEASY] Error al obtener documento por ID: ",
+        error.response.data.message,
+      );
+      return res
+        .status(error.response.data.status)
+        .json({ success: false, message: error.response.data.message });
+    }
+
+    console.log("[FIRMEASY] Error al obtener documento por ID: ", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener documento por ID" });
+  }
+});
+
+router.post(
+  "/firmeasy-create-document",
+  (req, res, next) => {
+    upload.single("pdf")(req, res, (err) => {
+      if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          error: `El archivo excede el límite permitido de ${MAX_UPLOAD_BYTES / 1024 / 1024}MB`,
+        });
+      }
+      if (err) return res.status(500).json({ error: err.message });
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      const { data } = req.body;
+
+      const dataParse = JSON.parse(data);
+
+      const file = req.file;
+
+      if (!file)
+        return res.status(400).json({
+          success: false,
+          message: "Es obligatorio enviar un archivo",
+        });
+
+      const fileBase64 = file.buffer.toString("base64");
+
+      dataParse.document_pdf_base64 = fileBase64;
+
+      const token = await getToken("firmeasy");
+
+      const firmeasy = new FirmEasySevice(token);
+
+      const newDocument = await firmeasy.createDocument(dataParse);
+
+      return res.status(201).json(newDocument);
+    } catch (error) {
+      if (error.response.data.errorType) {
+        console.log(
+          "[FIRMEASY] Error al obtener documento por ID: ",
+          error.response.data.message,
+        );
+        return res
+          .status(error.response.data.status)
+          .json({ success: false, message: error.response.data.message });
+      }
+
+      console.log("[FIRMEASY] Error al crear documento: ", error);
+      return res
+        .status(500)
+        .json({ success: false, message: "Error al crear documento" });
+    }
+  },
+);
+
+router.delete("/firmeasy-delete-document/:documentId", async (req, res) => {
+  try {
+    const documentId = req.params.documentId;
+
+    const token = await getToken("firmeasy");
+
+    const firmeasy = new FirmEasySevice(token);
+
+    const deleteDocument = await firmeasy.deleteDocument(documentId);
+
+    return res.status(200).json(deleteDocument);
+  } catch (error) {
+    if (error.response.data.errorType) {
+      console.log(
+        "[FIRMEASY] Error al obtener documento por ID: ",
+        error.response.data.message,
+      );
+      return res
+        .status(error.response.data.status)
+        .json({ success: false, message: error.response.data.message });
+    }
+
+    console.log("[FIRMEASY] Error al obtener documento por ID: ", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener documento por ID" });
+  }
+});
 
 module.exports = router;

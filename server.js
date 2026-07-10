@@ -116,6 +116,12 @@ app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+app.post("/webhook", (req, res) => {
+  res.status(200);
+
+  console.log(JSON.stringify(req.body));
+})
+
 // Iniciar servidor IP_LOCAL/
 server.listen(port, () => {
   console.log(`Servidor corriendo en https://${IP_LOCAL}:${port}`);
