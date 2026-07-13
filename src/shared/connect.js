@@ -1,5 +1,5 @@
 const odbc = require("odbc");
-const { DB_USER, DB_PASSWORD, IP_ODBC_BD, SCHEMA_BD } = require("./conf.js");
+const { DB_USER, DB_PASSWORD, IP_ODBC_BD, SCHEMA_BD, DSN_DB } = require("./conf.js");
 
 process.env.UV_THREADPOOL_SIZE = "16";
 
@@ -54,7 +54,7 @@ const createPool = async () => {
       );
       pool = await Promise.race([
         odbc.pool({
-          connectionString: `DRIVER={IBM i Access ODBC Driver};SYSTEM=${IP_ODBC_BD};UID=${DB_USER};PWD=${DB_PASSWORD};NAM=1;DBQ=${SCHEMA_BD};CCSID=1208;UNICODE=UCS-2;TIMEOUT=5;`,
+          connectionString: `DRIVER=${DSN_DB};SYSTEM=${IP_ODBC_BD};UID=${DB_USER};PWD=${DB_PASSWORD};NAM=1;DBQ=${SCHEMA_BD};CCSID=1208;UNICODE=UCS-2;TIMEOUT=5;`,
           initialSize: 2,
           maxSize: 20,
           incrementSize: 2,
