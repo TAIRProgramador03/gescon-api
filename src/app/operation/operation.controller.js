@@ -69,6 +69,8 @@ const listAssingByContract = async (req, res) => {
     const convertResult = await withConnection(async (cn) => {
       const statusArray = typeof status === "string" ? status.split(",") : [];
 
+      const toYYYYMMDD = (dateStr) => dateStr.replaceAll("-", "");
+
       let filtrosA = "";
       let filtrosB = "";
       let params = [];
@@ -135,17 +137,17 @@ const listAssingByContract = async (req, res) => {
       }
 
       if (fromDate && toDate) {
-        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') BETWEEN ? AND ?";
-        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') BETWEEN ? AND ?";
-        params.push(fromDate, toDate);
+        filtrosA += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+        filtrosB += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+        params.push(toYYYYMMDD(fromDate), toYYYYMMDD(toDate));
       } else if (fromDate) {
-        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') >= ?";
-        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') >= ?";
-        params.push(fromDate);
+        filtrosA += "AND AD.FECHA_FIN >= ?"
+        filtrosB += "AND AD.FECHA_FIN >= ?"
+        params.push(toYYYYMMDD(fromDate));
       } else if (toDate) {
-        filtrosA += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') <= ?";
-        filtrosB += "AND TO_DATE(AD.FECHA_FIN, 'YYYYMMDD') <= ?";
-        params.push(toDate);
+        filtrosA += "AND AD.FECHA_FIN <= ?"
+        filtrosB += "AND AD.FECHA_FIN <= ?"
+        params.push(toYYYYMMDD(toDate));
       }
 
       let sql = `
