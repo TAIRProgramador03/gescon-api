@@ -18,7 +18,7 @@ const listClient = async (req, res) => {
         ORDER BY CLINOM ASC
       `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         sql = `
           SELECT DISTINCT PO.IDCLI, PO.CLINOM
           FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu

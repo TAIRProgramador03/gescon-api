@@ -639,7 +639,7 @@ const listPlateTraceability = async (req, res) => {
       WHERE RN = 1
     `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         filtrosA += ` AND C.ID_USU = ${idUser}`;
         filtrosB += ` AND C.ID_USU = ${idUser}`;
 

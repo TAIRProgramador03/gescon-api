@@ -1542,7 +1542,7 @@ const notifications = async (req, res) => {
       FROM SYSIBM.SYSDUMMY1
     `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         sql = `
         SELECT
           (
