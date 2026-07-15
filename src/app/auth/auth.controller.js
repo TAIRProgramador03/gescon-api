@@ -9,7 +9,7 @@ const login = async (req, res) => {
   try {
     const data = await withConnection(async (cn) => {
       const sql = `
-        SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.V_TK, U.ESTADO, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
+        SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.V_TK, U.ACTIVO, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
         JOIN ${SCHEMA_BD}.T_RL_GC R
         ON U.ID_RL = R.ID
         WHERE USU = ?
@@ -20,9 +20,9 @@ const login = async (req, res) => {
       if (!result[0].CLV)
         return { code: 403, message: "El usuario no cuenta con contraseña" };
 
-      console.log(result[0].ESTADO);
+      console.log(result[0].ACTIVO);
 
-      if (result[0].ESTADO != 1)
+      if (result[0].ACTIVO != "1")
         return { code: 403, message: "El usuario no puede acceder al sistema" };
 
       const hashed = await bcryptjs.compare(password, result[0].CLV);
@@ -111,7 +111,7 @@ const verify = async (req, res) => {
 
   try {
     const usuario = await withConnection(async (cn) => {
-      const sql = `SELECT U.V_TK, U.ESTADO FROM ${SCHEMA_BD}.T_US_GC U WHERE U.ID = ?`;
+      const sql = `SELECT U.V_TK, U.ACTIVO FROM ${SCHEMA_BD}.T_US_GC U WHERE U.ID = ?`;
       const result = await cn.query(sql, [decoded.id]);
       return result[0];
     });
@@ -122,7 +122,7 @@ const verify = async (req, res) => {
         .json({ success: false, message: "Sesión expirada" });
     }
 
-    if (!usuario.ESTADO) {
+    if (usuario.ACTIVO != "1") {
       return res
         .status(401)
         .json({ success: false, message: "Sesión no válida" });
