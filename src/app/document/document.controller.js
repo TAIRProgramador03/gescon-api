@@ -160,7 +160,7 @@ const detailDocument = async (req, res) => {
         )
       `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         sqlTotal = `
           SELECT
             COALESCE(TOTAL_VEH_SU, 0) AS TOTAL_VEH_SUP,
@@ -323,7 +323,7 @@ const detailVehByDocu = async (req, res) => {
         WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
       `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         sqlDet = `
           SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
           FROM SPEED400AT.TBL_ASIGNACION_DET L

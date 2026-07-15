@@ -184,7 +184,7 @@ const listAllLeasing = async (req, res) => {
       ORDER BY L.ID ASC
     `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         if (condiciones.length > 0) {
           filtros = " AND " + condiciones.join(" AND ");
         }
@@ -522,7 +522,7 @@ const listLeasingGeneral = async (req, res) => {
       ${initWhere} ${filtroB}
     `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         if (contratoId || clienteId) {
           initWhere = "AND";
         }

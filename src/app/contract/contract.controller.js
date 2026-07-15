@@ -47,7 +47,7 @@ const contractNroAdi = async (req, res) => {
         ORDER BY DESCRIPCION ASC
       `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         query = `
           SELECT ID, DESCRIPCION FROM (
             SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION
@@ -450,7 +450,7 @@ const detailContract = async (req, res) => {
         ? [clienteId, contratoId, clienteId, contratoId]
         : [clienteId, clienteId];
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         filtrosA += ` AND C.ID_USU = ${idUser}`;
         filtrosB += ` AND C.ID_USU = ${idUser}`;
 
@@ -1194,7 +1194,7 @@ const verifyContractsTemp = async (req, res) => {
         ORDER BY cl.CLINOM
       `;
 
-      if (roleId != 1 && roleId != 2) {
+      if (roleId == 3) {
         sql = `
           SELECT
             SUM(COUNT(*)) OVER() AS TOTAL_TEMPORALES,
