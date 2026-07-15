@@ -17,6 +17,7 @@ const getUsers = async () => {
       usuario: row.USU.trim(),
       codEmp: row.COD_EMP ? row.COD_EMP.trim() : "",
       clave: row.CLV ? row.CLV.trim() : "",
+      estado: row.ESTADO == "T" ? true : false, 
       idRol: row.ID_RL,
       rol: {
         id: row.ID_RL,
@@ -52,6 +53,7 @@ const getUserByField = async (field, value) => {
       codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
       clave: result[0].CLV ? result[0].CLV.trim() : "",
       idRol: result[0].ID_RL,
+      estado: result[0].ESTADO == "T" ? true : false,
       rol: {
         id: result[0].ID_RL,
         name: result[0].DESCRIPCION.trim(),
@@ -103,6 +105,7 @@ const getUserById = async (id) => {
       usuario: result[0].USU.trim(),
       codEmp: result[0].COD_EMP ? result[0].COD_EMP.trim() : "",
       clave: result[0].CLV ? result[0].CLV.trim() : "",
+      estado: result[0].ESTADO == "T" ? true : false,
       idRol: result[0].ID_RL,
       rol: {
         id: result[0].ID_RL,
@@ -185,10 +188,10 @@ const putUser = async (id, data, username) => {
     try {
       const sql = `
         UPDATE ${SCHEMA_BD}.T_US_GC
-        SET ID_RL = ?, V_TK = V_TK + 1, ACTUALIZADO_EL = CURRENT TIMESTAMP, ACTUALIZADO_POR = ?
+        SET ID_RL = ?, ESTADO = ?, V_TK = V_TK + 1, ACTUALIZADO_EL = CURRENT TIMESTAMP, ACTUALIZADO_POR = ?
         WHERE ID = ?
       `;
-      await cn.query(sql, [data.roleId, username, id]);
+      await cn.query(sql, [data.roleId, data.status, username, id]);
       await cn.commit();
       return { success: true };
     } catch (err) {
