@@ -32,6 +32,7 @@ const listUsers = async (req, res) => {
         apellido: user.apellido,
         usuario: user.usuario,
         codEmp: user.codEmp,
+        estado: user.estado,
         rol: user.rol,
       })),
     );
@@ -171,16 +172,6 @@ const updatePasswordUser = async (req, res) => {
         message:
           "La contraseña de confirmación no coincide con la contraseña nueva",
       });
-
-    if (findUser.clave && findUser.clave !== "" ) {
-      const hashed = await bcryptjs.compare(body.oldPassword, findUser.clave);
-
-      if (!hashed)
-        return res.status(400).json({
-          success: false,
-          message: "La contraseña actual no es la correcta",
-        });
-    }
 
     const salt = await bcryptjs.genSalt(Number(process.env.SALT_NUMBER));
 
