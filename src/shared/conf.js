@@ -5,6 +5,11 @@ const DB_USER = process.env.DB_USER;
 const DB_PASSWORD = process.env.DB_PASSWORD;
 const DSN_DB = process.env.DSN_DB;
 
+// MS
+const AZURE_CLIENT_ID = process.env.AZURE_CLIENT_ID;
+const AZURE_TENANT_ID = process.env.AZURE_TENANT_ID;
+const AZURE_CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET;
+
 const dbConfig = {
   DSN: `QDSN_${IP_ODBC_BD}`,
   system: IP_ODBC_BD,
@@ -17,5 +22,8 @@ module.exports = {
   DB_USER,
   DB_PASSWORD,
   IP_ODBC_BD,
-  DSN_DB
+  DSN_DB,
+  AZURE_CLIENT_ID,
+  AZURE_CLIENT_SECRET,
+  AZURE_TENANT_ID
 }
