@@ -385,6 +385,310 @@ const contVehicleLeasings = async (req, res) => {
   }
 };
 
+const contAssign = async (req, res) => {
+  const { clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
+
+  try {
+    const { resultVencidos, resultPorVencer } = await withConnection(
+      async (cn) => {
+        // Condición dinámica para el último bucket
+        const condMayor90Vencidos = isAll
+          ? `DIFERENCIA_DIAS < -90`
+          : `DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120`;
+
+        const condMayor90PorVencer = isAll
+          ? `DIFERENCIA_DIAS > 90`
+          : `DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120`;
+
+        const sqlVencidos = `
+          SELECT
+            COUNT(CASE WHEN  DIFERENCIA_DIAS < 0 AND DIFERENCIA_DIAS >= -30 THEN 1 END) AS "MENOR_30_DIAS" ,
+            COUNT(CASE WHEN  DIFERENCIA_DIAS < -30 AND DIFERENCIA_DIAS >= -45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
+            COUNT(CASE WHEN  DIFERENCIA_DIAS < -45 AND DIFERENCIA_DIAS >= -60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
+            COUNT(CASE WHEN  DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
+            COUNT(CASE WHEN  ${condMayor90Vencidos} THEN 1 END) AS "MAYOR_90_DIAS"
+          FROM (
+            SELECT
+              COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE,
+              DAYS(
+                DATE(
+                  SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2)
+                )
+              ) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+            ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
+            ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+          ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
+        `;
+
+        const sqlPorVencer = `
+          SELECT
+            COUNT(CASE WHEN  DIFERENCIA_DIAS > 0 AND DIFERENCIA_DIAS <= 30 THEN 1 END) AS "MENOR_30_DIAS" ,
+            COUNT(CASE WHEN  DIFERENCIA_DIAS > 30 AND DIFERENCIA_DIAS <= 45 THEN 1 END) AS "ENTRE_30_Y_45_DIAS",
+            COUNT(CASE WHEN  DIFERENCIA_DIAS > 45 AND DIFERENCIA_DIAS <= 60 THEN 1 END) AS "ENTRE_45_Y_60_DIAS",
+            COUNT(CASE WHEN  DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90 THEN 1 END) AS "ENTRE_60_Y_90_DIAS",
+            COUNT(CASE WHEN  ${condMayor90PorVencer} THEN 1 END) AS "MAYOR_90_DIAS"
+          FROM (
+            SELECT
+              COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE,
+              DAYS(
+                DATE(
+                  SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2)
+                )
+              ) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+            ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
+            ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+          ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
+        `;
+
+        const params = [];
+
+        if (clienteId) params.push(clienteId);
+
+        const rv = await cn.query(sqlVencidos, params);
+        const rpv = await cn.query(sqlPorVencer, params);
+
+        return { resultVencidos: rv, resultPorVencer: rpv };
+      },
+    );
+
+    const clsVencidos = {
+      menor30Dias: resultVencidos[0].MENOR_30_DIAS,
+      entre30Y45Dias: resultVencidos[0].ENTRE_30_Y_45_DIAS,
+      entre45Y60Dias: resultVencidos[0].ENTRE_45_Y_60_DIAS,
+      entre60Y90Dias: resultVencidos[0].ENTRE_60_Y_90_DIAS,
+      mayor90Dias: resultVencidos[0].MAYOR_90_DIAS,
+    };
+
+    const clsPorVencer = {
+      menor30Dias: resultPorVencer[0].MENOR_30_DIAS,
+      entre30Y45Dias: resultPorVencer[0].ENTRE_30_Y_45_DIAS,
+      entre45Y60Dias: resultPorVencer[0].ENTRE_45_Y_60_DIAS,
+      entre60Y90Dias: resultPorVencer[0].ENTRE_60_Y_90_DIAS,
+      mayor90Dias: resultPorVencer[0].MAYOR_90_DIAS,
+    };
+
+    return res.status(200).json({
+      vencidos: clsVencidos,
+      porVencer: clsPorVencer,
+    });
+  } catch (error) {
+    console.error("Error al obtener asignaciones vencidos y por vencer", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener asignaciones vencidos y por vencer",
+    });
+  }
+};
+
+const listVehicleAssignExpired = async (req, res) => {
+  const { label, clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
+
+  if (!label)
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro label es obligatorio" });
+
+  try {
+    let sentences;
+
+    switch (label) {
+      case "Menor 30 dias":
+        sentences = "DIFERENCIA_DIAS < 0 AND DIFERENCIA_DIAS >= -30";
+        break;
+      case "Entre 30 y 45 dias":
+        sentences = "DIFERENCIA_DIAS < -30 AND DIFERENCIA_DIAS >= -45";
+        break;
+      case "Entre 45 y 60 dias":
+        sentences = "DIFERENCIA_DIAS < -45 AND DIFERENCIA_DIAS >= -60";
+        break;
+      case "Entre 60 y 90 dias":
+        sentences = "DIFERENCIA_DIAS < -60 AND DIFERENCIA_DIAS >= -90";
+        break;
+      case "Entre 90 y 120 dias":
+        sentences = isAll
+          ? "DIFERENCIA_DIAS < -90"
+          : "DIFERENCIA_DIAS < -90 AND DIFERENCIA_DIAS >= -120";
+        break;
+      default:
+        return res
+          .status(400)
+          .json({ success: false, message: "El label no es valido" });
+    }
+
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT *
+      FROM (
+        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+        LEFT JOIN SPEED400AT.TBLCONTRATO_CAB TC
+	    ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
+	    LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB TC2
+	    ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+        LEFT JOIN SPEED400AT.PO_VEHICULO V
+        ON TAD.ID_VEH = V.ID
+        LEFT JOIN SPEED400AT.PO_MARCA M
+        ON V.IDMAR = M.ID
+        LEFT JOIN SPEED400AT.PO_MODELO MO
+        ON V.IDMOD  = MO.ID
+        LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+        ON PO.ID = TAD.ID_OPE
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM SPEED400AT.PO_OPERACIONES A
+              INNER JOIN SPEED400AT.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+              ORDER BY CLINOM ASC
+        ) C ON TC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM SPEED400AT.PO_OPERACIONES A
+              INNER JOIN SPEED400AT.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+              ORDER BY CLINOM ASC
+        ) C2 ON TC2.ID_CLIENTE = C2.IDCLI
+      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
+      ORDER BY CLIENTE, PLACA
+    `;
+
+      const params = [];
+
+      if (clienteId) {
+        params.push(clienteId);
+      }
+
+      const result = await cn.query(sql, params);
+
+      return result.map((row) => ({
+        placa: row.PLACA.trim(),
+        modelo: row.MODELO.trim(),
+        marca: row.MARCA.trim(),
+        fechaIni: row.FECHA_INI.trim(),
+        fechaFin: row.FECHA_FIN.trim(),
+        cliente: row.CLIENTE.trim(),
+        operacion: row.OPERACION.trim(),
+      }));
+    });
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener vehiculos por grafico", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener vehiculos por grafico",
+    });
+  }
+};
+
+const listVehicleAssignExpiring = async (req, res) => {
+  const { label, clienteId, all } = req.query;
+  const isAll = all === "true" || all === true;
+
+  if (!label)
+    return res
+      .status(400)
+      .json({ success: false, message: "El parametro label es obligatorio" });
+
+  try {
+    let sentences;
+
+    switch (label) {
+      case "Menor 30 dias":
+        sentences = "DIFERENCIA_DIAS >= 0 AND DIFERENCIA_DIAS <= 30";
+        break;
+      case "Entre 30 y 45 dias":
+        sentences = "DIFERENCIA_DIAS > 30 AND DIFERENCIA_DIAS <= 45";
+        break;
+      case "Entre 45 y 60 dias":
+        sentences = "DIFERENCIA_DIAS > 45 AND DIFERENCIA_DIAS <= 60";
+        break;
+      case "Entre 60 y 90 dias":
+        sentences = "DIFERENCIA_DIAS > 60 AND DIFERENCIA_DIAS <= 90";
+        break;
+      case "Entre 90 y 120 dias":
+        sentences = isAll
+          ? "DIFERENCIA_DIAS > 90"
+          : "DIFERENCIA_DIAS > 90 AND DIFERENCIA_DIAS <= 120";
+        break;
+      default:
+        return res
+          .status(400)
+          .json({ success: false, message: "El label no es valido" });
+    }
+
+    const cleanedResult = await withConnection(async (cn) => {
+      const sql = `
+      SELECT *
+      FROM (
+        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        FROM SPEED400AT.TBL_ASIGNACION_DET TAD
+        LEFT JOIN SPEED400AT.TBLCONTRATO_CAB TC
+	    ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
+	    LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB TC2
+	    ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+        LEFT JOIN SPEED400AT.PO_VEHICULO V
+        ON TAD.ID_VEH = V.ID
+        LEFT JOIN SPEED400AT.PO_MARCA M
+        ON V.IDMAR = M.ID
+        LEFT JOIN SPEED400AT.PO_MODELO MO
+        ON V.IDMOD  = MO.ID
+        LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+        ON PO.ID = TAD.ID_OPE
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM SPEED400AT.PO_OPERACIONES A
+              INNER JOIN SPEED400AT.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+              ORDER BY CLINOM ASC
+        ) C ON TC.ID_CLIENTE = C.IDCLI
+        LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM
+              FROM SPEED400AT.PO_OPERACIONES A
+              INNER JOIN SPEED400AT.TCLIE B ON A.IDCLI=B.CLICVE
+              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+              ORDER BY CLINOM ASC
+        ) C2 ON TC2.ID_CLIENTE = C2.IDCLI
+      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
+      ORDER BY CLIENTE, PLACA
+    `;
+
+      const params = [];
+
+      if (clienteId) {
+        params.push(clienteId);
+      }
+
+      const result = await cn.query(sql, params);
+
+      return result.map((row) => ({
+        placa: row.PLACA.trim(),
+        modelo: row.MODELO.trim(),
+        marca: row.MARCA.trim(),
+        fechaIni: row.FECHA_INI.trim(),
+        fechaFin: row.FECHA_FIN.trim(),
+        cliente: row.CLIENTE.trim(),
+        operacion: row.OPERACION.trim(),
+      }));
+    });
+
+    return res.status(200).json(cleanedResult);
+  } catch (error) {
+    console.error("Error al obtener vehiculos por grafico", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener vehiculos por grafico",
+    });
+  }
+};
+
 const contLeasings = async (req, res) => {
   const { clienteId, all } = req.query;
   const isAll = all === "true" || all === true;
@@ -552,7 +856,7 @@ const diferenceContractLeasing = async (req, res) => {
 
 const listVehicleLeasingExpire = async (req, res) => {
   const { label, clienteId, all } = req.query;
-    const isAll = all === "true" || all === true;
+  const isAll = all === "true" || all === true;
 
   if (!label)
     return res
@@ -1659,6 +1963,9 @@ const notifications = async (req, res) => {
 module.exports = {
   contVehicleFeet,
   contVehicleLeasings,
+  contAssign,
+  listVehicleAssignExpired,
+  listVehicleAssignExpiring,
   contLeasings,
   diferenceContractLeasing,
   listVehicleLeasingExpire,
