@@ -1,11 +1,14 @@
 const Router = require('express').Router();
 const authenticateToken = require("../../shared/middleware/jwt-valid.js")
 const validUser = require("../../shared/middleware/user-valid.js");
-const {contVehicleFeet, contLeasings, contVehicleLeasings, listVehicleLeasingExpire, listVehicleLeasingToExpire, contVehiculeByClient, contComparationDays, contTotalPriceByModel, depecratedVehicleExpires, depecratedVehicleToExpires, deprecatedVehicleById, contTotalVehicleMap, notifications, diferenceContractLeasing} = require("./report.controller.js")
+const {contVehicleFeet, contLeasings, contVehicleLeasings, listVehicleLeasingExpire, listVehicleLeasingToExpire, contVehiculeByClient, contComparationDays, contTotalPriceByModel, depecratedVehicleExpires, depecratedVehicleToExpires, deprecatedVehicleById, contTotalVehicleMap, notifications, diferenceContractLeasing, contAssign, listVehicleAssignExpired, listVehicleAssignExpiring} = require("./report.controller.js")
 
 Router.get("/contVehicleFleet", authenticateToken, validUser, contVehicleFeet);
 Router.get("/contVehicleLeasing", authenticateToken, validUser, contVehicleLeasings);
+Router.get("/contAsignaciones", authenticateToken, validUser, contAssign);
 Router.get("/contLeasing", authenticateToken, validUser, contLeasings);
+Router.get("/listVehicleAssignExpires", authenticateToken, validUser, listVehicleAssignExpired)
+Router.get("/listVehicleAssignToExpires", authenticateToken, validUser, listVehicleAssignExpiring)
 Router.get("/diferenceContractLeasing", authenticateToken, validUser, diferenceContractLeasing);
 Router.get("/listVehicleExpires", authenticateToken, validUser, listVehicleLeasingExpire)
 Router.get("/listVehicleToExpires", authenticateToken, validUser, listVehicleLeasingToExpire)
