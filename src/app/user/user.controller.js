@@ -42,16 +42,16 @@ const listUsers = async (req, res) => {
   }
 };
 
-const listNewUsers = async (req, res) => {
-  try {
-    const users = await getNewUsers();
+// const listNewUsers = async (req, res) => {
+//   try {
+//     const users = await getNewUsers();
 
-    return res.status(200).json(users);
-  } catch (error) {
-    console.error(error.message);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+//     return res.status(200).json(users);
+//   } catch (error) {
+//     console.error(error.message);
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
 const findUserById = async (req, res) => {
   const id = Number(req.params.id);
@@ -91,21 +91,21 @@ const createUser = async (req, res) => {
         message: "El usuario ingresado ya se encuentra registrado",
       });
 
-    if (body.inGesoper) {
-      const findUsernameGesoper = await getUserGesoperByField(
-        "usuario",
-        body.usuario,
-      );
+    // if (body.inGesoper) {
+    //   const findUsernameGesoper = await getUserGesoperByField(
+    //     "usuario",
+    //     body.usuario,
+    //   );
 
-      if (findUsernameGesoper)
-        return res.status(409).json({
-          success: false,
-          message:
-            "El usuario ingresado ya se encuentra registrado dentro del GesOper",
-        });
+    //   if (findUsernameGesoper)
+    //     return res.status(409).json({
+    //       success: false,
+    //       message:
+    //         "El usuario ingresado ya se encuentra registrado dentro del GesOper",
+    //     });
 
-      await postUserGesoper(body);
-    }
+    //   await postUserGesoper(body);
+    // }
 
     const salt = await bcryptjs.genSalt(Number(process.env.SALT_NUMBER));
 
@@ -199,16 +199,16 @@ const listRoles = async (req, res) => {
   }
 };
 
-const listRolesGesoper = async (req, res) => {
-  try {
-    const roles = await getRolesGesoper();
+// const listRolesGesoper = async (req, res) => {
+//   try {
+//     const roles = await getRolesGesoper();
 
-    return res.status(200).json(roles);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
+//     return res.status(200).json(roles);
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ success: false, message: error.message });
+//   }
+// };
 
 const createRole = async (req, res) => {
   const { user } = req.user;
@@ -305,13 +305,13 @@ const updatePermissionsByRole = async (req, res) => {
 
 module.exports = {
   listUsers,
-  listNewUsers,
+  // listNewUsers,
   findUserById,
   createUser,
   updateUser,
   updatePasswordUser,
   listRoles,
-  listRolesGesoper,
+  // listRolesGesoper,
   createRole,
   listPermissions,
   listPermissionsByUser,
