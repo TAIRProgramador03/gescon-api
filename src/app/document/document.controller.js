@@ -59,7 +59,7 @@ const getDocumentByContract = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const sql = `
-        SELECT A.ID, A.NRO_DOC
+        SELECT A.ID, A.NRO_DOC, A.DURACION AS PLAZO
         FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB A
         INNER JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB B
         ON B.ID = A.ID_PADRE
@@ -71,6 +71,7 @@ const getDocumentByContract = async (req, res) => {
       return result.map((row) => ({
         id: row.ID,
         nroDocumento: row.NRO_DOC ? row.NRO_DOC.trim() : "",
+        plazo: row.PLAZO ? Number(row.PLAZO.trim()) : null,
       }));
     });
 
@@ -97,10 +98,7 @@ const documentPending = async (req, res) => {
       `;
       const result = await cn.query(query, idCli ? [idCli] : []);
       return result.map((row) => ({
-        id:
-          row.ID !== null && row.ID !== undefined
-            ? row.ID
-            : null,
+        id: row.ID !== null && row.ID !== undefined ? row.ID : null,
         nroDocumento:
           row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
             ? decodeString(row.DESCRIPCION.toString().trim())
@@ -310,7 +308,7 @@ const detailVehByDocu = async (req, res) => {
       // `;
 
       let sqlDet = `
-        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
         FROM SPEED400AT.TBL_ASIGNACION_DET L
         LEFT JOIN SPEED400AT.PO_VEHICULO V
         ON L.ID_VEH = V.ID
@@ -325,7 +323,7 @@ const detailVehByDocu = async (req, res) => {
 
       if (roleId == 3) {
         sqlDet = `
-          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
           FROM SPEED400AT.TBL_ASIGNACION_DET L
           LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac
           ON L.ID_ASIGNACION = TAC.ID
