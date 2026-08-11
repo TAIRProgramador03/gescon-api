@@ -169,7 +169,7 @@ const listAssingByContract = async (req, res) => {
           AD.PLACA,
           V.ANO,
           V.COLOR,
-          V.NROSER,
+          AD.NROSER,
           MA.DESCRIPCION AS MARCA,
           MO.DESCRIPCION AS MODELO,
           AD.TP_TERRENO AS TERRENO,
@@ -208,7 +208,6 @@ const listAssingByContract = async (req, res) => {
             V.ID,
             V.ANO,
             V.COLOR,
-            V.NROSER,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
             O.IDCLI,
@@ -239,7 +238,7 @@ const listAssingByContract = async (req, res) => {
           AD.PLACA,
           V.ANO,
           V.COLOR,
-          V.NROSER,
+          AD.NROSER,
           MA.DESCRIPCION AS MARCA,
           MO.DESCRIPCION AS MODELO,
           AD.TP_TERRENO AS TERRENO,
@@ -280,7 +279,6 @@ const listAssingByContract = async (req, res) => {
             V.ID,
             V.ANO,
             V.COLOR,
-            V.NROSER,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
             O.IDCLI,
@@ -324,7 +322,7 @@ const listAssingByContract = async (req, res) => {
               AD.PLACA,
               V.ANO,
               V.COLOR,
-              V.NROSER,
+              AD.NROSER,
               MA.DESCRIPCION AS MARCA,
               MO.DESCRIPCION AS MODELO,
               AD.TP_TERRENO AS TERRENO,
@@ -374,7 +372,6 @@ const listAssingByContract = async (req, res) => {
                 V.ID,
                 V.ANO,
                 V.COLOR,
-                V.NROSER,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
                 O.IDCLI,
@@ -405,7 +402,7 @@ const listAssingByContract = async (req, res) => {
               AD.PLACA,
               V.ANO,
               V.COLOR,
-              V.NROSER,
+              AD.NROSER,
               MA.DESCRIPCION AS MARCA,
               MO.DESCRIPCION AS MODELO,
               AD.TP_TERRENO AS TERRENO,
@@ -457,7 +454,6 @@ const listAssingByContract = async (req, res) => {
                 V.ID,
                 V.ANO,
                 V.COLOR,
-                V.NROSER,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
                 O.IDCLI,
@@ -607,8 +603,8 @@ const insertOperation = async (req, res) => {
 
       const queryDetalle = `
               INSERT INTO ${SCHEMA_BD}.TBL_ASIGNACION_DET
-              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF, CONDICION, CREADO_POR, ACTUALIZADO_POR)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (ID_ASIGNACION, ID_VEH, SEC_CON, PLACA, NROSER, TARIFA, ID_OPE, ID_CONTRATO, TP_TERRENO, FECHA_INI, FECHA_FIN, LEASING, CLASE_CONTRATO, ARCHIVO_PDF, CONDICION, CREADO_POR, ACTUALIZADO_POR)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `;
 
       if (detalles && detalles.length > 0) {
@@ -629,6 +625,7 @@ const insertOperation = async (req, res) => {
             detalle.idveh,
             detalle.secCon,
             detalle.numpla,
+            detalle.nroSer,
             detalle.tarifa,
             detalle.idOperacion,
             funcionNumerica(detalle.idContrato),
