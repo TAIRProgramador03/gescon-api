@@ -35,6 +35,7 @@ const tableVehicles = async (req, res) => {
         A.ID,
         A.CODINI AS CODINI,
         A.NUMPLA AS PLACA,
+        A.NROSER AS SERIE,
         C.DESCRIPCION AS MARCA,
         B.DESCRIPCION AS MODELO,
         B.DESMODGEN AS GENERICO,
@@ -77,6 +78,10 @@ const tableVehicles = async (req, res) => {
           PLACA:
             row.PLACA !== null && row.PLACA !== undefined
               ? decodeString(row.PLACA.toString().trim())
+              : null,
+          SERIE:
+            row.SERIE !== null && row.SERIE !== undefined
+              ? decodeString(row.SERIE.toString().trim())
               : null,
           MARCA:
             row.MARCA !== null && row.MARCA !== undefined
@@ -432,6 +437,7 @@ const listPlateTraceability = async (req, res) => {
           AD.PLACA,
           V.ANO,
           V.COLOR,
+          V.NROSER,
           MA.DESCRIPCION AS MARCA,
           MO.DESCRIPCION AS MODELO,
           AD.TP_TERRENO AS TERRENO,
@@ -470,6 +476,7 @@ const listPlateTraceability = async (req, res) => {
             V.ID,
             V.ANO,
             V.COLOR,
+            V.NROSER,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
             O.IDCLI,
@@ -500,6 +507,7 @@ const listPlateTraceability = async (req, res) => {
           AD.PLACA,
           V.ANO,
           V.COLOR,
+          V.NROSER,
           MA.DESCRIPCION AS MARCA,
           MO.DESCRIPCION AS MODELO,
           AD.TP_TERRENO AS TERRENO,
@@ -540,6 +548,7 @@ const listPlateTraceability = async (req, res) => {
             V.ID,
             V.ANO,
             V.COLOR,
+            V.NROSER,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
             O.IDCLI,
@@ -579,6 +588,7 @@ const listPlateTraceability = async (req, res) => {
           AD.PLACA,
           V.ANO,
           V.COLOR,
+          V.NROSER,
           MA.DESCRIPCION AS MARCA,
           MO.DESCRIPCION AS MODELO,
           AD.TP_TERRENO AS TERRENO,
@@ -619,6 +629,7 @@ const listPlateTraceability = async (req, res) => {
             V.ID,
             V.ANO,
             V.COLOR,
+            V.NROSER,
             O.ID AS ID_OPE,
             O.DESCRIPCION AS OPERACIONES,
             O.IDCLI,
@@ -662,6 +673,7 @@ const listPlateTraceability = async (req, res) => {
               AD.PLACA,
               V.ANO,
               V.COLOR,
+              V.NROSER,
               MA.DESCRIPCION AS MARCA,
               MO.DESCRIPCION AS MODELO,
               AD.TP_TERRENO AS TERRENO,
@@ -711,6 +723,7 @@ const listPlateTraceability = async (req, res) => {
                 V.ID,
                 V.ANO,
                 V.COLOR,
+                V.NROSER,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
                 O.IDCLI,
@@ -741,6 +754,7 @@ const listPlateTraceability = async (req, res) => {
               AD.PLACA,
               V.ANO,
               V.COLOR,
+              V.NROSER,
               MA.DESCRIPCION AS MARCA,
               MO.DESCRIPCION AS MODELO,
               AD.TP_TERRENO AS TERRENO,
@@ -792,6 +806,7 @@ const listPlateTraceability = async (req, res) => {
                 V.ID,
                 V.ANO,
                 V.COLOR,
+                V.NROSER,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
                 O.IDCLI,
@@ -831,6 +846,7 @@ const listPlateTraceability = async (req, res) => {
               AD.PLACA,
               V.ANO,
               V.COLOR,
+              V.NROSER,
               MA.DESCRIPCION AS MARCA,
               MO.DESCRIPCION AS MODELO,
               AD.TP_TERRENO AS TERRENO,
@@ -882,6 +898,7 @@ const listPlateTraceability = async (req, res) => {
                 V.ID,
                 V.ANO,
                 V.COLOR,
+                V.NROSER,
                 O.ID AS ID_OPE,
                 O.DESCRIPCION AS OPERACIONES,
                 O.IDCLI,
@@ -919,6 +936,7 @@ const listPlateTraceability = async (req, res) => {
         color: row.COLOR ? row.COLOR.trim() : "Sin color",
         marca: row.MARCA ? row.MARCA.trim() : "Sin marca",
         modelo: row.MODELO ? row.MODELO.trim() : "Sin modelo",
+        nroSer: row.NROSER ? row.NROSER.trim() : "Sin serie",
         terreno: row.TERRENO,
         leasing: row.LEASING ? row.LEASING.trim() : "Sin leasing",
         fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
@@ -974,6 +992,7 @@ const listPlateByRegion = async (req, res) => {
       const sql = `
       SELECT
         TAD.PLACA,
+        PV.NROSER,
         PM.DESCRIPCION AS MARCA,
         PM2.DESCRIPCION AS MODELO,
         TAD.TP_TERRENO AS TERRENO,
@@ -1018,6 +1037,7 @@ const listPlateByRegion = async (req, res) => {
 
       return result.map((row) => ({
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         marca: row.MARCA.trim(),
         modelo: row.MODELO.trim(),
         terreno: transformType(row.TERRENO, {

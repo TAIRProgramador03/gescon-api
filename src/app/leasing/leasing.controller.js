@@ -826,7 +826,7 @@ const detailVehByLeasing = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const sql = `
-      SELECT L.MODELO, L.PLACA, L.CANTIDAD, L.TIPO_TERRENO, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, COALESCE(A.CONDICION, '3') AS CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
+      SELECT L.MODELO, L.PLACA, L.CANTIDAD, L.TIPO_TERRENO, V.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, COALESCE(A.CONDICION, '3') AS CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_LEASING_DET L
       LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
       ON L.ID_VEH = V.ID
@@ -846,6 +846,7 @@ const detailVehByLeasing = async (req, res) => {
       return result.map((row) => ({
         modelo: row.MODELO.trim() ?? "",
         placa: row.PLACA.trim() ?? "",
+        nroSer: row.NROSER.trim() ?? "",
         cantidad: row.CANTIDAD,
         terreno: row.TIPO_TERRENO.trim() ?? "",
         año: row.ANO,
@@ -887,7 +888,7 @@ const detailAssignByLeasing = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const sql = `
-      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
+      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, V.NROSER, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
       LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
       ON AC.ID = AD.ID_ASIGNACION
@@ -916,6 +917,7 @@ const detailAssignByLeasing = async (req, res) => {
       return result.map((row) => ({
         modelo: row.MODELO.trim() ?? "",
         placa: row.PLACA.trim() ?? "",
+        nroSer: row.NROSER.trim() ?? "",
         terreno: transformType(row.TERRENO, {
           0: "SUPERFICIE",
           1: "SOCAVON",
