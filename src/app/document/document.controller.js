@@ -310,7 +310,7 @@ const detailVehByDocu = async (req, res) => {
       // `;
 
       let sqlDet = `
-        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
         FROM SPEED400AT.TBL_ASIGNACION_DET L
         LEFT JOIN SPEED400AT.PO_VEHICULO V
         ON L.ID_VEH = V.ID
@@ -325,7 +325,7 @@ const detailVehByDocu = async (req, res) => {
 
       if (roleId == 3) {
         sqlDet = `
-          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, V.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
           FROM SPEED400AT.TBL_ASIGNACION_DET L
           LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac
           ON L.ID_ASIGNACION = TAC.ID
@@ -370,6 +370,7 @@ const detailVehByDocu = async (req, res) => {
       return resultDet.map((row) => ({
         modelo: row.MODELO.trim() ?? "",
         placa: row.PLACA.trim() ?? "",
+        nroSer: row.NROSER.trim() ?? "",
         año: row.ANO,
         color: row.COLOR.trim() ?? "",
         marca: row.MARCA.trim() ?? "",
