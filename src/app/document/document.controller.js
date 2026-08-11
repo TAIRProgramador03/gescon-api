@@ -91,7 +91,7 @@ const documentPending = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
-        SELECT ID, NRO_DOC AS DESCRIPCION
+        SELECT ID, NRO_DOC AS DESCRIPCION, DURACION AS PLAZO
         FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB
         WHERE NRO_DOC LIKE 'DPEN-%'
         ${idCli ? `AND ID_CLIENTE = ?` : ""}
@@ -99,6 +99,7 @@ const documentPending = async (req, res) => {
       const result = await cn.query(query, idCli ? [idCli] : []);
       return result.map((row) => ({
         id: row.ID !== null && row.ID !== undefined ? row.ID : null,
+        plazo: row.PLAZO ? Number(row.PLAZO.trim()) : null,
         nroDocumento:
           row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
             ? decodeString(row.DESCRIPCION.toString().trim())
