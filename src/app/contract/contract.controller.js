@@ -13,13 +13,14 @@ const contractNro = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
-        SELECT ID, NRO_CONTRATO AS DESCRIPCION
+        SELECT ID, NRO_CONTRATO AS DESCRIPCION, DURACION AS PLAZO
         FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
         ${idCli ? `WHERE ID_CLIENTE = ?` : ""}
       `;
       const result = await cn.query(query, idCli ? [idCli] : []);
       return result.map((row) => ({
         ID: row.ID !== null && row.ID !== undefined ? row.ID.toString().trim() : null,
+        PLAZO: row.PLAZO !== null && row.PLAZO !== undefined ? Number(row.PLAZO.trim()) : null,
         DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
       }));
     });
