@@ -150,6 +150,7 @@ const contVehicleLeasings = async (req, res) => {
       SELECT
         LD.ID,
         LD.PLACA,
+        PV.NROSER,
         LD.MODELO,
         LC.NRO_LEASING,
         LC.ID_CLIENTE AS CLIENTE,
@@ -252,6 +253,7 @@ const contVehicleLeasings = async (req, res) => {
       SELECT
         LD.ID,
         LD.PLACA,
+        PV.NROSER,
         LD.MODELO,
         LC.NRO_LEASING,
         LC.ID_CLIENTE AS CLIENTE,
@@ -357,6 +359,7 @@ const contVehicleLeasings = async (req, res) => {
       return result.map((row) => ({
         id: row.ID,
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         nroLeasing: row.NRO_LEASING.trim(),
         cliente: row.CLIENTE,
@@ -527,12 +530,12 @@ const listVehicleAssignExpired = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, V.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM SPEED400AT.TBL_ASIGNACION_DET TAD
         LEFT JOIN SPEED400AT.TBLCONTRATO_CAB TC
-	    ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
-	    LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB TC2
-	    ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+	      ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
+	      LEFT JOIN SPEED400AT.TBLDOCUMENTO_CAB TC2
+	      ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
         LEFT JOIN SPEED400AT.PO_VEHICULO V
         ON TAD.ID_VEH = V.ID
         LEFT JOIN SPEED400AT.PO_MARCA M
@@ -569,6 +572,7 @@ const listVehicleAssignExpired = async (req, res) => {
 
       return result.map((row) => ({
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         fechaIni: row.FECHA_INI.trim(),
@@ -628,7 +632,7 @@ const listVehicleAssignExpiring = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, V.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM SPEED400AT.TBL_ASIGNACION_DET TAD
         LEFT JOIN SPEED400AT.TBLCONTRATO_CAB TC
 	    ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
@@ -670,6 +674,7 @@ const listVehicleAssignExpiring = async (req, res) => {
 
       return result.map((row) => ({
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         fechaIni: row.FECHA_INI.trim(),
@@ -894,7 +899,7 @@ const listVehicleLeasingExpire = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, V.NROSER, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -930,6 +935,7 @@ const listVehicleLeasingExpire = async (req, res) => {
 
       return result.map((row) => ({
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         nroLeasing: row.NRO_LEASING.trim(),
@@ -992,7 +998,7 @@ const listVehicleLeasingToExpire = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT LD.ID, LC.ID_CLIENTE, C.CLINOM AS CLIENTE, C2.CLINOM AS CLIENTE_ASOCIADO, LD.MODELO, LD.PLACA, V.NROSER, M.DESCRIPCION AS MARCA,  LC.NRO_LEASING, DATE(SUBSTR(LC.FECHA_INI, 1, 4) || '-' || SUBSTR(LC.FECHA_INI, 5, 2) || '-' || SUBSTR(LC.FECHA_INI, 7, 2)) AS FECHA_INI, DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2)) AS FECHA_FIN, DAYS(DATE(SUBSTR(LC.FECHA_FIN, 1, 4) || '-' || SUBSTR(LC.FECHA_FIN, 5, 2) || '-' || SUBSTR(LC.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_LEASING_DET LD
         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
         ON LD.ID_LEA_CAB = LC.ID
@@ -1028,6 +1034,7 @@ const listVehicleLeasingToExpire = async (req, res) => {
 
       return result.map((row) => ({
         placa: row.PLACA.trim(),
+        nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         nroLeasing: row.NRO_LEASING.trim(),
