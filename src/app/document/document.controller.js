@@ -89,21 +89,45 @@ const documentPending = async (req, res) => {
   const { idCli } = req.query;
 
   try {
+    const params = [];
+    const conditions = ["NRO_DOC LIKE 'DPEN-%'"];
+
+    if (idCli) {
+      conditions.push("TBC.ID_CLIENTE = ?");
+      params.push(idCli);
+    }
+
+    const where =
+      conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
-        SELECT ID, NRO_DOC AS DESCRIPCION, DURACION AS PLAZO
-        FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB
-        WHERE NRO_DOC LIKE 'DPEN-%'
-        ${idCli ? `AND ID_CLIENTE = ?` : ""}
+        WITH
+        CLIENTES AS (
+          SELECT 
+            DISTINCT PO.IDCLI, 
+            TRIM(TC.CLINOM) AS CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES PO
+          INNER JOIN ${SCHEMA_BD}.TCLIE TC
+          ON PO.IDCLI = TC.CLICVE
+          WHERE PO.ID <> 86
+          AND TC.CLINOM <> '*** ANULADO ***'
+        )
+        SELECT TBC.ID, TRIM(TBC.NRO_DOC) AS DESCRIPCION, C.CLINOM AS CLIENTE, COUNT(TLC.ID) AS LEASINGS
+        FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TBC
+        LEFT JOIN CLIENTES C
+        ON C.IDCLI = TBC.ID_CLIENTE
+        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB tlc 
+        ON TLC.ID_CONTRATO = TBC.ID AND TRIM(TLC.TIPCON) = 'H'
+        ${where}
+        GROUP BY TBC.ID, TBC.NRO_DOC, C.CLINOM
       `;
-      const result = await cn.query(query, idCli ? [idCli] : []);
+      const result = await cn.query(query, params);
       return result.map((row) => ({
-        id: row.ID !== null && row.ID !== undefined ? row.ID : null,
-        plazo: row.PLAZO ? Number(row.PLAZO.trim()) : null,
-        nroDocumento:
-          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
-            ? decodeString(row.DESCRIPCION.toString().trim())
-            : null,
+        id: row.ID,
+        nroDocumento: row.DESCRIPCION,
+        cliente: row.CLIENTE,
+        leasings: row.LEASINGS,
       }));
     });
 
@@ -310,14 +334,14 @@ const detailVehByDocu = async (req, res) => {
 
       let sqlDet = `
         SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
-        FROM SPEED400AT.TBL_ASIGNACION_DET L
-        LEFT JOIN SPEED400AT.PO_VEHICULO V
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET L
+        LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
         ON L.ID_VEH = V.ID
-        LEFT JOIN SPEED400AT.PO_MARCA M
+        LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
         ON V.IDMAR = M.ID
-        LEFT JOIN SPEED400AT.PO_MODELO MO
+        LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON V.IDMOD = MO.ID
-        LEFT JOIN SPEED400AT.PO_OPERACIONES O
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
         ON V.SECOPE = O.ID
         WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
       `;
@@ -325,35 +349,35 @@ const detailVehByDocu = async (req, res) => {
       if (roleId == 3) {
         sqlDet = `
           SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
-          FROM SPEED400AT.TBL_ASIGNACION_DET L
-          LEFT JOIN SPEED400AT.TBL_ASIGNACION_CAB tac
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET L
+          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
           ON L.ID_ASIGNACION = TAC.ID
           LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM SPEED400AT.MAE_OPERACION_X_USUARIO moxu
+                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
                   LEFT JOIN (
                     SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM SPEED400AT.PO_OPERACIONES A
-                    INNER JOIN SPEED400AT.TCLIE B
+                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                    INNER JOIN ${SCHEMA_BD}.TCLIE B
                     ON A.IDCLI = B.CLICVE
                     WHERE A.ID <> 86
                     AND B.CLINOM <> '*** ANULADO ***'
                   )PO
                   ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN SPEED400AT.T_US_GC tug
+                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
                   ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN SPEED400AT.T_RL_GC trg
+                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
             ) C
             ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = L.ID_OPE
-          LEFT JOIN SPEED400AT.PO_VEHICULO V
+          LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
           ON L.ID_VEH = V.ID
-          LEFT JOIN SPEED400AT.PO_MARCA M
+          LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
           ON V.IDMAR = M.ID
-          LEFT JOIN SPEED400AT.PO_MODELO MO
+          LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
           ON V.IDMOD = MO.ID
-          LEFT JOIN SPEED400AT.PO_OPERACIONES O
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
           ON V.SECOPE = O.ID
           WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
         `;
