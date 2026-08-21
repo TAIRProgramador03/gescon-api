@@ -337,8 +337,8 @@ const getPermissionsByRole = async (id) => {
       SELECT
         P.ID, P.DESCRIPCION, P.NOMBRE, P.DESCRIPCION2, P.MODULO,
         CASE WHEN RP.ID_PS IS NOT NULL THEN 1 ELSE 0 END AS ACTIVO
-      FROM SPEED400AT.T_PS_GC P
-      LEFT JOIN SPEED400AT.T_RL_PS_GC RP ON P.ID = RP.ID_PS AND RP.ID_RL = ?
+      FROM ${SCHEMA_BD}.T_PS_GC P
+      LEFT JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON P.ID = RP.ID_PS AND RP.ID_RL = ?
       ORDER BY P.MODULO
     `;
     const result = await cn.query(sql, [id]);

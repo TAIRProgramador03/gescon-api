@@ -394,7 +394,7 @@ const getLeasingByContract = async (req, res) => {
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
-      const sql = `SELECT ID, NRO_LEASING FROM SPEED400AT.TBL_LEASING_CAB tlc WHERE ID_CONTRATO = ? AND TIPCON = 'P'`;
+      const sql = `SELECT ID, NRO_LEASING FROM ${SCHEMA_BD}.TBL_LEASING_CAB tlc WHERE ID_CONTRATO = ? AND TIPCON = 'P'`;
 
       const result = await cn.query(sql, [contratoId]);
 
@@ -426,7 +426,7 @@ const getLeasingByDocument = async (req, res) => {
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
-      const sql = `SELECT ID, NRO_LEASING FROM SPEED400AT.TBL_LEASING_CAB tlc WHERE ID_CONTRATO = ? AND TIPCON = 'H'`;
+      const sql = `SELECT ID, NRO_LEASING FROM ${SCHEMA_BD}.TBL_LEASING_CAB tlc WHERE ID_CONTRATO = ? AND TIPCON = 'H'`;
 
       const result = await cn.query(sql, [documentoId]);
 

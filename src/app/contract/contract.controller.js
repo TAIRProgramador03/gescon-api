@@ -19,16 +19,27 @@ const contractNro = async (req, res) => {
       `;
       const result = await cn.query(query, idCli ? [idCli] : []);
       return result.map((row) => ({
-        ID: row.ID !== null && row.ID !== undefined ? row.ID.toString().trim() : null,
-        PLAZO: row.PLAZO !== null && row.PLAZO !== undefined ? Number(row.PLAZO.trim()) : null,
-        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
+        ID:
+          row.ID !== null && row.ID !== undefined
+            ? row.ID.toString().trim()
+            : null,
+        PLAZO:
+          row.PLAZO !== null && row.PLAZO !== undefined
+            ? Number(row.PLAZO.trim())
+            : null,
+        DESCRIPCION:
+          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
+            ? decodeString(row.DESCRIPCION.toString().trim())
+            : null,
       }));
     });
 
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los contratos:", error);
-    res.status(500).json({ success: false, message: "Error al obtener contratos" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contratos" });
   }
 };
 
@@ -105,15 +116,23 @@ const contractNroAdi = async (req, res) => {
 
       const result = await cn.query(query, idCli ? [idCli, idCli] : []);
       return result.map((row) => ({
-        ID: row.ID !== null && row.ID !== undefined ? row.ID.toString().trim() : null,
-        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
+        ID:
+          row.ID !== null && row.ID !== undefined
+            ? row.ID.toString().trim()
+            : null,
+        DESCRIPCION:
+          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
+            ? decodeString(row.DESCRIPCION.toString().trim())
+            : null,
       }));
     });
 
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los contratos:", error);
-    res.status(500).json({ success: false, message: "Error al obtener contratos" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contratos" });
   }
 };
 
@@ -121,24 +140,54 @@ const contractPending = async (req, res) => {
   const { idCli } = req.query;
 
   try {
+    const params = [];
+    const conditions = ["NRO_CONTRATO LIKE 'CPEN-%'"];
+
+    if (idCli) {
+      conditions.push("TBC.ID_CLIENTE = ?");
+      params.push(idCli);
+    }
+
+    const where =
+      conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
-        SELECT ID, NRO_CONTRATO AS DESCRIPCION
-        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
-        WHERE NRO_CONTRATO LIKE 'CPEN-%'
-        ${idCli ? `AND ID_CLIENTE = ?` : ""}
+        WITH
+        CLIENTES AS (
+          SELECT 
+            DISTINCT PO.IDCLI, 
+            TRIM(TC.CLINOM) AS CLINOM
+          FROM ${SCHEMA_BD}.PO_OPERACIONES PO
+          INNER JOIN ${SCHEMA_BD}.TCLIE TC
+          ON PO.IDCLI = TC.CLICVE
+          WHERE PO.ID <> 86
+          AND TC.CLINOM <> '*** ANULADO ***'
+        )
+        SELECT TBC.ID, TRIM(TBC.NRO_CONTRATO) AS DESCRIPCION, C.CLINOM AS CLIENTE, COUNT(TLC.ID) AS LEASINGS
+        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TBC
+        LEFT JOIN CLIENTES C
+        ON C.IDCLI = TBC.ID_CLIENTE
+        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB tlc 
+        ON TLC.ID_CONTRATO = TBC.ID AND TRIM(TLC.TIPCON) = 'P'
+        ${where}
+        GROUP BY TBC.ID, TBC.NRO_CONTRATO, C.CLINOM
       `;
-      const result = await cn.query(query, idCli ? [idCli] : []);
+      const result = await cn.query(query, params);
       return result.map((row) => ({
-        ID: row.ID !== null && row.ID !== undefined ? row.ID.toString().trim() : null,
-        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
+        ID: row.ID,
+        DESCRIPCION: row.DESCRIPCION,
+        CLIENTE: row.CLIENTE,
+        LEASINGS: row.LEASINGS
       }));
     });
 
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los contratos:", error);
-    res.status(500).json({ success: false, message: "Error al obtener contratos" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contratos" });
   }
 };
 
@@ -146,7 +195,9 @@ const tableContract = async (req, res) => {
   const { idCli, id } = req.query;
 
   if (!idCli) {
-    return res.status(400).json({ success: false, message: "El parámetro idCli es obligatorio." });
+    return res
+      .status(400)
+      .json({ success: false, message: "El parámetro idCli es obligatorio." });
   }
 
   try {
@@ -159,17 +210,34 @@ const tableContract = async (req, res) => {
       const result = await cn.query(query, id ? [idCli, id] : [idCli]);
       return result.map((row) => ({
         ID: row.ID,
-        DESCRIPCION: row.DESCRIPCION !== null && row.DESCRIPCION !== undefined ? decodeString(row.DESCRIPCION.toString().trim()) : null,
-        FECHACREA: row.FECHACREA !== null && row.FECHACREA !== undefined ? row.FECHACREA.toString().trim() : null,
-        TOTVEH: row.TOTVEH !== null && row.TOTVEH !== undefined ? row.TOTVEH.toString().trim() : null,
-        DURACION: row.DURACION !== null && row.DURACION !== undefined ? row.DURACION.toString().trim() : null,
+        DESCRIPCION:
+          row.DESCRIPCION !== null && row.DESCRIPCION !== undefined
+            ? decodeString(row.DESCRIPCION.toString().trim())
+            : null,
+        FECHACREA:
+          row.FECHACREA !== null && row.FECHACREA !== undefined
+            ? row.FECHACREA.toString().trim()
+            : null,
+        TOTVEH:
+          row.TOTVEH !== null && row.TOTVEH !== undefined
+            ? row.TOTVEH.toString().trim()
+            : null,
+        DURACION:
+          row.DURACION !== null && row.DURACION !== undefined
+            ? row.DURACION.toString().trim()
+            : null,
       }));
     });
 
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los datos:", error);
-    res.status(500).json({ success: false, message: "Error al obtener los datos. Por favor intente más tarde." });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error al obtener los datos. Por favor intente más tarde.",
+      });
   }
 };
 
@@ -178,7 +246,12 @@ const detailContract = async (req, res) => {
   const { contratoId, clienteId } = req.query;
 
   if (!clienteId) {
-    return res.status(400).json({ success: false, message: "El parametro clienteId es obligatorio" });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "El parametro clienteId es obligatorio",
+      });
   }
 
   try {
@@ -298,8 +371,10 @@ const detailContract = async (req, res) => {
         )
       `;
 
-      let filtrosA = " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      let filtrosB = " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+      let filtrosA =
+        " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
+      let filtrosB =
+        " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
       const params = [clienteId];
 
       if (contratoId) {
@@ -754,10 +829,22 @@ const detailContract = async (req, res) => {
         `;
       }
 
-      const resultCont = await cn.query(sqlContrato, contratoId ? [clienteId, contratoId] : [clienteId]);
-      const resultDoc = await cn.query(sqlDocumentos, contratoId ? [clienteId, contratoId] : [clienteId]);
-      const resultLea = await cn.query(sqlLeasing, contratoId ? [clienteId, contratoId] : [clienteId]);
-      const resultTotalActivas = await cn.query(sqlTotalPlacasActivas, paramsTotalVeh);
+      const resultCont = await cn.query(
+        sqlContrato,
+        contratoId ? [clienteId, contratoId] : [clienteId],
+      );
+      const resultDoc = await cn.query(
+        sqlDocumentos,
+        contratoId ? [clienteId, contratoId] : [clienteId],
+      );
+      const resultLea = await cn.query(
+        sqlLeasing,
+        contratoId ? [clienteId, contratoId] : [clienteId],
+      );
+      const resultTotalActivas = await cn.query(
+        sqlTotalPlacasActivas,
+        paramsTotalVeh,
+      );
       const resultTotalVeh = await cn.query(sqlTotalVeh, paramsTotalVeh);
       const resultTotalAssign = await cn.query(sqlTotalAsign, paramsTotalVeh);
       const resultTotalPending = await cn.query(sqlPendientes, [clienteId]);
@@ -773,12 +860,22 @@ const detailContract = async (req, res) => {
       };
     });
 
-    const { contrato, documento, leasing, totalActivas, totalVeh, totalVehAssign, totalPending } = data;
+    const {
+      contrato,
+      documento,
+      leasing,
+      totalActivas,
+      totalVeh,
+      totalVehAssign,
+      totalPending,
+    } = data;
 
     res.json({
       success: true,
       data: {
-        isTemp: contrato ? contrato.NRO_CONTRATO.trim().toUpperCase().startsWith("CPEN-") : false,
+        isTemp: contrato
+          ? contrato.NRO_CONTRATO.trim().toUpperCase().startsWith("CPEN-")
+          : false,
         descripcion: contrato ? contrato.DESCRIPCION.trim() : "",
         fechaFirma: contrato ? contrato.FECHA_FIRMA : "",
         duracion: contrato ? contrato.DURACION.trim() : "",
@@ -797,7 +894,12 @@ const detailContract = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al obtener los detalles del contrato:", error);
-    res.status(500).json({ success: false, message: "Error al obtener los detalles del contrato" });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error al obtener los detalles del contrato",
+      });
   }
 };
 
@@ -805,7 +907,12 @@ const detailVehByCont = async (req, res) => {
   const { contratoId, tipoTerr } = req.query;
 
   if (!contratoId)
-    return res.status(400).json({ success: false, message: "El parametro contratoId es obligatorio" });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "El parametro contratoId es obligatorio",
+      });
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -829,7 +936,10 @@ const detailVehByCont = async (req, res) => {
       `;
 
       const params = [...cleanLea];
-      if (tipoTerr) { sqlDetLea += ` AND TIPO_TERRENO = ?`; params.push(tipoTerr.toUpperCase()); }
+      if (tipoTerr) {
+        sqlDetLea += ` AND TIPO_TERRENO = ?`;
+        params.push(tipoTerr.toUpperCase());
+      }
 
       const resultDet = await cn.query(sqlDetLea, params);
       if (resultDet.length == 0) return [];
@@ -847,12 +957,23 @@ const detailVehByCont = async (req, res) => {
       }));
     });
 
-    if (cleanedResult === null) return res.status(404).json({ success: false, message: "Sin placas contratadas" });
-    if (cleanedResult.length === 0) return res.status(404).json({ success: false, message: "Sin placas encontradas" });
+    if (cleanedResult === null)
+      return res
+        .status(404)
+        .json({ success: false, message: "Sin placas contratadas" });
+    if (cleanedResult.length === 0)
+      return res
+        .status(404)
+        .json({ success: false, message: "Sin placas encontradas" });
     return res.status(200).json(cleanedResult);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ success: false, message: "Error al obtener placas por documento" });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error al obtener placas por documento",
+      });
   }
 };
 
@@ -870,15 +991,27 @@ const contContract = async (req, res) => {
           (SELECT COUNT(*) FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac ON TAD.ID_ASIGNACION = TAC.ID ${filter}) AS VEHICULOS
         FROM sysibm.sysdummy1
       `;
-      const params = clienteId ? [clienteId, clienteId, clienteId, clienteId] : [];
+      const params = clienteId
+        ? [clienteId, clienteId, clienteId, clienteId]
+        : [];
       const result = await cn.query(sql, params);
       return result[0];
     });
 
-    res.json({ success: true, data: { PADRE: data.CONTRATOS, TIPO_1: data.DOCUMENTOS, TIPO_2: data.LEASINGS, TIPO_3: data.VEHICULOS } });
+    res.json({
+      success: true,
+      data: {
+        PADRE: data.CONTRATOS,
+        TIPO_1: data.DOCUMENTOS,
+        TIPO_2: data.LEASINGS,
+        TIPO_3: data.VEHICULOS,
+      },
+    });
   } catch (error) {
     console.error("Error al obtener los contadores:", error);
-    res.status(500).json({ success: false, message: "Error al obtener los contadores" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener los contadores" });
   }
 };
 
@@ -901,15 +1034,32 @@ const contClient = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (error) {
     console.error("Error al obtener los contadores:", error);
-    res.status(500).json({ success: false, message: "Error al obtener los contadores" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al obtener los contadores" });
   }
 };
 
 const insertContract = async (req, res) => {
   const { user } = req.user;
   const {
-    idCliente, nroContrato, cantVehiculos, fechaFirma, duracion, kmAdicional, kmTotal,
-    vehSup, vehSev, vehSoc, vehCiu, tipoMoneda, tipoCliente, contratoEspecial, story, detalles, archivoPdf,
+    idCliente,
+    nroContrato,
+    cantVehiculos,
+    fechaFirma,
+    duracion,
+    kmAdicional,
+    kmTotal,
+    vehSup,
+    vehSev,
+    vehSoc,
+    vehCiu,
+    tipoMoneda,
+    tipoCliente,
+    contratoEspecial,
+    story,
+    detalles,
+    archivoPdf,
   } = req.body;
 
   const claseContra = "P";
@@ -919,7 +1069,10 @@ const insertContract = async (req, res) => {
 
   try {
     await withConnection(async (cn) => {
-      const findContract = await cn.query(`SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`, [nroContrato.toUpperCase()]);
+      const findContract = await cn.query(
+        `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`,
+        [nroContrato.toUpperCase()],
+      );
       if (findContract.length > 0) {
         const err = new Error("El N° contrato ya se encuentra registrado");
         err.statusCode = 409;
@@ -933,8 +1086,25 @@ const insertContract = async (req, res) => {
       `;
 
       const result = await cn.query(queryCabecera, [
-        idCliente, nroContrato, cantVehiculos, fechaFormatoDB, duracion, kmAdicional, kmTotal,
-        vehSup, vehSev, vehSoc, vehCiu, contratoEspecial, tipoCliente, tipoMoneda, story, newKey, claseContra, user, user,
+        idCliente,
+        nroContrato,
+        cantVehiculos,
+        fechaFormatoDB,
+        duracion,
+        kmAdicional,
+        kmTotal,
+        vehSup,
+        vehSev,
+        vehSoc,
+        vehCiu,
+        contratoEspecial,
+        tipoCliente,
+        tipoMoneda,
+        story,
+        newKey,
+        claseContra,
+        user,
+        user,
       ]);
 
       await moveFile(oldKey, newKey);
@@ -950,8 +1120,21 @@ const insertContract = async (req, res) => {
       if (detalles && detalles.length > 0) {
         for (const detalle of detalles) {
           await cn.query(queryDetalle, [
-            idContratoCab, detalle.secCon, detalle.modelo, detalle.tipoTerreno, detalle.tarifa, detalle.cpk,
-            detalle.rm, detalle.cantidad, detalle.duracion, detalle.kmAdicional, detalle.compraVeh, detalle.precioVeh, detalle.condicion, user, user,
+            idContratoCab,
+            detalle.secCon,
+            detalle.modelo,
+            detalle.tipoTerreno,
+            detalle.tarifa,
+            detalle.cpk,
+            detalle.rm,
+            detalle.cantidad,
+            detalle.duracion,
+            detalle.kmAdicional,
+            detalle.compraVeh,
+            detalle.precioVeh,
+            detalle.condicion,
+            user,
+            user,
           ]);
         }
       }
@@ -959,9 +1142,12 @@ const insertContract = async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    if (error.statusCode === 409) return res.status(409).json({ success: false, message: error.message });
+    if (error.statusCode === 409)
+      return res.status(409).json({ success: false, message: error.message });
     console.error("Error al insertar contrato:", error);
-    res.status(500).json({ success: false, message: "Error al insertar contrato" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al insertar contrato" });
   }
 };
 
@@ -971,11 +1157,31 @@ const updateContract = async (req, res) => {
   const contractId = Number(id);
 
   if (isNaN(contractId))
-    return res.status(400).json({ success: false, message: "El parametro id no es un dato numérico" });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "El parametro id no es un dato numérico",
+      });
 
   const {
-    idCliente, nroContrato, cantVehiculos, fechaFirma, duracion, kmAdicional, kmTotal,
-    vehSup, vehSev, vehSoc, vehCiu, tipoMoneda, tipoCliente, contratoEspecial, story, detalles, archivoPdf,
+    idCliente,
+    nroContrato,
+    cantVehiculos,
+    fechaFirma,
+    duracion,
+    kmAdicional,
+    kmTotal,
+    vehSup,
+    vehSev,
+    vehSoc,
+    vehCiu,
+    tipoMoneda,
+    tipoCliente,
+    contratoEspecial,
+    story,
+    detalles,
+    archivoPdf,
   } = req.body;
 
   const claseContra = "P";
@@ -998,8 +1204,14 @@ const updateContract = async (req, res) => {
         throw err;
       }
 
-      if (findContract[0].NRO_CONTRATO.trim().toUpperCase() != nroContrato.toUpperCase()) {
-        const findNroContract = await cn.query(`SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`, [nroContrato.toUpperCase()]);
+      if (
+        findContract[0].NRO_CONTRATO.trim().toUpperCase() !=
+        nroContrato.toUpperCase()
+      ) {
+        const findNroContract = await cn.query(
+          `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB WHERE UPPER(NRO_CONTRATO) = ?`,
+          [nroContrato.toUpperCase()],
+        );
         if (findNroContract.length > 0) {
           const err = new Error("El N° contrato ya se encuentra registrado");
           err.statusCode = 409;
@@ -1020,8 +1232,25 @@ const updateContract = async (req, res) => {
       `;
 
       await cn.query(queryCabecera, [
-        idCliente, nroContrato, cantVehiculos, fechaFormatoDB, duracion, kmAdicional, kmTotal,
-        vehSup, vehSev, vehSoc, vehCiu, contratoEspecial, tipoCliente, tipoMoneda, story, newKey, claseContra, user, contractId,
+        idCliente,
+        nroContrato,
+        cantVehiculos,
+        fechaFormatoDB,
+        duracion,
+        kmAdicional,
+        kmTotal,
+        vehSup,
+        vehSev,
+        vehSoc,
+        vehCiu,
+        contratoEspecial,
+        tipoCliente,
+        tipoMoneda,
+        story,
+        newKey,
+        claseContra,
+        user,
+        contractId,
       ]);
 
       const detailDelete = [];
@@ -1041,7 +1270,8 @@ const updateContract = async (req, res) => {
         [contractId, ...detailUpdate.map((det) => det.idDet)],
       );
 
-      if (resultValidDelete.length > 0) resultValidDelete.forEach((row) => detailDelete.push(row.ID));
+      if (resultValidDelete.length > 0)
+        resultValidDelete.forEach((row) => detailDelete.push(row.ID));
 
       const queryUpdDetalle = `
         UPDATE ${SCHEMA_BD}.TBLCONTRATO_DET
@@ -1050,8 +1280,20 @@ const updateContract = async (req, res) => {
       `;
       for (const detalle of detailUpdate) {
         await cn.query(queryUpdDetalle, [
-          detalle.secCon, detalle.modelo, detalle.tipoTerreno, detalle.tarifa, detalle.cpk, detalle.rm,
-          detalle.cantidad, detalle.duracion, detalle.kmAdicional, detalle.compraVeh, detalle.precioVeh, detalle.condicion, user, detalle.idDet,
+          detalle.secCon,
+          detalle.modelo,
+          detalle.tipoTerreno,
+          detalle.tarifa,
+          detalle.cpk,
+          detalle.rm,
+          detalle.cantidad,
+          detalle.duracion,
+          detalle.kmAdicional,
+          detalle.compraVeh,
+          detalle.precioVeh,
+          detalle.condicion,
+          user,
+          detalle.idDet,
         ]);
       }
 
@@ -1062,23 +1304,43 @@ const updateContract = async (req, res) => {
       `;
       for (const detalle of detailNew) {
         await cn.query(queryNewDetalle, [
-          contractId, detalle.secCon, detalle.modelo, detalle.tipoTerreno, detalle.tarifa, detalle.cpk, detalle.rm,
-          detalle.cantidad, detalle.duracion, detalle.kmAdicional, detalle.compraVeh, detalle.precioVeh, detalle.condicion, user, user,
+          contractId,
+          detalle.secCon,
+          detalle.modelo,
+          detalle.tipoTerreno,
+          detalle.tarifa,
+          detalle.cpk,
+          detalle.rm,
+          detalle.cantidad,
+          detalle.duracion,
+          detalle.kmAdicional,
+          detalle.compraVeh,
+          detalle.precioVeh,
+          detalle.condicion,
+          user,
+          user,
         ]);
       }
 
       if (detailDelete.length > 0) {
         const paramsDel = detailDelete.map(() => "?");
-        await cn.query(`DELETE FROM ${SCHEMA_BD}.TBLCONTRATO_DET WHERE ID IN (${paramsDel.join(",")})`, detailDelete);
+        await cn.query(
+          `DELETE FROM ${SCHEMA_BD}.TBLCONTRATO_DET WHERE ID IN (${paramsDel.join(",")})`,
+          detailDelete,
+        );
       }
     });
 
     res.json({ success: true });
   } catch (error) {
-    if (error.statusCode === 404) return res.status(404).json({ success: false, message: error.message });
-    if (error.statusCode === 409) return res.status(409).json({ success: false, message: error.message });
+    if (error.statusCode === 404)
+      return res.status(404).json({ success: false, message: error.message });
+    if (error.statusCode === 409)
+      return res.status(409).json({ success: false, message: error.message });
     console.error("Error al insertar contrato:", error);
-    res.status(500).json({ success: false, message: "Error al insertar contrato" });
+    res
+      .status(500)
+      .json({ success: false, message: "Error al insertar contrato" });
   }
 };
 
@@ -1087,17 +1349,34 @@ const getContractById = async (req, res) => {
   const contractId = Number(id);
 
   if (isNaN(contractId))
-    return res.status(400).json({ success: false, message: "El parametro id no es un dato numérico" });
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "El parametro id no es un dato numérico",
+      });
 
   try {
     const data = await withConnection(async (cn) => {
-      const result = await cn.query(`SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB C WHERE C.ID = ?`, [contractId]);
+      const result = await cn.query(
+        `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_CAB C WHERE C.ID = ?`,
+        [contractId],
+      );
       if (result.length == 0) return null;
-      const resultDet = await cn.query(`SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_DET D WHERE D.ID_CON_CAB = ?`, [contractId]);
+      const resultDet = await cn.query(
+        `SELECT * FROM ${SCHEMA_BD}.TBLCONTRATO_DET D WHERE D.ID_CON_CAB = ?`,
+        [contractId],
+      );
       return { result, resultDet };
     });
 
-    if (!data) return res.status(404).json({ success: false, message: "No se encontró el contrato solicitado" });
+    if (!data)
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "No se encontró el contrato solicitado",
+        });
 
     const { result, resultDet } = data;
     return res.status(200).json({
@@ -1136,7 +1415,9 @@ const getContractById = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al obtener contrato por id", error);
-    return res.status(500).json({ success: false, message: "Error al obtener contrato por id" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contrato por id" });
   }
 };
 
@@ -1149,15 +1430,21 @@ const getContractAdiById = async (req, res) => {
     const data = await withConnection(async (cn) => {
       let sql = "";
       if (type == "P") {
-        sql = `SELECT ID, tc.NRO_CONTRATO, DURACION FROM SPEED400AT.TBLCONTRATO_CAB tc WHERE ID = ?`;
+        sql = `SELECT ID, tc.NRO_CONTRATO, DURACION FROM ${SCHEMA_BD}.TBLCONTRATO_CAB tc WHERE ID = ?`;
       } else if (type == "H") {
-        sql = `SELECT ID, tc.NRO_DOC AS NRO_CONTRATO, DURACION FROM SPEED400AT.TBLDOCUMENTO_CAB tc WHERE ID = ?`;
+        sql = `SELECT ID, tc.NRO_DOC AS NRO_CONTRATO, DURACION FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc WHERE ID = ?`;
       }
       const result = await cn.query(sql, [contractId]);
       return result[0] || null;
     });
 
-    if (!data) return res.status(404).json({ success: false, message: "No se encontró el contrato solicitado" });
+    if (!data)
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "No se encontró el contrato solicitado",
+        });
 
     return res.status(200).json({
       idCliente: data.ID_CLIENTE,
@@ -1166,7 +1453,9 @@ const getContractAdiById = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al obtener contrato por id", error);
-    return res.status(500).json({ success: false, message: "Error al obtener contrato por id" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Error al obtener contrato por id" });
   }
 };
 
@@ -1234,12 +1523,18 @@ const verifyContractsTemp = async (req, res) => {
       success: true,
       data: {
         total: result[0] ? result[0].TOTAL_TEMPORALES : 0,
-        clientes: result.length > 0 ? result.map((row) => row.CLIENTE.trim()) : [],
+        clientes:
+          result.length > 0 ? result.map((row) => row.CLIENTE.trim()) : [],
       },
     });
   } catch (error) {
     console.error("Error al verificar contratos temporales", error);
-    return res.status(500).json({ success: false, message: "Error al verificar contratos temporales" });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error al verificar contratos temporales",
+      });
   }
 };
 
