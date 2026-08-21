@@ -6,7 +6,7 @@ const validUser = async (req, res, next) => {
 
   try {
     const row = await withConnection(async (cn) => {
-      const sql = `SELECT TUG.USU AS USUARIO, TUG.ID_RL AS ID_ROL FROM SPEED400AT.T_US_GC tug WHERE TUG.ID = ?`;
+      const sql = `SELECT TUG.USU AS USUARIO, TUG.ID_RL AS ID_ROL FROM ${SCHEMA_BD}.T_US_GC tug WHERE TUG.ID = ?`;
       const result = await cn.query(sql, [idUser]);
       return result[0];
     });
