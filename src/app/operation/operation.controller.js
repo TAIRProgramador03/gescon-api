@@ -57,7 +57,15 @@ const listOperations = async (req, res) => {
 const listAssingByContract = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const { idContrato, idCliente, idLeasing, tipoTerr, status, fromDate, toDate } = req.query;
+  const {
+    idContrato,
+    idCliente,
+    idLeasing,
+    tipoTerr,
+    status,
+    fromDate,
+    toDate,
+  } = req.query;
 
   if (!idCliente)
     return res.status(400).json({
@@ -137,16 +145,16 @@ const listAssingByContract = async (req, res) => {
       }
 
       if (fromDate && toDate) {
-        filtrosA += "AND AD.FECHA_FIN BETWEEN ? AND ?"
-        filtrosB += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+        filtrosA += "AND AD.FECHA_FIN BETWEEN ? AND ?";
+        filtrosB += "AND AD.FECHA_FIN BETWEEN ? AND ?";
         params.push(toYYYYMMDD(fromDate), toYYYYMMDD(toDate));
       } else if (fromDate) {
-        filtrosA += "AND AD.FECHA_FIN >= ?"
-        filtrosB += "AND AD.FECHA_FIN >= ?"
+        filtrosA += "AND AD.FECHA_FIN >= ?";
+        filtrosB += "AND AD.FECHA_FIN >= ?";
         params.push(toYYYYMMDD(fromDate));
       } else if (toDate) {
-        filtrosA += "AND AD.FECHA_FIN <= ?"
-        filtrosB += "AND AD.FECHA_FIN <= ?"
+        filtrosA += "AND AD.FECHA_FIN <= ?";
+        filtrosB += "AND AD.FECHA_FIN <= ?";
         params.push(toYYYYMMDD(toDate));
       }
 
@@ -949,52 +957,54 @@ const listVehPending = async (req, res) => {
       }
 
       const sql = `
-      SELECT
-        TAD.ID,
-        TAD.ID_VEH,
-        TAD.PLACA,
-        TAD.ID_CONTRATO,
-        COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO,
-        COALESCE(TC.DURACION, TD.DURACION) AS PLAZO,
-        TAD.CLASE_CONTRATO,
-        TAD.TARIFA,
-        TAD.CONDICION,
-        TAD.TP_TERRENO,
-        TAD.ID_OPE AS ID_OPE_ASIGN,
-        PA.SECOPE AS ID_OPE_ACTUAL,
-        PO.DESCRIPCION AS OPE_ASIGN,
-        PO3.DESCRIPCION AS OPE_ACTUAL,
-        PO3.IDCLI AS ID_CLIENTE_OPE,
-        PA.DESDE AS FECHA_REF,
-        TAD.FECHA_INI AS FECHA_INICIO,
-        TAD.FECHA_FIN AS FECHA_FIN
-      FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-      JOIN (
         SELECT
-          IDVEH,
-          SECOPE,
-          IDOPE,
-          DESDE,
-          ROW_NUMBER() OVER (
-            PARTITION BY IDVEH
-            ORDER BY ID DESC
-          ) AS RN
-        FROM ${SCHEMA_BD}.PO_ASIGNACION
-      ) PA
-      ON TAD.ID_VEH = PA.IDVEH
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
-      ON PO.ID = TAD.ID_OPE
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
-      ON PO3.ID = PA.SECOPE
-      JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
-      ON TAD.ID_ASIGNACION = TAC.ID
-      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
-      ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
-      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-      ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
-      WHERE PA.RN = 1 AND TAD.ID_OPE <> PA.SECOPE ${filtros}
-      ORDER BY TAD.ID ASC
-    `;
+          TAD.ID,
+          TAD.ID_VEH,
+          TAD.PLACA,
+          TAD.ID_CONTRATO,
+          COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO,
+          COALESCE(TC.DURACION, TD.DURACION) AS PLAZO,
+          TAD.CLASE_CONTRATO,
+          TAD.TARIFA,
+          TAD.CONDICION,
+          TAD.TP_TERRENO,
+          TAD.ID_OPE AS ID_OPE_ASIGN,
+          PV.SECOPE AS ID_OPE_ACTUAL,
+          PO.DESCRIPCION AS OPE_ASIGN,
+          PO3.DESCRIPCION AS OPE_ACTUAL,
+          PO3.IDCLI AS ID_CLIENTE_OPE,
+          PA.DESDE AS FECHA_REF,
+          TAD.FECHA_INI AS FECHA_INICIO,
+          TAD.FECHA_FIN AS FECHA_FIN
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+        JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+        ON TAD.ID_VEH = PV.ID
+        JOIN (
+          SELECT
+            IDVEH,
+            SECOPE,
+            IDOPE,
+            DESDE,
+            ROW_NUMBER() OVER (
+              PARTITION BY IDVEH
+              ORDER BY ID DESC
+            ) AS RN
+          FROM ${SCHEMA_BD}.PO_ASIGNACION
+        ) PA
+        ON PV.ID = PA.IDVEH
+        JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+        ON PO.ID = TAD.ID_OPE
+        JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
+        ON PO3.ID = PV.SECOPE
+        JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
+        ON TAD.ID_ASIGNACION = TAC.ID
+        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
+        ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
+        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+        ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
+        WHERE PA.RN = 1 AND TAD.ID_OPE <> PV.SECOPE ${filtros}
+        ORDER BY TAD.ID ASC
+      `;
 
       const result = await cn.query(sql, params);
 
@@ -1016,6 +1026,7 @@ const listVehPending = async (req, res) => {
         terreno: row.TP_TERRENO,
         fechaInicio: row.FECHA_INICIO.trim(),
         fechaFin: row.FECHA_FIN.trim(),
+        esVendida: row.ID_OPE_ACTUAL == 109 ? true : false,
       }));
     });
 
@@ -1154,6 +1165,9 @@ const changeOperation = async (req, res) => {
     observation,
     tariff,
     terrain,
+    selfPrice,
+    isSelf,
+    currency
   } = req.body;
 
   const convertDate = convertirFecha(date);
@@ -1180,8 +1194,8 @@ const changeOperation = async (req, res) => {
       }
 
       // await cn.beginTransaction();
-
-      if (isChecked) {
+      
+      if (isChecked) { // ACTUALIZAR DATOS CON REGISTRO DE MOVIMIENTO
         const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
         SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
@@ -1247,7 +1261,7 @@ const changeOperation = async (req, res) => {
           user,
           user,
         ]);
-      } else {
+      } else { // REALIZAR UNA REASIGNACIÓN DE OPERACIÓN
         const sqlChangeOpe = `
         UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
         SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
@@ -1255,8 +1269,8 @@ const changeOperation = async (req, res) => {
       `;
 
         const sqlInsertReassign = `
-        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, PRECIO_VENTA, MONEDA, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
         const oldAssign = {
@@ -1287,8 +1301,8 @@ const changeOperation = async (req, res) => {
           newAssing.tarifa,
           newAssing.archivo,
           newAssing.terreno,
-          convertirFecha(dateInit),
-          convertirFecha(dateFinish),
+          isSelf ? convertDate : convertirFecha(dateInit),
+          isSelf ? convertDate : convertirFecha(dateFinish),
           user,
           id,
         ]);
@@ -1309,6 +1323,8 @@ const changeOperation = async (req, res) => {
           oldAssign.terreno,
           newAssing.terreno,
           convertDate,
+          selfPrice ?? null,
+          currency ?? null,
           observation,
           id,
           user,
@@ -1413,6 +1429,8 @@ const getReassignById = async (req, res) => {
         TR.FECHA_REASIGNACION,
         TR.ARCHIVO AS ARCHIVO_ANTERIOR,
         TR.SEC_ARCHIVO AS ARCHIVO_NUEVO,
+        TR.PRECIO_VENTA,
+        TR.MONEDA,
         TR.OBSERVACION
       FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
       JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
@@ -1445,6 +1463,8 @@ const getReassignById = async (req, res) => {
     return res.status(200).json({
       fecha: data[0].FECHA_REASIGNACION.trim(),
       observacion: data[0].OBSERVACION ? data[0].OBSERVACION.trim() : "",
+      precioVenta: data[0].PRECIO_VENTA,
+      moneda: data[0].MONEDA,
       anterior: {
         operacion: data[0].OPERACION_ANTERIOR.trim(),
         contrato: data[0].CONTRATO_ANTERIOR.trim(),
