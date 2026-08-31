@@ -9,7 +9,7 @@ const login = async (req, res) => {
   try {
     const data = await withConnection(async (cn) => {
       const sql = `
-        SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.V_TK, U.ACTIVO, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
+        SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.COD_EMP, U.V_TK, U.ACTIVO, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
         JOIN ${SCHEMA_BD}.T_RL_GC R
         ON U.ID_RL = R.ID
         WHERE USU = ?
