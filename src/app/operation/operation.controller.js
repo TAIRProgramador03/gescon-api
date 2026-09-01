@@ -14,6 +14,7 @@ const path = require("path");
 const mime = require("mime-types");
 const ExcelJS = require("exceljs");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const { OPERACIONES_TAIR, TIPOS_DOC_REA } = require("../../shared/constant/operations.js")
 
 const listOperations = async (req, res) => {
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
@@ -970,10 +971,10 @@ const listVehPending = async (req, res) => {
           TAD.TP_TERRENO,
           TAD.ID_OPE AS ID_OPE_ASIGN,
           PV.SECOPE AS ID_OPE_ACTUAL,
+          PT.KILOMETRAJE,
           PO.DESCRIPCION AS OPE_ASIGN,
           PO3.DESCRIPCION AS OPE_ACTUAL,
           PO3.IDCLI AS ID_CLIENTE_OPE,
-          PA.DESDE AS FECHA_REF,
           TAD.FECHA_INI AS FECHA_INICIO,
           TAD.FECHA_FIN AS FECHA_FIN
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
@@ -982,16 +983,14 @@ const listVehPending = async (req, res) => {
         JOIN (
           SELECT
             IDVEH,
-            SECOPE,
-            IDOPE,
-            DESDE,
+            pt.KILOMETRAJE,
             ROW_NUMBER() OVER (
               PARTITION BY IDVEH
-              ORDER BY ID DESC
+              ORDER BY FECHA DESC, KILOMETRAJE DESC
             ) AS RN
-          FROM ${SCHEMA_BD}.PO_ASIGNACION
-        ) PA
-        ON PV.ID = PA.IDVEH
+          FROM ${SCHEMA_BD}.PO_TEMPREGTAB pt 
+        ) PT
+        ON TAD.ID_VEH = PT.IDVEH
         JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
         ON PO.ID = TAD.ID_OPE
         JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
@@ -1002,7 +1001,7 @@ const listVehPending = async (req, res) => {
         ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
         ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
-        WHERE PA.RN = 1 AND TAD.ID_OPE <> PV.SECOPE ${filtros}
+        WHERE PT.RN = 1 AND TAD.ID_OPE <> PV.SECOPE ${filtros}
         ORDER BY TAD.ID ASC
       `;
 
@@ -1017,7 +1016,7 @@ const listVehPending = async (req, res) => {
         idOpeActual: row.ID_OPE_ACTUAL,
         opeActual: row.OPE_ACTUAL.trim(),
         idClienteOpe: row.ID_CLIENTE_OPE.trim(),
-        fechaRef: row.FECHA_REF,
+        kilometraje: row.KILOMETRAJE,
         idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
         nroContrato: row.CONTRATO.trim(),
         plazoContrato: row.PLAZO.trim(),
@@ -1071,39 +1070,39 @@ const listVehNoPending = async (req, res) => {
         TAD.CONDICION,
         TAD.TP_TERRENO,
         TAD.ID_OPE AS ID_OPE_ASIGN,
-        PA.SECOPE AS ID_OPE_ACTUAL,
+        PV.SECOPE AS ID_OPE_ACTUAL,
+        PT.KILOMETRAJE,
         PO.DESCRIPCION AS OPE_ASIGN,
         PO3.DESCRIPCION AS OPE_ACTUAL,
         PO3.IDCLI AS ID_CLIENTE_OPE,
-        PA.DESDE AS FECHA_REF,
         TAD.FECHA_INI AS FECHA_INICIO,
         TAD.FECHA_FIN AS FECHA_FIN,
         TAD.ARCHIVO_PDF AS ACTA
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+      JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+        ON TAD.ID_VEH = PV.ID
       JOIN (
-        SELECT
-          IDVEH,
-          SECOPE,
-          IDOPE,
-          DESDE,
-          ROW_NUMBER() OVER (
-            PARTITION BY IDVEH
-            ORDER BY ID DESC
-          ) AS RN
-        FROM ${SCHEMA_BD}.PO_ASIGNACION
-      ) PA
-      ON TAD.ID_VEH = PA.IDVEH
+          SELECT
+            IDVEH,
+            pt.KILOMETRAJE,
+            ROW_NUMBER() OVER (
+              PARTITION BY IDVEH
+              ORDER BY FECHA DESC, KILOMETRAJE DESC
+            ) AS RN
+          FROM ${SCHEMA_BD}.PO_TEMPREGTAB pt 
+        ) PT
+      ON TAD.ID_VEH = PT.IDVEH
       JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
       ON PO.ID = TAD.ID_OPE
       JOIN ${SCHEMA_BD}.PO_OPERACIONES PO3
-      ON PO3.ID = PA.SECOPE
+      ON PO3.ID = PV.SECOPE
       JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB TAC
       ON TAD.ID_ASIGNACION = TAC.ID
       LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
       ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
       ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
-      WHERE PA.RN = 1 AND TAD.ID_OPE = PA.SECOPE ${filtros}
+      WHERE PT.RN = 1 AND TAD.ID_OPE = PV.SECOPE AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.LIMA}, ${OPERACIONES_TAIR.AREQUIPA}) ${filtros}
       ORDER BY TAD.ID ASC
     `;
 
@@ -1118,7 +1117,7 @@ const listVehNoPending = async (req, res) => {
         idOpeActual: row.ID_OPE_ACTUAL,
         opeActual: row.OPE_ACTUAL.trim(),
         idClienteOpe: row.ID_CLIENTE_OPE.trim(),
-        fechaRef: row.FECHA_REF,
+        kilometraje: row.KILOMETRAJE,
         idContrato: `${row.CLASE_CONTRATO.trim()}_${row.ID_CONTRATO}`,
         nroContrato: row.CONTRATO.trim(),
         plazoContrato: row.PLAZO.trim(),
@@ -1153,33 +1152,82 @@ const changeOperation = async (req, res) => {
   }
 
   const {
-    beforeOperation,
-    condition,
-    contract,
-    date,
-    dateInit,
-    dateFinish,
-    file,
-    isChecked,
-    operation,
-    observation,
-    tariff,
-    terrain,
-    selfPrice,
-    isSelf,
-    currency
+    // VALIDACION
+    isChecked, // MODO TRUE = ACTUALIZAR FALSE = REASIGNAR
+
+    // CABECERA
+    date, // FECHA REASIGNACION - VENTA
+    observation, // OBSERVACION
+
+    // DETALLE A
+    beforeOperation, // ANTIGUA OPERACION
+
+    // DETALLE B
+    condition, // NUEVA CONDICION
+    contract, // NUEVO CONTRATO
+    dateInit, // NUEVA FECHA ENTREGRA
+    dateFinish, // NUEVA FECHA FINAL
+    operation, // NUEVA OPERACION
+    tariff, // NUEVA TARIFA
+    terrain, // NUEVO TERRENO
+    mileage, // KILOMETRAJE
+
+    // DOCUMENTO
+    docReceipt, // ACTA ENTREGA
+    docReturn, // ACTA DEVOLUCION
+    docSelf, // ACTA VENTA
+
+    // PARA VENTA
+    dateSelf, // FECHA VENTA
+    selfPrice, // PRECIO DE VENTA
+    currency, // MONEDA 0 = SOLES 1 = DOLAR
   } = req.body;
 
+  const isSelf = operation == OPERACIONES_TAIR.VENDIDAS;
   const convertDate = convertirFecha(date);
-  const validFile = file ? file.replace(/^temp\//, "") : null;
+  const validDocReceipt = docReceipt ? docReceipt.replace(/^temp\//, "") : null;
+  const validDocReturn = docReturn ? docReturn.replace(/^temp\//, "") : null;
+  const validDocSelf = docSelf ? docSelf.replace(/^temp\//, "") : null;
+
+  /**
+   * DATOS QUE NECESITA LA CABECERA
+   * id, date, observation, *type_reassign*
+   */
+
+  /**
+   * DATOS QUE NECESITA DETALLES A (antiguo)
+   * *id_cab*, beforeOperation, *id_cont_before*, *tariff_before*, *condition_before*, *type_cont_before*, *terrain_before*, *dateInit_before*, *dateFinish_before*, *mileage_before*
+   */
+
+  /**
+   * DATOS QUE NECESITA DETALLES B (nuevo)
+   * *id_cab*, operation, *id_cont*, tariff, condition, *type_cont*, terrain, dateInit, dateFinish, *mileage*
+   */
+
+  /**
+   * DATOS QUE NECESITA LOS DOCUMENTOS
+   * *id_cab*, *id_type_doc*, *side*, *file*
+   */
 
   try {
     await withConnection(async (cn) => {
       const sqlFind = `
-      SELECT ID_CONTRATO, CONDICION, CLASE_CONTRATO, TARIFA, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-      WHERE TAD.ID = ?
-      FETCH FIRST 1 ROW ONLY
-    `;
+        SELECT TAD.ID_CONTRATO , TAD.CONDICION, TAD.FECHA_INI , TAD.FECHA_FIN, TAD.CLASE_CONTRATO , TAD.TARIFA, TAD.ARCHIVO_PDF , TAD.TP_TERRENO, PT.KILOMETRAJE 
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+        JOIN (
+          SELECT
+          IDVEH,
+          pt.KILOMETRAJE,
+          ROW_NUMBER() OVER (
+            PARTITION BY IDVEH
+            ORDER BY FECHA DESC, KILOMETRAJE DESC
+          ) AS RN
+          FROM ${SCHEMA_BD}.PO_TEMPREGTAB PT
+        ) PT
+        ON TAD.ID_VEH = PT.IDVEH
+        WHERE PT.RN = 1 AND TAD.ID = ?
+        FETCH FIRST 1 ROW ONLY
+      `;
 
       const findAssign = await cn.query(sqlFind, [id]);
 
@@ -1193,40 +1241,93 @@ const changeOperation = async (req, res) => {
         throw err;
       }
 
-      // await cn.beginTransaction();
-      
-      if (isChecked) { // ACTUALIZAR DATOS CON REGISTRO DE MOVIMIENTO
-        const sqlChangeOpe = `
-        UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
-        WHERE ID = ?
-      `;
+      await cn.beginTransaction();
 
-        const sqlInsertReassign = `
-        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+      if (isChecked) {
+        // ACTUALIZAR DATOS CON REGISTRO DE MOVIMIENTO
+
+        const sqlInsertReassignCab = `
+          SELECT ID FROM FINAL TABLE (
+            INSERT INTO ${SCHEMA_BD}.T_GC_RE_CAB (ID_ASG_DET, FRE, OBS, TRE, USU_REG)
+            VALUES (?, ?, ?, ?, ?)
+          )
+        `;
+
+        const sqlInsertReassignDetA = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_A (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const sqlInsertReassignDetB = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_B (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        // EJECUTAR AL FINAL
+        const sqlChangeOpe = `
+          UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+          SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
+          WHERE ID = ?
+        `;
 
         const oldAssign = {
-          id,
           idContrato: findAssign[0].ID_CONTRATO,
           tipo: findAssign[0].CLASE_CONTRATO.trim(),
           condicion: findAssign[0].CONDICION.trim(),
           tarifa: findAssign[0].TARIFA,
           terreno: String(findAssign[0].TP_TERRENO),
-          archivo: findAssign[0].ARCHIVO_PDF,
+          fechaIni: convertirFecha(findAssign[0].FECHA_INI),
+          fechaFin: convertirFecha(findAssign[0].FECHA_FIN),
+          kilometraje: findAssign[0].KILOMETRAJE,
         };
 
         const newAssing = {
-          id,
           idContrato: Number(contract.split("_")[1]),
           tipo: contract.split("_")[0],
           condicion: condition,
           tarifa: Number(tariff),
           terreno: terrain,
-          archivo: findAssign[0].ARCHIVO_PDF,
+          fechaIni: convertirFecha(dateInit),
+          fechaFin: convertirFecha(dateFinish),
+          kilometraje: mileage,
         };
 
+        // CABECERA
+        const newCab = await cn.query(sqlInsertReassignCab, [
+          id,
+          convertDate,
+          observation,
+          isSelf ? "V" : "C",
+          user,
+        ]);
+
+        // DETALLE ANTIGUO
+        await cn.query(sqlInsertReassignDetA, [
+          newCab[0].ID,
+          beforeOperation,
+          oldAssign.idContrato,
+          oldAssign.tarifa,
+          oldAssign.condicion,
+          oldAssign.tipo,
+          oldAssign.terreno,
+          oldAssign.fechaIni,
+          oldAssign.fechaFin,
+          oldAssign.kilometraje,
+        ]);
+
+        // DETALLE NUEVO
+        await cn.query(sqlInsertReassignDetB, [
+          newCab[0].ID,
+          operation,
+          newAssing.idContrato,
+          newAssing.tarifa,
+          newAssing.condicion,
+          newAssing.tipo,
+          newAssing.terreno,
+          newAssing.fechaIni,
+          newAssing.fechaFin,
+          newAssing.kilometraje,
+        ]);
+
+        // ACTUALIZAMOS LA ASIGNACION
         await cn.query(sqlChangeOpe, [
           operation,
           newAssing.idContrato,
@@ -1234,119 +1335,208 @@ const changeOperation = async (req, res) => {
           newAssing.tipo,
           newAssing.tarifa,
           newAssing.terreno,
-          convertirFecha(dateInit),
-          convertirFecha(dateFinish),
+          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateInit),
+          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateFinish),
           user,
           id,
         ]);
+      } else {
+        // REALIZAR UNA REASIGNACIÓN DE OPERACIÓN
 
-        await cn.query(sqlInsertReassign, [
-          beforeOperation,
-          operation,
-          oldAssign.idContrato,
-          newAssing.idContrato,
-          oldAssign.tarifa,
-          newAssing.tarifa,
-          oldAssign.condicion,
-          newAssing.condicion,
-          oldAssign.archivo,
-          newAssing.archivo,
-          oldAssign.tipo,
-          newAssing.tipo,
-          oldAssign.terreno,
-          newAssing.terreno,
-          convertDate,
-          observation,
-          id,
-          user,
-          user,
-        ]);
-      } else { // REALIZAR UNA REASIGNACIÓN DE OPERACIÓN
+        const sqlInsertReassignCab = `
+          SELECT ID FROM FINAL TABLE (
+            INSERT INTO ${SCHEMA_BD}.T_GC_RE_CAB (ID_ASG_DET, FRE, OBS, TRE, USU_REG)
+            VALUES (?, ?, ?, ?, ?)
+          )
+        `;
+
+        const sqlInsertReassignDetA = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_A (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const sqlInsertReassignDetB = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_B (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const sqlInsertReassignDoc = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DOC (ID_CAB, ID_TIP, LDO, ACH, USU_REG) VALUES (?, ?, ?, ?, ?)
+        `;
+
+        // EJECUTAR SOLO SI PASA A TAIR VENDIDAS
+        const sqlInsertReassignExt = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_EXT_A (ID_CAB, FVE, PVE, MND) VALUES(?, ?, ?, ?)
+        `;
+
+        // EJECUTAR AL FINAL
         const sqlChangeOpe = `
-        UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-        SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
-        WHERE ID = ?
-      `;
-
-        const sqlInsertReassign = `
-        INSERT INTO ${SCHEMA_BD}.TBL_REASIGNACION (ID_OPE, SEC_OPE, ID_CONTRATO, SEC_CONTRATO, TARIFA, SEC_TARIFA, CONDICION, SEC_CONDICION, ARCHIVO, SEC_ARCHIVO, TIPO_CONTRATO, SEC_TIPO_CONTRATO, TERRENO, SEC_TERRENO, FECHA_REASIGNACION, PRECIO_VENTA, MONEDA, OBSERVACION, ID_ASIGNACION, CREADO_POR, ACTUALIZADO_POR)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+          UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+          SET ID_OPE = ?, ID_CONTRATO = ?, CONDICION = ?, CLASE_CONTRATO = ?, TARIFA = ?, ARCHIVO_PDF = ?, TP_TERRENO = ?, FECHA_INI = ?, FECHA_FIN = ?, ACTUALIZADO_POR = ?, ACTUALIZADO_EL = CURRENT TIMESTAMP
+          WHERE ID = ?
+        `;
 
         const oldAssign = {
-          id,
           idContrato: findAssign[0].ID_CONTRATO,
           tipo: findAssign[0].CLASE_CONTRATO.trim(),
           condicion: findAssign[0].CONDICION.trim(),
           tarifa: findAssign[0].TARIFA,
           terreno: String(findAssign[0].TP_TERRENO),
-          archivo: findAssign[0].ARCHIVO_PDF,
+          fechaIni: convertirFecha(findAssign[0].FECHA_INI),
+          fechaFin: convertirFecha(findAssign[0].FECHA_FIN),
+          kilometraje: findAssign[0].KILOMETRAJE,
+          actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
+          actaDevol: validDocSelf,
         };
 
         const newAssing = {
-          id,
           idContrato: Number(contract.split("_")[1]),
           tipo: contract.split("_")[0],
           condicion: condition,
           tarifa: Number(tariff),
           terreno: terrain,
-          archivo: validFile,
+          fechaIni: convertirFecha(dateInit),
+          fechaFin: convertirFecha(dateFinish),
+          kilometraje: mileage,
+          actaEntrega: validDocReceipt,
+          actaVenta: isSelf && validDocSelf ? validDocSelf : null,
         };
 
+        // CABECERA
+        const newCab = await cn.query(sqlInsertReassignCab, [
+          id,
+          convertDate,
+          observation,
+          isSelf ? "V" : "C",
+          user,
+        ]);
+
+        // DETALLE ANTIGUO
+        await cn.query(sqlInsertReassignDetA, [
+          newCab[0].ID,
+          beforeOperation,
+          oldAssign.idContrato,
+          oldAssign.tarifa,
+          oldAssign.condicion,
+          oldAssign.tipo,
+          oldAssign.terreno,
+          oldAssign.fechaIni,
+          oldAssign.fechaFin,
+          oldAssign.kilometraje,
+        ]);
+
+        // DETALLE NUEVO
+        await cn.query(sqlInsertReassignDetB, [
+          newCab[0].ID,
+          operation,
+          newAssing.idContrato,
+          newAssing.tarifa,
+          newAssing.condicion,
+          newAssing.tipo,
+          newAssing.terreno,
+          newAssing.fechaIni,
+          newAssing.fechaFin,
+          newAssing.kilometraje,
+        ]);
+
+        // DOCUMENTO ENTREGA OLD
+        if (oldAssign.actaEntrega) {
+          // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+          await cn.query(sqlInsertReassignDoc, [
+            newCab[0].ID,
+            TIPOS_DOC_REA.ENTREGA,
+            "A",
+            oldAssign.actaEntrega,
+            user,
+          ]);
+        }
+
+        // DOCUMENTO ENTREGA NUEVO
+        if (newAssing.actaEntrega) {
+          // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+          await cn.query(sqlInsertReassignDoc, [
+            newCab[0].ID,
+            TIPOS_DOC_REA.ENTREGA,
+            "B",
+            newAssing.actaEntrega,
+            user,
+          ]);
+        }
+
+        // DOCUMENTO DEVOLUCION
+        if (oldAssign.actaDevol) {
+          // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+          await cn.query(sqlInsertReassignDoc, [
+            newCab[0].ID,
+            TIPOS_DOC_REA.DEVOLUCION,
+            "A",
+            oldAssign.actaDevol,
+            user,
+          ]);
+        }
+
+        // DOCUMENTO VENTA
+        if (newAssing.actaVenta) {
+          // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+          await cn.query(sqlInsertReassignDoc, [
+            newCab[0].ID,
+            TIPOS_DOC_REA.VENTA,
+            "B",
+            newAssing.actaVenta,
+            user,
+          ]);
+        }
+
+        // DETALLE VENTA
+        if (isSelf) {
+          // ID_CAB, FVE, PVE, MND
+          await cn.query(sqlInsertReassignExt, [
+            newCab[0].ID,
+            convertirFecha(dateSelf),
+            selfPrice,
+            currency,
+          ]);
+        }
+
+        // ACTUALIZAMOS LA ASIGNACION
         await cn.query(sqlChangeOpe, [
           operation,
           newAssing.idContrato,
           newAssing.condicion,
           newAssing.tipo,
           newAssing.tarifa,
-          newAssing.archivo,
+          newAssing.actaEntrega,
           newAssing.terreno,
-          isSelf ? convertDate : convertirFecha(dateInit),
-          isSelf ? convertDate : convertirFecha(dateFinish),
+          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateInit),
+          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateFinish),
           user,
           id,
         ]);
 
-        await cn.query(sqlInsertReassign, [
-          beforeOperation,
-          operation,
-          oldAssign.idContrato,
-          newAssing.idContrato,
-          oldAssign.tarifa,
-          newAssing.tarifa,
-          oldAssign.condicion,
-          newAssing.condicion,
-          oldAssign.archivo,
-          newAssing.archivo,
-          oldAssign.tipo,
-          newAssing.tipo,
-          oldAssign.terreno,
-          newAssing.terreno,
-          convertDate,
-          selfPrice ?? null,
-          currency ?? null,
-          observation,
-          id,
-          user,
-          user,
-        ]);
+        // MOVEMOS ARCHIVOS TEMP A SUS RESPECTIVAS CARPETAS DE LA NUBE
+        if (docReceipt && validDocReceipt) {
+          await moveFile(docReceipt, validDocReceipt);
+        }
 
-        if (file && validFile) {
-          await moveFile(file, validFile);
+        if (docReturn && validDocReturn) {
+          await moveFile(docReturn, validDocReturn);
+        }
+
+        if (docSelf && validDocSelf) {
+          await moveFile(docSelf, validDocSelf);
         }
       }
 
-      // await cn.commit();
+      await cn.commit();
     });
 
     return res
       .status(201)
       .json({ success: true, message: "Vehiculo traspasado correctamente" });
   } catch (error) {
+    await cn.rollback();
+
     if (error.responseBody) {
       return res.status(error.statusCode || 500).json(error.responseBody);
     }
-    // await cn.rollback();
 
     console.error(error);
 

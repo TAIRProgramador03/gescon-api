@@ -1,0 +1,13 @@
+const OPERACIONES_TAIR = {
+  LIMA: 65,
+  AREQUIPA: 64,
+  VENDIDAS: 109,
+};
+
+const TIPOS_DOC_REA = {
+  ENTREGA: 1,
+  DEVOLUCION: 2,
+  VENTA: 3,
+};
+
+module.exports = { OPERACIONES_TAIR, TIPOS_DOC_REA };
