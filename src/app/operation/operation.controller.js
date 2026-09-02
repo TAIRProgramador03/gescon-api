@@ -14,7 +14,10 @@ const path = require("path");
 const mime = require("mime-types");
 const ExcelJS = require("exceljs");
 const { PutObjectCommand } = require("@aws-sdk/client-s3");
-const { OPERACIONES_TAIR, TIPOS_DOC_REA } = require("../../shared/constant/operations.js")
+const {
+  OPERACIONES_TAIR,
+  TIPOS_DOC_REA,
+} = require("../../shared/constant/operations.js");
 
 const listOperations = async (req, res) => {
   const { idCli } = req.query; // Obtiene el idCli de los parámetros de consulta
@@ -1001,7 +1004,9 @@ const listVehPending = async (req, res) => {
         ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
         ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
-        WHERE PT.RN = 1 AND TAD.ID_OPE <> PV.SECOPE ${filtros}
+        WHERE PT.RN = 1 AND TAD.ID_OPE <> PV.SECOPE 
+        AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
+        ${filtros}
         ORDER BY TAD.ID ASC
       `;
 
@@ -1025,7 +1030,10 @@ const listVehPending = async (req, res) => {
         terreno: row.TP_TERRENO,
         fechaInicio: row.FECHA_INICIO.trim(),
         fechaFin: row.FECHA_FIN.trim(),
-        esVendida: row.ID_OPE_ACTUAL == 109 ? true : false,
+        esVendida:
+          row.ID_OPE_ACTUAL == OPERACIONES_TAIR.VENDIDAS ? true : false,
+        esPerdida:
+          row.ID_OPE_ACTUAL == OPERACIONES_TAIR.PERDIDAS ? true : false,
       }));
     });
 
@@ -1102,7 +1110,9 @@ const listVehNoPending = async (req, res) => {
       ON TD.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'H'
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
       ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
-      WHERE PT.RN = 1 AND TAD.ID_OPE = PV.SECOPE AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.LIMA}, ${OPERACIONES_TAIR.AREQUIPA}) ${filtros}
+      WHERE PT.RN = 1 AND TAD.ID_OPE = PV.SECOPE 
+      AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.LIMA}, ${OPERACIONES_TAIR.AREQUIPA}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PENDIENTES}, ${OPERACIONES_TAIR.PERDIDAS}) 
+      ${filtros}
       ORDER BY TAD.ID ASC
     `;
 
@@ -1176,41 +1186,42 @@ const changeOperation = async (req, res) => {
     docReceipt, // ACTA ENTREGA
     docReturn, // ACTA DEVOLUCION
     docSelf, // ACTA VENTA
+    docTransfer, // ACTA TRASLADO
+    docLoserTotal, // CARTA DE PERDIDA TOTAL
 
     // PARA VENTA
     dateSelf, // FECHA VENTA
     selfPrice, // PRECIO DE VENTA
-    currency, // MONEDA 0 = SOLES 1 = DOLAR
+    currency, // MONEDA: 0 = SOLES, 1 = DOLAR
+
+    // PARA PERDIDAS TOTALES
+    numbSinister, // NUMERO DE SINIESTRO
+    dateLoser, // FECHA CARTA PERDIDA
+    insurer, // ASEGURADORA: 0 = MAPFRE, 1 = RIMAC
+    letterName, // NOMBRE DE CARTA
   } = req.body;
 
   const isSelf = operation == OPERACIONES_TAIR.VENDIDAS;
+  const isLoser = operation == OPERACIONES_TAIR.PERDIDAS;
+
   const convertDate = convertirFecha(date);
+
   const validDocReceipt = docReceipt ? docReceipt.replace(/^temp\//, "") : null;
   const validDocReturn = docReturn ? docReturn.replace(/^temp\//, "") : null;
   const validDocSelf = docSelf ? docSelf.replace(/^temp\//, "") : null;
+  const validDocTransfer = docTransfer
+    ? docTransfer.replace(/^temp\//, "")
+    : null;
+  const validDocLoser = docLoserTotal
+    ? docLoserTotal.replace(/^temp\//, "")
+    : null;
 
-  /**
-   * DATOS QUE NECESITA LA CABECERA
-   * id, date, observation, *type_reassign*
-   */
-
-  /**
-   * DATOS QUE NECESITA DETALLES A (antiguo)
-   * *id_cab*, beforeOperation, *id_cont_before*, *tariff_before*, *condition_before*, *type_cont_before*, *terrain_before*, *dateInit_before*, *dateFinish_before*, *mileage_before*
-   */
-
-  /**
-   * DATOS QUE NECESITA DETALLES B (nuevo)
-   * *id_cab*, operation, *id_cont*, tariff, condition, *type_cont*, terrain, dateInit, dateFinish, *mileage*
-   */
-
-  /**
-   * DATOS QUE NECESITA LOS DOCUMENTOS
-   * *id_cab*, *id_type_doc*, *side*, *file*
-   */
+  let cn; // CONEXION FUERA DE SCOPE PARA ROLLBACK
 
   try {
-    await withConnection(async (cn) => {
+    await withConnection(async (connection) => {
+      cn = connection;
+
       const sqlFind = `
         SELECT TAD.ID_CONTRATO , TAD.CONDICION, TAD.FECHA_INI , TAD.FECHA_FIN, TAD.CLASE_CONTRATO , TAD.TARIFA, TAD.ARCHIVO_PDF , TAD.TP_TERRENO, PT.KILOMETRAJE 
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
@@ -1274,8 +1285,8 @@ const changeOperation = async (req, res) => {
           condicion: findAssign[0].CONDICION.trim(),
           tarifa: findAssign[0].TARIFA,
           terreno: String(findAssign[0].TP_TERRENO),
-          fechaIni: convertirFecha(findAssign[0].FECHA_INI),
-          fechaFin: convertirFecha(findAssign[0].FECHA_FIN),
+          fechaIni: convertirFecha(findAssign[0].FECHA_INI.trim()),
+          fechaFin: convertirFecha(findAssign[0].FECHA_FIN.trim()),
           kilometraje: findAssign[0].KILOMETRAJE,
         };
 
@@ -1294,8 +1305,8 @@ const changeOperation = async (req, res) => {
         const newCab = await cn.query(sqlInsertReassignCab, [
           id,
           convertDate,
-          observation,
-          isSelf ? "V" : "C",
+          observation ?? null,
+          "C",
           user,
         ]);
 
@@ -1335,8 +1346,8 @@ const changeOperation = async (req, res) => {
           newAssing.tipo,
           newAssing.tarifa,
           newAssing.terreno,
-          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateInit),
-          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateFinish),
+          convertirFecha(dateInit),
+          convertirFecha(dateFinish),
           user,
           id,
         ]);
@@ -1363,8 +1374,13 @@ const changeOperation = async (req, res) => {
         `;
 
         // EJECUTAR SOLO SI PASA A TAIR VENDIDAS
-        const sqlInsertReassignExt = `
+        const sqlInsertReassignExtA = `
           INSERT INTO ${SCHEMA_BD}.T_GC_RE_EXT_A (ID_CAB, FVE, PVE, MND) VALUES(?, ?, ?, ?)
+        `;
+
+        // EJECUTAR SOLO SI PASA A TAIR PERDIDAS TOTALES
+        const sqlInsertReassignExtB = `
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_EXT_B (ID_CAB, NST, FCP, ASG, NCT) VALUES (?, ?, ?, ?, ?)
         `;
 
         // EJECUTAR AL FINAL
@@ -1380,11 +1396,12 @@ const changeOperation = async (req, res) => {
           condicion: findAssign[0].CONDICION.trim(),
           tarifa: findAssign[0].TARIFA,
           terreno: String(findAssign[0].TP_TERRENO),
-          fechaIni: convertirFecha(findAssign[0].FECHA_INI),
-          fechaFin: convertirFecha(findAssign[0].FECHA_FIN),
+          fechaIni: convertirFecha(findAssign[0].FECHA_INI.trim()),
+          fechaFin: convertirFecha(findAssign[0].FECHA_FIN.trim()),
           kilometraje: findAssign[0].KILOMETRAJE,
           actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
-          actaDevol: validDocSelf,
+          actaDevol: validDocReturn,
+          actaTraslado: validDocTransfer,
         };
 
         const newAssing = {
@@ -1396,16 +1413,18 @@ const changeOperation = async (req, res) => {
           fechaIni: convertirFecha(dateInit),
           fechaFin: convertirFecha(dateFinish),
           kilometraje: mileage,
-          actaEntrega: validDocReceipt,
+          actaEntrega:
+            !isSelf && !isLoser && validDocReceipt ? validDocReceipt : null,
           actaVenta: isSelf && validDocSelf ? validDocSelf : null,
+          cartaPerdida: isLoser && validDocLoser ? validDocLoser : null,
         };
 
         // CABECERA
         const newCab = await cn.query(sqlInsertReassignCab, [
           id,
           convertDate,
-          observation,
-          isSelf ? "V" : "C",
+          observation ?? null,
+          isSelf ? "V" : isLoser ? "P" : "C",
           user,
         ]);
 
@@ -1450,7 +1469,7 @@ const changeOperation = async (req, res) => {
         }
 
         // DOCUMENTO ENTREGA NUEVO
-        if (newAssing.actaEntrega) {
+        if (!isSelf && !isLoser && newAssing.actaEntrega) {
           // ID_CAB, ID_TIP, LDO, ACH, USU_REG
           await cn.query(sqlInsertReassignDoc, [
             newCab[0].ID,
@@ -1462,7 +1481,7 @@ const changeOperation = async (req, res) => {
         }
 
         // DOCUMENTO DEVOLUCION
-        if (oldAssign.actaDevol) {
+        if (!isLoser && oldAssign.actaDevol) {
           // ID_CAB, ID_TIP, LDO, ACH, USU_REG
           await cn.query(sqlInsertReassignDoc, [
             newCab[0].ID,
@@ -1473,14 +1492,14 @@ const changeOperation = async (req, res) => {
           ]);
         }
 
-        // DOCUMENTO VENTA
-        if (newAssing.actaVenta) {
+        // DOCUMENTO TRASLADO
+        if (!isLoser && oldAssign.actaTraslado) {
           // ID_CAB, ID_TIP, LDO, ACH, USU_REG
           await cn.query(sqlInsertReassignDoc, [
             newCab[0].ID,
-            TIPOS_DOC_REA.VENTA,
-            "B",
-            newAssing.actaVenta,
+            TIPOS_DOC_REA.TRASLADO,
+            "A",
+            oldAssign.actaTraslado,
             user,
           ]);
         }
@@ -1488,12 +1507,48 @@ const changeOperation = async (req, res) => {
         // DETALLE VENTA
         if (isSelf) {
           // ID_CAB, FVE, PVE, MND
-          await cn.query(sqlInsertReassignExt, [
+          await cn.query(sqlInsertReassignExtA, [
             newCab[0].ID,
             convertirFecha(dateSelf),
             selfPrice,
             currency,
           ]);
+
+          // DOCUMENTO VENTA
+          if (newAssing.actaVenta) {
+            // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+            await cn.query(sqlInsertReassignDoc, [
+              newCab[0].ID,
+              TIPOS_DOC_REA.VENTA,
+              "B",
+              newAssing.actaVenta,
+              user,
+            ]);
+          }
+        }
+
+        // DETALLE PERDIDATOTAL
+        if (isLoser) {
+          // ID_CAB, NST, FCP, ASG, NCT
+          await cn.query(sqlInsertReassignExtB, [
+            newCab[0].ID,
+            numbSinister,
+            convertirFecha(dateLoser),
+            insurer,
+            letterName,
+          ]);
+
+          // DOCUMENTO CARTA DE PERDIDA
+          if (newAssing.cartaPerdida) {
+            // ID_CAB, ID_TIP, LDO, ACH, USU_REG
+            await cn.query(sqlInsertReassignDoc, [
+              newCab[0].ID,
+              TIPOS_DOC_REA.PERDIDA,
+              "B",
+              newAssing.cartaPerdida,
+              user,
+            ]);
+          }
         }
 
         // ACTUALIZAMOS LA ASIGNACION
@@ -1523,6 +1578,10 @@ const changeOperation = async (req, res) => {
         if (docSelf && validDocSelf) {
           await moveFile(docSelf, validDocSelf);
         }
+
+        if (docTransfer && validDocTransfer) {
+          await moveFile(docTransfer, validDocTransfer);
+        }
       }
 
       await cn.commit();
@@ -1532,7 +1591,9 @@ const changeOperation = async (req, res) => {
       .status(201)
       .json({ success: true, message: "Vehiculo traspasado correctamente" });
   } catch (error) {
-    await cn.rollback();
+    if (cn) {
+      await cn.rollback();
+    }
 
     if (error.responseBody) {
       return res.status(error.statusCode || 500).json(error.responseBody);
