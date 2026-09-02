@@ -1620,24 +1620,33 @@ const listReassign = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const sql = `
-      SELECT TR.ID, PO.DESCRIPCION AS OPERACION_ANTERIOR, PO2.DESCRIPCION AS OPERACION_NUEVA, TR.FECHA_REASIGNACION, TR.ARCHIVO
-      FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
-      ON PO.ID = TR.ID_OPE
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO2
-      ON PO2.ID = TR.SEC_OPE
-      WHERE TR.ID_ASIGNACION = ?
-      ORDER BY TR.ID ASC
+      WITH
+      DETALLE_A AS (
+        SELECT tgrda.ID_CAB, PO.DESCRIPCION AS OPERACION FROM ${SCHEMA_BD}.T_GC_RE_DET_A tgrda 
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+        ON PO.ID = tgrda.ID_OPE 
+      ),
+      DETALLE_B AS (
+        SELECT tgrdb.ID_CAB, PO.DESCRIPCION AS OPERACION FROM ${SCHEMA_BD}.T_GC_RE_DET_B tgrdb 
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+        ON PO.ID = tgrdb.ID_OPE 
+      )
+      SELECT CAB.ID, CAB.FRE, A.OPERACION AS OPE_ANTERIOR, B.OPERACION AS OPE_NUEVA FROM ${SCHEMA_BD}.T_GC_RE_CAB CAB 
+      LEFT JOIN DETALLE_A A 
+      ON CAB.ID = A.ID_CAB
+      LEFT JOIN DETALLE_B B 
+      ON CAB.ID = B.ID_CAB
+      WHERE ID_ASG_DET = ? 
+      ORDER BY FRE DESC
     `;
 
       const result = await cn.query(sql, [id]);
 
       return result.map((row) => ({
         id: row.ID,
-        opeAnterior: row.OPERACION_ANTERIOR.trim(),
-        opeNueva: row.OPERACION_NUEVA.trim(),
-        fecha: row.FECHA_REASIGNACION,
-        archivo: row.ARCHIVO,
+        opeAnterior: row.OPE_ANTERIOR.trim(),
+        opeNueva: row.OPE_NUEVA.trim(),
+        fecha: row.FRE,
       }));
     });
 
@@ -1662,100 +1671,180 @@ const getReassignById = async (req, res) => {
   }
 
   try {
-    const data = await withConnection(async (cn) => {
+    const { cabReassing, docReassing } = await withConnection(async (cn) => {
       const sql = `
-      SELECT
-        PO.DESCRIPCION AS OPERACION_ANTERIOR,
-        PO2.DESCRIPCION AS OPERACION_NUEVA,
-        COALESCE(TC.NRO_CONTRATO, TD.NRO_DOC) AS CONTRATO_ANTERIOR,
-        COALESCE(TC2.NRO_CONTRATO, TD2.NRO_DOC) AS CONTRATO_NUEVO,
-        TR.TARIFA AS TARIFA_ANTIGUA,
-        TR.SEC_TARIFA AS TARIFA_NUEVA,
-        TR.CONDICION AS CONDICION_ANTIGUA,
-        TR.SEC_CONDICION AS CONDICION_NUEVA,
-        TR.TERRENO AS TERRENO_ANTIGUO,
-        TR.SEC_TERRENO TERRENO_NUEVO,
-        TR.TIPO_CONTRATO AS TIPO_ANTERIOR,
-        TR.SEC_TIPO_CONTRATO AS TIPO_NUEVO,
-        TR.FECHA_REASIGNACION,
-        TR.ARCHIVO AS ARCHIVO_ANTERIOR,
-        TR.SEC_ARCHIVO AS ARCHIVO_NUEVO,
-        TR.PRECIO_VENTA,
-        TR.MONEDA,
-        TR.OBSERVACION
-      FROM ${SCHEMA_BD}.TBL_REASIGNACION TR
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
-        ON PO.ID = TR.ID_OPE
-      JOIN ${SCHEMA_BD}.PO_OPERACIONES PO2
-        ON PO2.ID = TR.SEC_OPE
-      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-        ON TR.ID_CONTRATO = TC.ID
-        AND TR.TIPO_CONTRATO = 'P'
-      LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC2
-        ON TR.SEC_CONTRATO = TC2.ID
-        AND TR.SEC_TIPO_CONTRATO = 'P'
-      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
-        ON TR.ID_CONTRATO = TD.ID
-        AND TR.TIPO_CONTRATO = 'H'
-      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
-        ON TR.SEC_CONTRATO = TD2.ID
-        AND TR.SEC_TIPO_CONTRATO = 'H'
-      WHERE TR.ID = ?
-    `;
+        WITH
+        DETALLE_A AS (
+          SELECT 
+            tgrda.ID_CAB, 
+            PO.DESCRIPCION AS OPERACION,
+            COALESCE(TC.NRO_CONTRATO, tc2.NRO_DOC) AS CONTRATO, 
+            tgrda.TCON,
+            tgrda.TRF, 
+            tgrda.TRN,
+            tgrda.CND, 
+            tgrda.FEN , 
+            tgrda.FDV, 
+            tgrda.ODM
+          FROM ${SCHEMA_BD}.T_GC_RE_DET_A tgrda
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+          ON PO.ID = tgrda.ID_OPE
+          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+          ON TC.ID = tgrda.ID_CON AND tgrda.TCON = 'P'
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+          ON TC2.ID = tgrda.ID_CON AND tgrda.TCON = 'H' 
+        ),
+        DETALLE_B AS (
+          SELECT 
+            tgrdb.ID_CAB, 
+            PO.DESCRIPCION AS OPERACION,
+            COALESCE(TC.NRO_CONTRATO, tc2.NRO_DOC) AS CONTRATO, 
+            tgrdb.TCON,
+            tgrdb.TRF, 
+            tgrdb.TRN,
+            tgrdb.CND, 
+            tgrdb.FEN , 
+            tgrdb.FDV, 
+            tgrdb.ODM
+          FROM ${SCHEMA_BD}.T_GC_RE_DET_B tgrdb 
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
+          ON PO.ID = tgrdb.ID_OPE
+          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc 
+          ON TC.ID = tgrdb.ID_CON AND tgrdb.TCON = 'P'
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2 
+          ON TC2.ID = tgrdb.ID_CON AND tgrdb.TCON = 'H'
+        )
+        SELECT 
+          CAB.FRE, 
+          CAB.OBS, 
+          CAB.TRE, 
+          A.OPERACION AS OPE_ANTERIOR, 
+          B.OPERACION AS OPE_NUEVO,
+          A.CONTRATO AS CONT_ANTERIOR,
+          B.CONTRATO AS CONT_NUEVO,
+          A.TCON AS TCON_ANTERIOR,
+          B.TCON AS TCON_NUEVO,
+          A.FEN AS FEN_ANTERIOR,
+          B.FEN AS FEN_NUEVO,
+          A.FDV AS FDV_ANTERIOR,
+          B.FDV AS FDV_NUEVO,
+          A.TRF AS TRF_ANTERIOR,
+          B.TRF AS TRF_NUEVO,
+          A.CND AS CND_ANTERIOR,
+          B.CND AS CND_NUEVO,
+          A.TRN AS TRN_ANTERIOR,
+          B.TRN AS TRN_NUEVO,
+          A.ODM AS ODM_ANTERIOR,
+          B.ODM AS ODM_NUEVO,
+          EXA.FVE,
+          EXA.MND,
+          EXA.PVE,
+          EXB.FCP,
+          EXB.NST,
+          EXB.NCT,
+          EXB.ASG
+        FROM ${SCHEMA_BD}.T_GC_RE_CAB CAB
+        LEFT JOIN DETALLE_A A
+        ON CAB.ID = A.ID_CAB
+        LEFT JOIN DETALLE_B B
+        ON CAB.ID = B.ID_CAB
+        LEFT JOIN ${SCHEMA_BD}.T_GC_RE_EXT_A EXA
+        ON CAB.ID = EXA.ID_CAB
+        LEFT JOIN ${SCHEMA_BD}.T_GC_RE_EXT_B EXB
+        ON CAB.ID = EXB.ID_CAB
+        WHERE CAB.ID = ?
+      `;
 
-      return await cn.query(sql, [id]);
+      const sqlDoc = `
+        SELECT tgrdt.DSC, tgrd.LDO, tgrd.ACH FROM ${SCHEMA_BD}.T_GC_RE_DOC tgrd 
+        LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DOC_TIP tgrdt 
+        ON tgrd.ID_TIP = tgrdt.ID
+        WHERE tgrd.ID_CAB = ?
+      `;
+
+      const cabReassing = await cn.query(sql, [id]);
+      const docReassing = await cn.query(sqlDoc, [id]);
+
+      return { cabReassing, docReassing };
     });
 
-    if (!data[0] || data.length === 0)
+    if (!cabReassing[0] || cabReassing.length === 0)
       return res
         .status(404)
         .json({ success: false, message: "No se encontro la reasignación" });
 
     return res.status(200).json({
-      fecha: data[0].FECHA_REASIGNACION.trim(),
-      observacion: data[0].OBSERVACION ? data[0].OBSERVACION.trim() : "",
-      precioVenta: data[0].PRECIO_VENTA,
-      moneda: data[0].MONEDA,
+      fecha: cabReassing[0].FRE.trim(),
+      observacion: cabReassing[0].OBS ? cabReassing[0].OBS.trim() : "",
+      tipo_rea: cabReassing[0].TRE.trim(),
       anterior: {
-        operacion: data[0].OPERACION_ANTERIOR.trim(),
-        contrato: data[0].CONTRATO_ANTERIOR.trim(),
-        tarifa: data[0].TARIFA_ANTIGUA,
-        condicion: transformType(data[0].CONDICION_ANTIGUA.trim(), {
+        operacion: cabReassing[0].OPE_ANTERIOR.trim(),
+        contrato: cabReassing[0].CONT_ANTERIOR.trim(),
+        tipo: cabReassing[0].TCON_ANTERIOR,
+        fecEntrega: cabReassing[0].FEN_ANTERIOR,
+        fecDevol: cabReassing[0].FDV_ANTERIOR,
+        tarifa: cabReassing[0].TRF_ANTERIOR,
+        condicion: transformType(cabReassing[0].CND_ANTERIOR, {
           0: "Titular",
           1: "Retén",
           2: "Logística",
           3: "Pendiente",
         }),
-        terreno: transformType(data[0].TERRENO_ANTIGUO.trim(), {
+        terreno: transformType(cabReassing[0].TRN_ANTERIOR, {
           0: "Superficie",
           1: "Socavón",
           2: "Ciudad",
           3: "Severo",
           4: "Pendiente",
         }),
-        tipo: data[0].TIPO_ANTERIOR.trim(),
-        archivo: data[0].ARCHIVO_ANTERIOR,
+        kilometraje: cabReassing[0].ODM_ANTERIOR,
+        documentos: docReassing
+          .filter((doc) => doc.LDO === "A")
+          .map((doc) => ({
+            archivo: doc.ACH.trim(),
+            descripcion: doc.DSC,
+          })),
       },
       nuevo: {
-        operacion: data[0].OPERACION_NUEVA.trim(),
-        contrato: data[0].CONTRATO_NUEVO.trim(),
-        tarifa: data[0].TARIFA_NUEVA,
-        condicion: transformType(data[0].CONDICION_NUEVA.trim(), {
+        operacion: cabReassing[0].OPE_NUEVO.trim(),
+        contrato: cabReassing[0].CONT_NUEVO.trim(),
+        tipo: cabReassing[0].TCON_NUEVO,
+        fecEntrega: cabReassing[0].FEN_NUEVO,
+        fecDevol: cabReassing[0].FDV_NUEVO,
+        tarifa: cabReassing[0].TRF_NUEVO,
+        condicion: transformType(cabReassing[0].CND_NUEVO, {
           0: "Titular",
           1: "Retén",
           2: "Logística",
           3: "Pendiente",
         }),
-        terreno: transformType(data[0].TERRENO_NUEVO.trim(), {
+        terreno: transformType(cabReassing[0].TRN_NUEVO, {
           0: "Superficie",
           1: "Socavón",
           2: "Ciudad",
           3: "Severo",
           4: "Pendiente",
         }),
-        tipo: data[0].TIPO_NUEVO.trim(),
-        archivo: data[0].ARCHIVO_NUEVO,
+        kilometraje: cabReassing[0].ODM_NUEVO,
+        documentos: docReassing
+          .filter((doc) => doc.LDO === "B")
+          .map((doc) => ({
+            archivo: doc.ACH.trim(),
+            descripcion: doc.DSC,
+          })),
       },
+      extra: {
+        fechaVenta: cabReassing[0].FVE,
+        moneda: cabReassing[0].MND,
+        precioVenta: cabReassing[0].PVE,
+        fechaCarta: cabReassing[0].FCP,
+        nroSiniestro: cabReassing[0].NST,
+        nombreCarta: cabReassing[0].NCT,
+        aseguradora: cabReassing[0].ASG ? transformType(cabReassing[0].ASG, {
+          '0': "Mapfre",
+          '1': "Rimac"
+        }) : null,
+      }
     });
   } catch (error) {
     console.error(error);
