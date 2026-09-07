@@ -1010,6 +1010,15 @@ const listVehPending = async (req, res) => {
         ORDER BY TAD.ID ASC
       `;
 
+      const EXCLUDED_OPERATIONS = [
+        OPERACIONES_TAIR.AJENAS,
+        OPERACIONES_TAIR.AREQUIPA,
+        OPERACIONES_TAIR.LIMA,
+        OPERACIONES_TAIR.PENDIENTES,
+        OPERACIONES_TAIR.PERDIDAS,
+        OPERACIONES_TAIR.VENDIDAS,
+      ];
+
       const result = await cn.query(sql, params);
 
       return result.map((row) => ({
@@ -1034,6 +1043,15 @@ const listVehPending = async (req, res) => {
           row.ID_OPE_ACTUAL == OPERACIONES_TAIR.VENDIDAS ? true : false,
         esPerdida:
           row.ID_OPE_ACTUAL == OPERACIONES_TAIR.PERDIDAS ? true : false,
+        esDirecta:
+          row.ID_OPE_ASIGN != OPERACIONES_TAIR.AREQUIPA &&
+          row.ID_OPE_ASIGN != OPERACIONES_TAIR.LIMA,
+        esEntrega:
+          !EXCLUDED_OPERATIONS.filter(
+            (ope) =>
+              ope != OPERACIONES_TAIR.LIMA && ope != OPERACIONES_TAIR.AREQUIPA,
+          ).includes(row.ID_OPE_ASIGN) &&
+          !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ACTUAL),
       }));
     });
 
@@ -1177,6 +1195,7 @@ const changeOperation = async (req, res) => {
     contract, // NUEVO CONTRATO
     dateInit, // NUEVA FECHA ENTREGRA
     dateFinish, // NUEVA FECHA FINAL
+    dateTransffer, // NUEVA FECHA TRASLADO
     operation, // NUEVA OPERACION
     tariff, // NUEVA TARIFA
     terrain, // NUEVO TERRENO
@@ -1201,8 +1220,24 @@ const changeOperation = async (req, res) => {
     letterName, // NOMBRE DE CARTA
   } = req.body;
 
+  const EXCLUDED_OPERATIONS = [
+    OPERACIONES_TAIR.AJENAS,
+    OPERACIONES_TAIR.AREQUIPA,
+    OPERACIONES_TAIR.LIMA,
+    OPERACIONES_TAIR.PENDIENTES,
+    OPERACIONES_TAIR.PERDIDAS,
+    OPERACIONES_TAIR.VENDIDAS,
+  ];
+
   const isSelf = operation == OPERACIONES_TAIR.VENDIDAS;
+  const isDirect =
+    beforeOperation != OPERACIONES_TAIR.LIMA &&
+    beforeOperation != OPERACIONES_TAIR.AREQUIPA;
   const isLoser = operation == OPERACIONES_TAIR.PERDIDAS;
+  const isDelivery =
+    !EXCLUDED_OPERATIONS.filter(
+      (ope) => ope != OPERACIONES_TAIR.LIMA && ope != OPERACIONES_TAIR.AREQUIPA,
+    ).includes(beforeOperation) && !EXCLUDED_OPERATIONS.includes(operation);
 
   const convertDate = convertirFecha(date);
 
@@ -1362,11 +1397,11 @@ const changeOperation = async (req, res) => {
         `;
 
         const sqlInsertReassignDetA = `
-          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_A (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_A (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM, FTR) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const sqlInsertReassignDetB = `
-          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_B (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO ${SCHEMA_BD}.T_GC_RE_DET_B (ID_CAB, ID_OPE, ID_CON, TRF, CND, TCON, TRN, FEN, FDV, ODM, FTR) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const sqlInsertReassignDoc = `
@@ -1396,8 +1431,29 @@ const changeOperation = async (req, res) => {
           condicion: findAssign[0].CONDICION.trim(),
           tarifa: findAssign[0].TARIFA,
           terreno: String(findAssign[0].TP_TERRENO),
-          fechaIni: convertirFecha(findAssign[0].FECHA_INI.trim()),
-          fechaFin: convertirFecha(findAssign[0].FECHA_FIN.trim()),
+          fechaIni: isDelivery
+            ? convertirFecha(findAssign[0].FECHA_INI.trim())
+            : isSelf
+              ? isDirect
+                ? convertirFecha(findAssign[0].FECHA_INI.trim())
+                : null
+              : convertirFecha(findAssign[0].FECHA_INI.trim()),
+          fechaFin: isDelivery
+            ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+            : isSelf
+              ? isDirect
+                ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+                : dateFinish
+                  ? convertirFecha(dateFinish)
+                  : null
+              : convertirFecha(findAssign[0].FECHA_FIN.trim()),
+          fechaTraslado: isDelivery
+            ? null
+            : isSelf
+              ? isDirect
+                ? null
+                : convertirFecha(dateTransffer)
+              : convertirFecha(dateTransffer),
           kilometraje: findAssign[0].KILOMETRAJE,
           actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
           actaDevol: validDocReturn,
@@ -1410,8 +1466,23 @@ const changeOperation = async (req, res) => {
           condicion: condition,
           tarifa: Number(tariff),
           terreno: terrain,
-          fechaIni: convertirFecha(dateInit),
-          fechaFin: convertirFecha(dateFinish),
+          fechaIni: isDelivery ? convertirFecha(dateInit) : null,
+          fechaFin: isDelivery
+            ? convertirFecha(dateFinish)
+            : isSelf
+              ? isDirect
+                ? dateFinish
+                  ? convertirFecha(dateFinish)
+                  : null
+                : null
+              : null,
+          fechaTraslado: isDelivery
+            ? convertirFecha(dateTransffer)
+            : isSelf
+              ? isDirect
+                ? convertirFecha(dateTransffer)
+                : null
+              : null,
           kilometraje: mileage,
           actaEntrega:
             !isSelf && !isLoser && validDocReceipt ? validDocReceipt : null,
@@ -1440,6 +1511,7 @@ const changeOperation = async (req, res) => {
           oldAssign.fechaIni,
           oldAssign.fechaFin,
           oldAssign.kilometraje,
+          oldAssign.fechaTraslado,
         ]);
 
         // DETALLE NUEVO
@@ -1454,6 +1526,7 @@ const changeOperation = async (req, res) => {
           newAssing.fechaIni,
           newAssing.fechaFin,
           newAssing.kilometraje,
+          newAssing.fechaTraslado,
         ]);
 
         // DOCUMENTO ENTREGA OLD
@@ -1486,7 +1559,7 @@ const changeOperation = async (req, res) => {
           await cn.query(sqlInsertReassignDoc, [
             newCab[0].ID,
             TIPOS_DOC_REA.DEVOLUCION,
-            "A",
+            isDelivery ? "B" : isSelf ? (isDirect ? "B" : "A") : "A",
             oldAssign.actaDevol,
             user,
           ]);
@@ -1498,7 +1571,7 @@ const changeOperation = async (req, res) => {
           await cn.query(sqlInsertReassignDoc, [
             newCab[0].ID,
             TIPOS_DOC_REA.TRASLADO,
-            "A",
+            isDelivery ? "B" : isSelf ? (isDirect ? "B" : "A") : "A",
             oldAssign.actaTraslado,
             user,
           ]);
@@ -1560,8 +1633,16 @@ const changeOperation = async (req, res) => {
           newAssing.tarifa,
           newAssing.actaEntrega,
           newAssing.terreno,
-          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateInit),
-          isSelf ? convertirFecha(dateSelf) : convertirFecha(dateFinish),
+          isDelivery
+            ? convertirFecha(dateInit)
+            : isSelf
+              ? convertirFecha(dateSelf)
+              : convertirFecha(findAssign[0].FECHA_INI.trim()),
+          isDelivery
+            ? convertirFecha(dateFinish)
+            : isSelf
+              ? convertirFecha(dateSelf)
+              : convertirFecha(findAssign[0].FECHA_FIN.trim()),
           user,
           id,
         ]);
@@ -1683,9 +1764,10 @@ const getReassignById = async (req, res) => {
             tgrda.TRF, 
             tgrda.TRN,
             tgrda.CND, 
-            tgrda.FEN , 
+            tgrda.FEN, 
             tgrda.FDV, 
-            tgrda.ODM
+            tgrda.ODM,
+            tgrda.FTR
           FROM ${SCHEMA_BD}.T_GC_RE_DET_A tgrda
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
           ON PO.ID = tgrda.ID_OPE
@@ -1703,9 +1785,10 @@ const getReassignById = async (req, res) => {
             tgrdb.TRF, 
             tgrdb.TRN,
             tgrdb.CND, 
-            tgrdb.FEN , 
+            tgrdb.FEN, 
             tgrdb.FDV, 
-            tgrdb.ODM
+            tgrdb.ODM,
+            tgrdb.FTR
           FROM ${SCHEMA_BD}.T_GC_RE_DET_B tgrdb 
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES po 
           ON PO.ID = tgrdb.ID_OPE
@@ -1736,6 +1819,8 @@ const getReassignById = async (req, res) => {
           B.TRN AS TRN_NUEVO,
           A.ODM AS ODM_ANTERIOR,
           B.ODM AS ODM_NUEVO,
+          A.FTR AS FTR_ANTERIOR,
+          B.FTR AS FTR_NUEVO,
           EXA.FVE,
           EXA.MND,
           EXA.PVE,
@@ -1783,6 +1868,7 @@ const getReassignById = async (req, res) => {
         tipo: cabReassing[0].TCON_ANTERIOR,
         fecEntrega: cabReassing[0].FEN_ANTERIOR,
         fecDevol: cabReassing[0].FDV_ANTERIOR,
+        fecTras: cabReassing[0].FTR_ANTERIOR,
         tarifa: cabReassing[0].TRF_ANTERIOR,
         condicion: transformType(cabReassing[0].CND_ANTERIOR, {
           0: "Titular",
@@ -1811,6 +1897,7 @@ const getReassignById = async (req, res) => {
         tipo: cabReassing[0].TCON_NUEVO,
         fecEntrega: cabReassing[0].FEN_NUEVO,
         fecDevol: cabReassing[0].FDV_NUEVO,
+        fecTras: cabReassing[0].FTR_NUEVO,
         tarifa: cabReassing[0].TRF_NUEVO,
         condicion: transformType(cabReassing[0].CND_NUEVO, {
           0: "Titular",
@@ -1840,11 +1927,13 @@ const getReassignById = async (req, res) => {
         fechaCarta: cabReassing[0].FCP,
         nroSiniestro: cabReassing[0].NST,
         nombreCarta: cabReassing[0].NCT,
-        aseguradora: cabReassing[0].ASG ? transformType(cabReassing[0].ASG, {
-          '0': "Mapfre",
-          '1': "Rimac"
-        }) : null,
-      }
+        aseguradora: cabReassing[0].ASG
+          ? transformType(cabReassing[0].ASG, {
+              0: "Mapfre",
+              1: "Rimac",
+            })
+          : null,
+      },
     });
   } catch (error) {
     console.error(error);
