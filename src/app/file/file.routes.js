@@ -28,7 +28,7 @@ const upload = multer({
       cb(new Error("Solo se permiten archivos PDF"), false); // Rechazar
     }
   },
-  limits: { fileSize: 50 * 1024 * 1024 }, // Limite de tamaño de archivo a 50MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // Limite de tamaño de archivo a 100MB
 }).single("archivoPdf");
 
 Router.post(

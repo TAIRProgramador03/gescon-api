@@ -93,7 +93,8 @@ app.use(
       "https://gescon.tair360.net",
       "https://tair360.net",
       "http://104.21.60.95",
-      "http://172.67.195.129"
+      "http://172.67.195.129",
+      "https://gescon.pages.dev"
     ], // Permite solicitudes solo desde esta URL
     credentials: true, // Permite el envío de cookies con las solicitudes
   }),
