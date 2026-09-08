@@ -1046,12 +1046,7 @@ const listVehPending = async (req, res) => {
         esDirecta:
           row.ID_OPE_ASIGN != OPERACIONES_TAIR.AREQUIPA &&
           row.ID_OPE_ASIGN != OPERACIONES_TAIR.LIMA,
-        esEntrega:
-          !EXCLUDED_OPERATIONS.filter(
-            (ope) =>
-              ope != OPERACIONES_TAIR.LIMA && ope != OPERACIONES_TAIR.AREQUIPA,
-          ).includes(row.ID_OPE_ASIGN) &&
-          !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ACTUAL),
+        esEntrega: !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ACTUAL),
       }));
     });
 
@@ -1234,10 +1229,7 @@ const changeOperation = async (req, res) => {
     beforeOperation != OPERACIONES_TAIR.LIMA &&
     beforeOperation != OPERACIONES_TAIR.AREQUIPA;
   const isLoser = operation == OPERACIONES_TAIR.PERDIDAS;
-  const isDelivery =
-    !EXCLUDED_OPERATIONS.filter(
-      (ope) => ope != OPERACIONES_TAIR.LIMA && ope != OPERACIONES_TAIR.AREQUIPA,
-    ).includes(beforeOperation) && !EXCLUDED_OPERATIONS.includes(operation);
+  const isDelivery = !EXCLUDED_OPERATIONS.includes(operation);
 
   const convertDate = convertirFecha(date);
 
@@ -1453,7 +1445,9 @@ const changeOperation = async (req, res) => {
               ? isDirect
                 ? null
                 : convertirFecha(dateTransffer)
-              : convertirFecha(dateTransffer),
+              : isLoser
+                ? null
+                : convertirFecha(dateTransffer),
           kilometraje: findAssign[0].KILOMETRAJE,
           actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
           actaDevol: validDocReturn,
