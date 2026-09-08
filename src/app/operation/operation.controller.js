@@ -1444,10 +1444,14 @@ const changeOperation = async (req, res) => {
             : isSelf
               ? isDirect
                 ? null
-                : convertirFecha(dateTransffer)
+                : dateTransffer
+                  ? convertirFecha(dateTransffer)
+                  : null
               : isLoser
                 ? null
-                : convertirFecha(dateTransffer),
+                : dateTransffer
+                  ? convertirFecha(dateTransffer)
+                  : null,
           kilometraje: findAssign[0].KILOMETRAJE,
           actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
           actaDevol: validDocReturn,
@@ -1471,10 +1475,14 @@ const changeOperation = async (req, res) => {
                 : null
               : null,
           fechaTraslado: isDelivery
-            ? convertirFecha(dateTransffer)
+            ? dateTransffer
+              ? convertirFecha(dateTransffer)
+              : null
             : isSelf
               ? isDirect
-                ? convertirFecha(dateTransffer)
+                ? dateTransffer
+                  ? convertirFecha(dateTransffer)
+                  : null
                 : null
               : null,
           kilometraje: mileage,
