@@ -1475,7 +1475,7 @@ const changeOperation = async (req, res) => {
               ? convertirFecha(dateInit)
               : null,
           fechaFin: isDelivery
-            ? convertirFecha(dateFinish)
+            ? dateFinish ? convertirFecha(dateFinish) : null
             : isSelf
               ? isDirect
                 ? dateFinish
@@ -1644,12 +1644,12 @@ const changeOperation = async (req, res) => {
           newAssing.tarifa,
           newAssing.actaEntrega,
           newAssing.terreno,
-          isDelivery
+          !isDelivery
             ? convertirFecha(dateInit)
             : isSelf
               ? convertirFecha(dateSelf)
               : convertirFecha(findAssign[0].FECHA_INI.trim()),
-          isDelivery
+          !isDelivery
             ? convertirFecha(dateFinish)
             : isSelf
               ? convertirFecha(dateSelf)
