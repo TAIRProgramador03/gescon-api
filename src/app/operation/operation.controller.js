@@ -1046,7 +1046,10 @@ const listVehPending = async (req, res) => {
         esDirecta:
           row.ID_OPE_ASIGN != OPERACIONES_TAIR.AREQUIPA &&
           row.ID_OPE_ASIGN != OPERACIONES_TAIR.LIMA,
-        esEntrega: !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ACTUAL),
+        esEntrega:
+          !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ASIGN) &&
+          (row.ID_OPE_ACTUAL == OPERACIONES_TAIR.LIMA ||
+            row.ID_OPE_ACTUAL == OPERACIONES_TAIR.AREQUIPA),
       }));
     });
 
@@ -1229,7 +1232,10 @@ const changeOperation = async (req, res) => {
     beforeOperation != OPERACIONES_TAIR.LIMA &&
     beforeOperation != OPERACIONES_TAIR.AREQUIPA;
   const isLoser = operation == OPERACIONES_TAIR.PERDIDAS;
-  const isDelivery = !EXCLUDED_OPERATIONS.includes(operation);
+  const isDelivery =
+    !EXCLUDED_OPERATIONS.includes(beforeOperation) &&
+    (operation == OPERACIONES_TAIR.LIMA ||
+      operation == OPERACIONES_TAIR.AREQUIPA);
 
   const convertDate = convertirFecha(date);
 
@@ -1439,8 +1445,8 @@ const changeOperation = async (req, res) => {
                   ? convertirFecha(dateFinish)
                   : null
               : convertirFecha(findAssign[0].FECHA_FIN.trim()),
-          fechaTraslado: isDelivery
-            ? null
+          fechaTraslado: !isDelivery
+            ? dateTransffer ? convertirFecha(dateTransffer) : null
             : isSelf
               ? isDirect
                 ? null
@@ -1464,7 +1470,10 @@ const changeOperation = async (req, res) => {
           condicion: condition,
           tarifa: Number(tariff),
           terreno: terrain,
-          fechaIni: isDelivery ? convertirFecha(dateInit) : null,
+          fechaIni:
+            !isDelivery && !isSelf && !isLoser
+              ? convertirFecha(dateInit)
+              : null,
           fechaFin: isDelivery
             ? convertirFecha(dateFinish)
             : isSelf
@@ -1473,7 +1482,7 @@ const changeOperation = async (req, res) => {
                   ? convertirFecha(dateFinish)
                   : null
                 : null
-              : null,
+              : convertirFecha(dateFinish),
           fechaTraslado: isDelivery
             ? dateTransffer
               ? convertirFecha(dateTransffer)
