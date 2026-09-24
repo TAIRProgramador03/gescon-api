@@ -315,611 +315,837 @@ const listYearByModelGen = async (req, res) => {
   }
 };
 
+// const listPlateTraceability = async (req, res) => {
+//   const { id: idUser, roleId } = req.user;
+
+//   const { idContrato, idCliente, idLeasing, tipoTerr, fromDate, toDate } = req.query;
+
+//   try {
+//     const convertResult = await withConnection(async (cn) => {
+//       // const statusArray = typeof status === "string" ? status.split(",") : [];
+
+//       const toYYYYMMDD = (dateStr) => dateStr.replaceAll("-", "");
+
+//       let filtrosA = "";
+//       let filtrosB = "";
+//       let params = [];
+
+//       let typeDoc = "";
+//       let idDoc;
+
+//       // filtro obligatorio
+//       if (idCliente) {
+//         filtrosA += " AND CAST(C.IDCLI AS INTEGER) = ?";
+//         filtrosB += " AND CAST(C.IDCLI AS INTEGER) = ?";
+//         params.push(parseInt(idCliente, 10));
+//       }
+
+//       // opcionales
+//       if (idContrato) {
+//         typeDoc = idContrato.split("_")[0];
+//         idDoc = idContrato.split("_")[1];
+
+//         if (typeDoc == "P") {
+//           filtrosA += " AND CC.ID = ?";
+//           filtrosB += " AND CC.ID = ?";
+//         } else {
+//           filtrosA += "";
+//           filtrosB += " AND DC.ID = ?";
+//         }
+
+//         params.push(idDoc);
+//       }
+
+//       if (idLeasing) {
+//         filtrosA += " AND AD.LEASING = ?";
+//         filtrosB += " AND AD.LEASING = ?";
+//         params.push(idLeasing);
+//       }
+
+//       if (tipoTerr) {
+//         filtrosA += " AND AD.TP_TERRENO = ?";
+//         filtrosB += " AND AD.TP_TERRENO = ?";
+//         params.push(tipoTerr);
+//       }
+
+//       // if (status?.length) {
+//       //   const conditions = [];
+
+//       //   if (statusArray.includes("A")) {
+//       //     conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
+//       //   }
+
+//       //   if (statusArray.includes("I")) {
+//       //     conditions.push(
+//       //       "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
+//       //     );
+//       //   }
+
+//       //   if (statusArray.includes("PR")) {
+//       //     conditions.push(
+//       //       "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+//       //     );
+//       //   }
+
+//       //   if (statusArray.includes("PA")) {
+//       //     conditions.push(
+//       //       "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
+//       //     );
+//       //   }
+
+//       //   if (statusArray.includes("V")) {
+//       //     conditions.push("(V.ID_OPE = 109)");
+//       //   }
+
+//       //   if (conditions.length) {
+//       //     const filter = ` AND (${conditions.join(" OR ")})`;
+
+//       //     filtrosA += filter;
+//       //     filtrosB += filter;
+//       //   }
+//       // }
+
+//       if (fromDate && toDate) {
+//         filtrosA += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+//         filtrosB += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+//         params.push(toYYYYMMDD(fromDate), toYYYYMMDD(toDate));
+//       } else if (fromDate) {
+//         filtrosA += "AND AD.FECHA_FIN >= ?"
+//         filtrosB += "AND AD.FECHA_FIN >= ?"
+//         params.push(toYYYYMMDD(fromDate));
+//       } else if (toDate) {
+//         filtrosA += "AND AD.FECHA_FIN <= ?"
+//         filtrosB += "AND AD.FECHA_FIN <= ?"
+//         params.push(toYYYYMMDD(toDate));
+//       }
+
+//       let sql = `
+//     SELECT *
+//     FROM (
+//       SELECT
+//         T.*,
+//         ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
+//       FROM (
+//         SELECT
+//           DISTINCT(AD.ID),
+//           C.CLINOM AS CLIENTE,
+//           CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//           V.IDCLI AS ID_CLIENTE_OPE,
+//           O.ID AS ID_OPE,
+//           O.DESCRIPCION AS OPERACIONES,
+//           V.ID_OPE AS ID_OPE_ACTUAL,
+//           V.OPERACIONES AS OPERACION_ACTUAL,
+//           AD.PLACA,
+//           V.ANO,
+//           V.COLOR,
+//           AD.NROSER,
+//           MA.DESCRIPCION AS MARCA,
+//           MO.DESCRIPCION AS MODELO,
+//           AD.TP_TERRENO AS TERRENO,
+//           AD.LEASING,
+//           LC.FECHA_INI AS FECHA_INI_LEASING,
+//           LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//           CC.NRO_CONTRATO AS CONTRATO,
+//           CC.DURACION AS PLAZO,
+//           AD.FECHA_INI AS FECHA_ENTREGA,
+//           AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//           DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//           CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//           AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//           AD.CONDICION AS CONDICION
+//         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//         ON AD.ID_ASIGNACION = AC.ID
+//         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//         ON LC.NRO_LEASING = AD.LEASING
+//         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//         ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//         ON O.ID = AD.ID_OPE
+//         LEFT JOIN (
+//           SELECT DISTINCT A.IDCLI, B.CLINOM
+//           FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//           INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+//           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+//           ORDER BY CLINOM ASC
+//         ) C
+//         ON O.IDCLI = C.IDCLI
+//         LEFT JOIN (
+//           SELECT
+//             V.ID,
+//             V.ANO,
+//             V.COLOR,
+//             O.ID AS ID_OPE,
+//             O.DESCRIPCION AS OPERACIONES,
+//             O.IDCLI,
+//             V.IDMAR,
+//             V.IDMOD
+//           FROM ${SCHEMA_BD}.PO_VEHICULO V
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//           ON V.SECOPE = O.ID
+//         ) V
+//         ON V.ID = AD.ID_VEH
+//         LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//         ON MA.ID = V.IDMAR
+//         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//         ON MO.ID = V.IDMOD
+//         WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
+
+//         UNION ALL
+
+//         SELECT
+//           DISTINCT(AD.ID),
+//           C.CLINOM AS CLIENTE,
+//           DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//           V.IDCLI AS ID_CLIENTE_OPE,
+//           O.ID AS ID_OPE,
+//           O.DESCRIPCION AS OPERACIONES,
+//           V.ID_OPE AS ID_OPE_ACTUAL,
+//           V.OPERACIONES AS OPERACION_ACTUAL,
+//           AD.PLACA,
+//           V.ANO,
+//           V.COLOR,
+//           AD.NROSER,
+//           MA.DESCRIPCION AS MARCA,
+//           MO.DESCRIPCION AS MODELO,
+//           AD.TP_TERRENO AS TERRENO,
+//           AD.LEASING,
+//           LC.FECHA_INI AS FECHA_INI_LEASING,
+//           LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//           DC.NRO_DOC AS CONTRATO,
+//           DC.DURACION AS PLAZO,
+//           AD.FECHA_INI AS FECHA_ENTREGA,
+//           AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//           CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//           AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//           AD.CONDICION AS CONDICION
+//         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//         ON AD.ID_ASIGNACION = AC.ID
+//         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//         ON LC.NRO_LEASING = AD.LEASING
+//         LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+//         ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+//         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//         ON DC.ID_PADRE = CC.ID
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//         ON O.ID = AD.ID_OPE
+//         LEFT JOIN (
+//           SELECT DISTINCT A.IDCLI, B.CLINOM
+//           FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//           INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+//           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+//           ORDER BY CLINOM ASC
+//         ) C
+//         ON O.IDCLI = C.IDCLI
+//         LEFT JOIN (
+//           SELECT
+//             V.ID,
+//             V.ANO,
+//             V.COLOR,
+//             O.ID AS ID_OPE,
+//             O.DESCRIPCION AS OPERACIONES,
+//             O.IDCLI,
+//             V.IDMAR,
+//             V.IDMOD
+//           FROM ${SCHEMA_BD}.PO_VEHICULO V
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//           ON V.SECOPE = O.ID
+//         ) V
+//         ON V.ID = AD.ID_VEH
+//         LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//         ON MA.ID = V.IDMAR
+//         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//         ON MO.ID = V.IDMOD
+//         WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
+//         ) T
+//       ) X
+//       WHERE RN = 1
+//     `;
+
+//       let sqlDoc = `
+//     SELECT *
+//     FROM (
+//       SELECT
+//         T.*,
+//         ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
+//       FROM (
+//         SELECT
+//           DISTINCT(AD.ID),
+//           C.CLINOM AS CLIENTE,
+//           DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//           V.IDCLI AS ID_CLIENTE_OPE,
+//           O.ID AS ID_OPE,
+//           O.DESCRIPCION AS OPERACIONES,
+//           V.ID_OPE AS ID_OPE_ACTUAL,
+//           V.OPERACIONES AS OPERACION_ACTUAL,
+//           AD.PLACA,
+//           V.ANO,
+//           V.COLOR,
+//           AD.NROSER,
+//           MA.DESCRIPCION AS MARCA,
+//           MO.DESCRIPCION AS MODELO,
+//           AD.TP_TERRENO AS TERRENO,
+//           AD.LEASING,
+//           LC.FECHA_INI AS FECHA_INI_LEASING,
+//           LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//           DC.NRO_DOC AS CONTRATO,
+//           DC.DURACION AS PLAZO,
+//           AD.FECHA_INI AS FECHA_ENTREGA,
+//           AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//           DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//           CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//           CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//           AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//           AD.CONDICION AS CONDICION
+//         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//         LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//         ON AD.ID_ASIGNACION = AC.ID
+//         LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//         ON LC.NRO_LEASING = AD.LEASING
+//         LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+//         ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+//         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//         ON DC.ID_PADRE = CC.ID
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//         ON O.ID = AD.ID_OPE
+//         LEFT JOIN (
+//           SELECT DISTINCT A.IDCLI, B.CLINOM
+//           FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//           INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
+//           WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
+//           ORDER BY CLINOM ASC
+//         ) C
+//         ON O.IDCLI = C.IDCLI
+//         LEFT JOIN (
+//           SELECT
+//             V.ID,
+//             V.ANO,
+//             V.COLOR,
+//             O.ID AS ID_OPE,
+//             O.DESCRIPCION AS OPERACIONES,
+//             O.IDCLI,
+//             V.IDMAR,
+//             V.IDMOD
+//           FROM ${SCHEMA_BD}.PO_VEHICULO V
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//           ON V.SECOPE = O.ID
+//         ) V
+//         ON V.ID = AD.ID_VEH
+//         LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//         ON MA.ID = V.IDMAR
+//         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//         ON MO.ID = V.IDMOD
+//         WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
+//         ) T
+//       ) X
+//       WHERE RN = 1
+//     `;
+
+//       if (roleId == 3) {
+//         filtrosA += ` AND C.ID_USU = ${idUser}`;
+//         filtrosB += ` AND C.ID_USU = ${idUser}`;
+
+//         sql = `
+//         SELECT *
+//         FROM (
+//           SELECT
+//             T.*,
+//             ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
+//           FROM (
+//             SELECT
+//               DISTINCT(AD.ID),
+//               C.CLINOM AS CLIENTE,
+//               CC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//               V.IDCLI AS ID_CLIENTE_OPE,
+//               O.ID AS ID_OPE,
+//               O.DESCRIPCION AS OPERACIONES,
+//               V.ID_OPE AS ID_OPE_ACTUAL,
+//               V.OPERACIONES AS OPERACION_ACTUAL,
+//               AD.PLACA,
+//               V.ANO,
+//               V.COLOR,
+//               AD.NROSER,
+//               MA.DESCRIPCION AS MARCA,
+//               MO.DESCRIPCION AS MODELO,
+//               AD.TP_TERRENO AS TERRENO,
+//               AD.LEASING,
+//               LC.FECHA_INI AS FECHA_INI_LEASING,
+//               LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//               CC.NRO_CONTRATO AS CONTRATO,
+//               CC.DURACION AS PLAZO,
+//               AD.FECHA_INI AS FECHA_ENTREGA,
+//               AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//               DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//               DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//               CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//               AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//               AD.CONDICION AS CONDICION
+//             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//             LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//             ON AD.ID_ASIGNACION = AC.ID
+//             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//             ON LC.NRO_LEASING = AD.LEASING
+//             LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//             ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//             ON O.ID = AD.ID_OPE
+//             LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                 FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                 INNER JOIN ${SCHEMA_BD}.TCLIE B
+//                 ON A.IDCLI = B.CLICVE
+//                 WHERE A.ID <> 86
+//                 AND B.CLINOM <> '*** ANULADO ***'
+//               )PO
+//               ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+//               ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+//               ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//             ) C
+//             ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+//             LEFT JOIN (
+//               SELECT
+//                 V.ID,
+//                 V.ANO,
+//                 V.COLOR,
+//                 O.ID AS ID_OPE,
+//                 O.DESCRIPCION AS OPERACIONES,
+//                 O.IDCLI,
+//                 V.IDMAR,
+//                 V.IDMOD
+//               FROM ${SCHEMA_BD}.PO_VEHICULO V
+//               LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//               ON V.SECOPE = O.ID
+//             ) V
+//             ON V.ID = AD.ID_VEH
+//             LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//             ON MA.ID = V.IDMAR
+//             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//             ON MO.ID = V.IDMOD
+//             WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
+
+//             UNION ALL
+
+//             SELECT
+//               DISTINCT(AD.ID),
+//               C.CLINOM AS CLIENTE,
+//               DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//               V.IDCLI AS ID_CLIENTE_OPE,
+//               O.ID AS ID_OPE,
+//               O.DESCRIPCION AS OPERACIONES,
+//               V.ID_OPE AS ID_OPE_ACTUAL,
+//               V.OPERACIONES AS OPERACION_ACTUAL,
+//               AD.PLACA,
+//               V.ANO,
+//               V.COLOR,
+//               AD.NROSER,
+//               MA.DESCRIPCION AS MARCA,
+//               MO.DESCRIPCION AS MODELO,
+//               AD.TP_TERRENO AS TERRENO,
+//               AD.LEASING,
+//               LC.FECHA_INI AS FECHA_INI_LEASING,
+//               LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//               DC.NRO_DOC AS CONTRATO,
+//               DC.DURACION AS PLAZO,
+//               AD.FECHA_INI AS FECHA_ENTREGA,
+//               AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//               CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//               AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//               AD.CONDICION AS CONDICION
+//             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//             LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//             ON AD.ID_ASIGNACION = AC.ID
+//             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//             ON LC.NRO_LEASING = AD.LEASING
+//             LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+//             ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+//             LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//             ON DC.ID_PADRE = CC.ID
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//             ON O.ID = AD.ID_OPE
+//             LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                 FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                 INNER JOIN ${SCHEMA_BD}.TCLIE B
+//                 ON A.IDCLI = B.CLICVE
+//                 WHERE A.ID <> 86
+//                 AND B.CLINOM <> '*** ANULADO ***'
+//               )PO
+//               ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+//               ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+//               ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//             ) C
+//             ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+//             LEFT JOIN (
+//               SELECT
+//                 V.ID,
+//                 V.ANO,
+//                 V.COLOR,
+//                 O.ID AS ID_OPE,
+//                 O.DESCRIPCION AS OPERACIONES,
+//                 O.IDCLI,
+//                 V.IDMAR,
+//                 V.IDMOD
+//               FROM ${SCHEMA_BD}.PO_VEHICULO V
+//               LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//               ON V.SECOPE = O.ID
+//             ) V
+//             ON V.ID = AD.ID_VEH
+//             LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//             ON MA.ID = V.IDMAR
+//             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//             ON MO.ID = V.IDMOD
+//             WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
+//             ) T
+//           ) X
+//           WHERE RN = 1
+//       `;
+
+//         sqlDoc = `
+//         SELECT *
+//         FROM (
+//           SELECT
+//             T.*,
+//             ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
+//           FROM (
+//             SELECT
+//               DISTINCT(AD.ID),
+//               C.CLINOM AS CLIENTE,
+//               DC.ID_CLIENTE AS ID_CLIENTE_CONT,
+//               V.IDCLI AS ID_CLIENTE_OPE,
+//               O.ID AS ID_OPE,
+//               O.DESCRIPCION AS OPERACIONES,
+//               V.ID_OPE AS ID_OPE_ACTUAL,
+//               V.OPERACIONES AS OPERACION_ACTUAL,
+//               AD.PLACA,
+//               V.ANO,
+//               V.COLOR,
+//               AD.NROSER,
+//               MA.DESCRIPCION AS MARCA,
+//               MO.DESCRIPCION AS MODELO,
+//               AD.TP_TERRENO AS TERRENO,
+//               AD.LEASING,
+//               LC.FECHA_INI AS FECHA_INI_LEASING,
+//               LC.FECHA_FIN AS FECHA_FIN_LEASING,
+//               DC.NRO_DOC AS CONTRATO,
+//               DC.DURACION AS PLAZO,
+//               AD.FECHA_INI AS FECHA_ENTREGA,
+//               AD.FECHA_FIN AS FECHA_DEVOLUCION,
+//               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
+//               DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
+//               CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+//               CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
+//               AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+//               AD.CONDICION AS CONDICION
+//             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//             LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+//             ON AD.ID_ASIGNACION = AC.ID
+//             LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//             ON LC.NRO_LEASING = AD.LEASING
+//             LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+//             ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+//             LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//             ON DC.ID_PADRE = CC.ID
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//             ON O.ID = AD.ID_OPE
+//             LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO_ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                 SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                 FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                 INNER JOIN ${SCHEMA_BD}.TCLIE B
+//                 ON A.IDCLI = B.CLICVE
+//                 WHERE A.ID <> 86
+//                 AND B.CLINOM <> '*** ANULADO ***'
+//               )PO
+//               ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+//               ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+//               ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//             ) C
+//             ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+//             LEFT JOIN (
+//               SELECT
+//                 V.ID,
+//                 V.ANO,
+//                 V.COLOR,
+//                 O.ID AS ID_OPE,
+//                 O.DESCRIPCION AS OPERACIONES,
+//                 O.IDCLI,
+//                 V.IDMAR,
+//                 V.IDMOD
+//               FROM ${SCHEMA_BD}.PO_VEHICULO V
+//               LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+//               ON V.SECOPE = O.ID
+//             ) V
+//             ON V.ID = AD.ID_VEH
+//             LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
+//             ON MA.ID = V.IDMAR
+//             LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
+//             ON MO.ID = V.IDMOD
+//             WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
+//             ) T
+//           ) X
+//           WHERE RN = 1
+//       `;
+//       }
+
+//       const mapRow = (row) => ({
+//         idAssing: row.ID,
+//         cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
+//         idCliCont: row.ID_CLIENTE_CONT,
+//         idCliOpe: row.ID_CLIENTE_OPE.trim(),
+//         idOpe: row.ID_OPE,
+//         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
+//         idOpeActual: row.ID_OPE_ACTUAL,
+//         opeActual: row.OPERACION_ACTUAL
+//           ? row.OPERACION_ACTUAL.trim()
+//           : "Sin operacion",
+//         placa: row.PLACA ? row.PLACA.trim() : "Sin placa",
+//         año: row.ANO,
+//         color: row.COLOR ? row.COLOR.trim() : "Sin color",
+//         marca: row.MARCA ? row.MARCA.trim() : "Sin marca",
+//         modelo: row.MODELO ? row.MODELO.trim() : "Sin modelo",
+//         nroSer: row.NROSER ? row.NROSER.trim() : "Sin serie",
+//         terreno: row.TERRENO,
+//         leasing: row.LEASING ? row.LEASING.trim() : "Sin leasing",
+//         fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
+//         fechaFinLea: convertirFecha(row.FECHA_FIN_LEASING),
+//         contrato: row.CONTRATO ? row.CONTRATO.trim() : "Sin contrato",
+//         plazo: row.PLAZO,
+//         fechaIni: row.FECHA_ENTREGA
+//           ? convertirFecha(row.FECHA_ENTREGA.trim())
+//           : "Sin fecha",
+//         fechaFin: row.FECHA_DEVOLUCION
+//           ? convertirFecha(row.FECHA_DEVOLUCION.trim())
+//           : "Sin fecha",
+//         fechaIniCon: row.FECHA_INI_CONTRATO,
+//         fechaFinCon: row.FECHA_FIN_CONTRATO,
+//         tarifa: row.TARIFA,
+//         moneda: row.MONEDA,
+//         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
+//         condicion: row.CONDICION ? row.CONDICION : "",
+//       });
+
+//       if (typeDoc == "H") {
+//         const result = await cn.query(sqlDoc, [...params]);
+//         return result.map(mapRow);
+//       } else if (typeDoc == "P") {
+//         const result = await cn.query(sql, [...params, ...params]);
+//         return result.map(mapRow);
+//       } else {
+//         const result = await cn.query(sql, [...params, ...params]);
+//         return result.map(mapRow);
+//       }
+//     });
+
+//     return res.status(200).json(convertResult);
+//   } catch (error) {
+//     console.error("Error al listar asignaciones de un contrato", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Error al listar asignaciones de un contrato",
+//     });
+//   }
+// };
+
 const listPlateTraceability = async (req, res) => {
   const { id: idUser, roleId } = req.user;
-
-  const { idContrato, idCliente, idLeasing, tipoTerr, status, fromDate, toDate } = req.query;
+  const { idContrato, idCliente, idLeasing, tipoTerr, fromDate, toDate } = req.query;
 
   try {
     const convertResult = await withConnection(async (cn) => {
-      const statusArray = typeof status === "string" ? status.split(",") : [];
-
       const toYYYYMMDD = (dateStr) => dateStr.replaceAll("-", "");
 
-      let filtrosA = "";
-      let filtrosB = "";
-      let params = [];
+      const conditions = [];
+      const params = [];
 
-      let typeDoc = "";
-      let idDoc;
-
-      // filtro obligatorio
+      // Cliente (obligatorio)
       if (idCliente) {
-        filtrosA += " AND O.IDCLI = ?";
-        filtrosB += " AND O.IDCLI = ?";
-        params.push(idCliente);
+        conditions.push("CAST(C.IDCLI AS INTEGER) = ?");
+        params.push(parseInt(idCliente, 10));
       }
 
-      // opcionales
+      // Contrato específico (padre 'P' o documento 'H')
       if (idContrato) {
-        typeDoc = idContrato.split("_")[0];
-        idDoc = idContrato.split("_")[1];
-
-        if (typeDoc == "P") {
-          filtrosA += " AND CC.ID = ?";
-          filtrosB += " AND CC.ID = ?";
-        } else {
-          filtrosA += "";
-          filtrosB += " AND DC.ID = ?";
-        }
-
-        params.push(idDoc);
+        const [tipo, idDoc] = idContrato.split("_");
+        conditions.push("TRIM(AD.CLASE_CONTRATO) = ? AND AD.ID_CONTRATO = ?");
+        params.push(tipo, idDoc);
       }
 
       if (idLeasing) {
-        filtrosA += " AND AD.LEASING = ?";
-        filtrosB += " AND AD.LEASING = ?";
+        conditions.push("AD.LEASING = ?");
         params.push(idLeasing);
       }
 
       if (tipoTerr) {
-        filtrosA += " AND AD.TP_TERRENO = ?";
-        filtrosB += " AND AD.TP_TERRENO = ?";
+        conditions.push("AD.TP_TERRENO = ?");
         params.push(tipoTerr);
       }
 
-      if (status?.length) {
-        const conditions = [];
-
-        if (statusArray.includes("A")) {
-          conditions.push("(O.ID = V.ID_OPE AND V.ID_OPE != 109)");
-        }
-
-        if (statusArray.includes("I")) {
-          conditions.push(
-            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) < CURRENT_DATE)",
-          );
-        }
-
-        if (statusArray.includes("PR")) {
-          conditions.push(
-            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) <> V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
-          );
-        }
-
-        if (statusArray.includes("PA")) {
-          conditions.push(
-            "(O.ID != V.ID_OPE AND V.ID_OPE != 109 AND CAST(CC.ID_CLIENTE AS VARCHAR(20)) = V.IDCLI AND DATE(SUBSTR(AD.FECHA_FIN, 1, 4) || '-' || SUBSTR(AD.FECHA_FIN, 5, 2) || '-' || SUBSTR(AD.FECHA_FIN, 7, 2)) > CURRENT_DATE)",
-          );
-        }
-
-        if (statusArray.includes("V")) {
-          conditions.push("(V.ID_OPE = 109)");
-        }
-
-        if (conditions.length) {
-          const filter = ` AND (${conditions.join(" OR ")})`;
-
-          filtrosA += filter;
-          filtrosB += filter;
-        }
-      }
-
       if (fromDate && toDate) {
-        filtrosA += "AND AD.FECHA_FIN BETWEEN ? AND ?"
-        filtrosB += "AND AD.FECHA_FIN BETWEEN ? AND ?"
+        conditions.push("AD.FECHA_FIN BETWEEN ? AND ?");
         params.push(toYYYYMMDD(fromDate), toYYYYMMDD(toDate));
       } else if (fromDate) {
-        filtrosA += "AND AD.FECHA_FIN >= ?"
-        filtrosB += "AND AD.FECHA_FIN >= ?"
+        conditions.push("AD.FECHA_FIN >= ?");
         params.push(toYYYYMMDD(fromDate));
       } else if (toDate) {
-        filtrosA += "AND AD.FECHA_FIN <= ?"
-        filtrosB += "AND AD.FECHA_FIN <= ?"
+        conditions.push("AD.FECHA_FIN <= ?");
         params.push(toYYYYMMDD(toDate));
       }
 
-      let sql = `
-    SELECT *
-    FROM (
-      SELECT
-        T.*,
-        ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-      FROM (
-        SELECT
-          DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE,
-          CC.ID_CLIENTE AS ID_CLIENTE_CONT,
-          V.IDCLI AS ID_CLIENTE_OPE,
-          O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES,
-          V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL,
-          AD.PLACA,
-          V.ANO,
-          V.COLOR,
-          AD.NROSER,
-          MA.DESCRIPCION AS MARCA,
-          MO.DESCRIPCION AS MODELO,
-          AD.TP_TERRENO AS TERRENO,
-          AD.LEASING,
-          LC.FECHA_INI AS FECHA_INI_LEASING,
-          LC.FECHA_FIN AS FECHA_FIN_LEASING,
-          CC.NRO_CONTRATO AS CONTRATO,
-          CC.DURACION AS PLAZO,
-          AD.FECHA_INI AS FECHA_ENTREGA,
-          AD.FECHA_FIN AS FECHA_DEVOLUCION,
-          DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-          DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-          CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-          CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-          AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-          AD.CONDICION AS CONDICION
-        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-        ON AD.ID_ASIGNACION = AC.ID
-        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-        ON LC.NRO_LEASING = AD.LEASING
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-          ORDER BY CLINOM ASC
-        ) C
-        ON CC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-        ON O.ID = AD.ID_OPE
-        LEFT JOIN (
-          SELECT
-            V.ID,
-            V.ANO,
-            V.COLOR,
-            O.ID AS ID_OPE,
-            O.DESCRIPCION AS OPERACIONES,
-            O.IDCLI,
-            V.IDMAR,
-            V.IDMOD
-          FROM ${SCHEMA_BD}.PO_VEHICULO V
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON V.SECOPE = O.ID
-        ) V
-        ON V.ID = AD.ID_VEH
-        LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-        ON MA.ID = V.IDMAR
-        LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-        ON MO.ID = V.IDMOD
-        WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
-
-        UNION ALL
-
-        SELECT
-          DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE,
-          DC.ID_CLIENTE AS ID_CLIENTE_CONT,
-          V.IDCLI AS ID_CLIENTE_OPE,
-          O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES,
-          V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL,
-          AD.PLACA,
-          V.ANO,
-          V.COLOR,
-          AD.NROSER,
-          MA.DESCRIPCION AS MARCA,
-          MO.DESCRIPCION AS MODELO,
-          AD.TP_TERRENO AS TERRENO,
-          AD.LEASING,
-          LC.FECHA_INI AS FECHA_INI_LEASING,
-          LC.FECHA_FIN AS FECHA_FIN_LEASING,
-          DC.NRO_DOC AS CONTRATO,
-          DC.DURACION AS PLAZO,
-          AD.FECHA_INI AS FECHA_ENTREGA,
-          AD.FECHA_FIN AS FECHA_DEVOLUCION,
-          DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-          DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-          CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-          CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-          AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-          AD.CONDICION AS CONDICION
-        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-        ON AD.ID_ASIGNACION = AC.ID
-        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-        ON LC.NRO_LEASING = AD.LEASING
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON DC.ID_PADRE = CC.ID
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-          ORDER BY CLINOM ASC
-        ) C
-        ON DC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-        ON O.ID = AD.ID_OPE
-        LEFT JOIN (
-          SELECT
-            V.ID,
-            V.ANO,
-            V.COLOR,
-            O.ID AS ID_OPE,
-            O.DESCRIPCION AS OPERACIONES,
-            O.IDCLI,
-            V.IDMAR,
-            V.IDMOD
-          FROM ${SCHEMA_BD}.PO_VEHICULO V
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON V.SECOPE = O.ID
-        ) V
-        ON V.ID = AD.ID_VEH
-        LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-        ON MA.ID = V.IDMAR
-        LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-        ON MO.ID = V.IDMOD
-        WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
-        ) T
-      ) X
-      WHERE RN = 1
-    `;
-
-      let sqlDoc = `
-    SELECT *
-    FROM (
-      SELECT
-        T.*,
-        ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-      FROM (
-        SELECT
-          DISTINCT(AD.ID),
-          C.CLINOM AS CLIENTE,
-          DC.ID_CLIENTE AS ID_CLIENTE_CONT,
-          V.IDCLI AS ID_CLIENTE_OPE,
-          O.ID AS ID_OPE,
-          O.DESCRIPCION AS OPERACIONES,
-          V.ID_OPE AS ID_OPE_ACTUAL,
-          V.OPERACIONES AS OPERACION_ACTUAL,
-          AD.PLACA,
-          V.ANO,
-          V.COLOR,
-          AD.NROSER,
-          MA.DESCRIPCION AS MARCA,
-          MO.DESCRIPCION AS MODELO,
-          AD.TP_TERRENO AS TERRENO,
-          AD.LEASING,
-          LC.FECHA_INI AS FECHA_INI_LEASING,
-          LC.FECHA_FIN AS FECHA_FIN_LEASING,
-          DC.NRO_DOC AS CONTRATO,
-          DC.DURACION AS PLAZO,
-          AD.FECHA_INI AS FECHA_ENTREGA,
-          AD.FECHA_FIN AS FECHA_DEVOLUCION,
-          DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-          DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-          CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-          CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-          AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-          AD.CONDICION AS CONDICION
-        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-        LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-        ON AD.ID_ASIGNACION = AC.ID
-        LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-        ON LC.NRO_LEASING = AD.LEASING
-        LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-        ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-        ON DC.ID_PADRE = CC.ID
-        LEFT JOIN (
-          SELECT DISTINCT A.IDCLI, B.CLINOM
-          FROM ${SCHEMA_BD}.PO_OPERACIONES A
-          INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-          WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-          ORDER BY CLINOM ASC
-        ) C
-        ON DC.ID_CLIENTE
-        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-        ON O.ID = AD.ID_OPE
-        LEFT JOIN (
-          SELECT
-            V.ID,
-            V.ANO,
-            V.COLOR,
-            O.ID AS ID_OPE,
-            O.DESCRIPCION AS OPERACIONES,
-            O.IDCLI,
-            V.IDMAR,
-            V.IDMOD
-          FROM ${SCHEMA_BD}.PO_VEHICULO V
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON V.SECOPE = O.ID
-        ) V
-        ON V.ID = AD.ID_VEH
-        LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-        ON MA.ID = V.IDMAR
-        LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-        ON MO.ID = V.IDMOD
-        WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
-        ) T
-      ) X
-      WHERE RN = 1
-    `;
-
+      // JOIN de cliente: cambia según el rol (flota restringida por usuario)
+      let joinCliente;
       if (roleId == 3) {
-        filtrosA += ` AND C.ID_USU = ${idUser}`;
-        filtrosB += ` AND C.ID_USU = ${idUser}`;
-
-        sql = `
-        SELECT *
-        FROM (
-          SELECT
-            T.*,
-            ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-          FROM (
-            SELECT
-              DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE,
-              CC.ID_CLIENTE AS ID_CLIENTE_CONT,
-              V.IDCLI AS ID_CLIENTE_OPE,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL,
-              AD.PLACA,
-              V.ANO,
-              V.COLOR,
-              AD.NROSER,
-              MA.DESCRIPCION AS MARCA,
-              MO.DESCRIPCION AS MODELO,
-              AD.TP_TERRENO AS TERRENO,
-              AD.LEASING,
-              LC.FECHA_INI AS FECHA_INI_LEASING,
-              LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              CC.NRO_CONTRATO AS CONTRATO,
-              CC.DURACION AS PLAZO,
-              AD.FECHA_INI AS FECHA_ENTREGA,
-              AD.FECHA_FIN AS FECHA_DEVOLUCION,
-              DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-              DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-              CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-              AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-              AD.CONDICION AS CONDICION
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-            ON LC.NRO_LEASING = AD.LEASING
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
+        joinCliente = `
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
             LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                INNER JOIN ${SCHEMA_BD}.TCLIE B
-                ON A.IDCLI = B.CLICVE
-                WHERE A.ID <> 86
-                AND B.CLINOM <> '*** ANULADO ***'
-              )PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
-            ) C
-            ON CC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON O.ID = AD.ID_OPE
-            LEFT JOIN (
-              SELECT
-                V.ID,
-                V.ANO,
-                V.COLOR,
-                O.ID AS ID_OPE,
-                O.DESCRIPCION AS OPERACIONES,
-                O.IDCLI,
-                V.IDMAR,
-                V.IDMOD
-              FROM ${SCHEMA_BD}.PO_VEHICULO V
-              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-              ON V.SECOPE = O.ID
-            ) V
-            ON V.ID = AD.ID_VEH
-            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-            ON MA.ID = V.IDMAR
-            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-            ON MO.ID = V.IDMOD
-            WHERE AD.CLASE_CONTRATO = 'P' ${filtrosA}
-
-            UNION ALL
-
-            SELECT
-              DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE,
-              DC.ID_CLIENTE AS ID_CLIENTE_CONT,
-              V.IDCLI AS ID_CLIENTE_OPE,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL,
-              AD.PLACA,
-              V.ANO,
-              V.COLOR,
-              AD.NROSER,
-              MA.DESCRIPCION AS MARCA,
-              MO.DESCRIPCION AS MODELO,
-              AD.TP_TERRENO AS TERRENO,
-              AD.LEASING,
-              LC.FECHA_INI AS FECHA_INI_LEASING,
-              LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              DC.NRO_DOC AS CONTRATO,
-              DC.DURACION AS PLAZO,
-              AD.FECHA_INI AS FECHA_ENTREGA,
-              AD.FECHA_FIN AS FECHA_DEVOLUCION,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-              CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-              AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-              AD.CONDICION AS CONDICION
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-            ON LC.NRO_LEASING = AD.LEASING
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                INNER JOIN ${SCHEMA_BD}.TCLIE B
-                ON A.IDCLI = B.CLICVE
-                WHERE A.ID <> 86
-                AND B.CLINOM <> '*** ANULADO ***'
-              )PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
-            ) C
-            ON DC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON O.ID = AD.ID_OPE
-            LEFT JOIN (
-              SELECT
-                V.ID,
-                V.ANO,
-                V.COLOR,
-                O.ID AS ID_OPE,
-                O.DESCRIPCION AS OPERACIONES,
-                O.IDCLI,
-                V.IDMAR,
-                V.IDMOD
-              FROM ${SCHEMA_BD}.PO_VEHICULO V
-              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-              ON V.SECOPE = O.ID
-            ) V
-            ON V.ID = AD.ID_VEH
-            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-            ON MA.ID = V.IDMAR
-            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-            ON MO.ID = V.IDMOD
-            WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
-            ) T
-          ) X
-          WHERE RN = 1
-      `;
-
-        sqlDoc = `
-        SELECT *
-        FROM (
-          SELECT
-            T.*,
-            ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-          FROM (
-            SELECT
-              DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE,
-              DC.ID_CLIENTE AS ID_CLIENTE_CONT,
-              V.IDCLI AS ID_CLIENTE_OPE,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL,
-              AD.PLACA,
-              V.ANO,
-              V.COLOR,
-              AD.NROSER,
-              MA.DESCRIPCION AS MARCA,
-              MO.DESCRIPCION AS MODELO,
-              AD.TP_TERRENO AS TERRENO,
-              AD.LEASING,
-              LC.FECHA_INI AS FECHA_INI_LEASING,
-              LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              DC.NRO_DOC AS CONTRATO,
-              DC.DURACION AS PLAZO,
-              AD.FECHA_INI AS FECHA_ENTREGA,
-              AD.FECHA_FIN AS FECHA_DEVOLUCION,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-              CASE WHEN CC.MONEDA = '1' THEN 'DÓLAR' ELSE 'SOLES' END AS MONEDA,
-              AD.ARCHIVO_PDF AS ARCHIVO_PDF,
-              AD.CONDICION AS CONDICION
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-            ON LC.NRO_LEASING = AD.LEASING
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO_ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                INNER JOIN ${SCHEMA_BD}.TCLIE B
-                ON A.IDCLI = B.CLICVE
-                WHERE A.ID <> 86
-                AND B.CLINOM <> '*** ANULADO ***'
-              )PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
-            ) C
-            ON DC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON O.ID = AD.ID_OPE
-            LEFT JOIN (
-              SELECT
-                V.ID,
-                V.ANO,
-                V.COLOR,
-                O.ID AS ID_OPE,
-                O.DESCRIPCION AS OPERACIONES,
-                O.IDCLI,
-                V.IDMAR,
-                V.IDMOD
-              FROM ${SCHEMA_BD}.PO_VEHICULO V
-              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-              ON V.SECOPE = O.ID
-            ) V
-            ON V.ID = AD.ID_VEH
-            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-            ON MA.ID = V.IDMAR
-            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-            ON MO.ID = V.IDMOD
-            WHERE AD.CLASE_CONTRATO = 'H' ${filtrosB}
-            ) T
-          ) X
-          WHERE RN = 1
-      `;
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+              WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+            ) PO ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) C
+          ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+        `;
+        conditions.push("C.ID_USU = ?");
+        params.push(idUser);
+      } else {
+        joinCliente = `
+          LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+          ) C
+          ON O.IDCLI = C.IDCLI
+        `;
       }
+
+      const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const sql = `
+        SELECT *
+        FROM (
+          SELECT
+            BASE.*,
+            CASE WHEN BASE.FECHA_FIRMA_EFECTIVA IS NULL THEN NULL
+              ELSE DATE(
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 1, 4) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 5, 2) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 7, 2)
+              )
+            END AS FECHA_INI_CONTRATO,
+            CASE WHEN BASE.FECHA_FIRMA_EFECTIVA IS NULL OR BASE.PLAZO IS NULL THEN NULL
+              ELSE DATE(
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 1, 4) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 5, 2) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 7, 2)
+              ) + CAST(BASE.PLAZO AS INTEGER) MONTHS
+            END AS FECHA_FIN_CONTRATO,
+            ROW_NUMBER() OVER(PARTITION BY BASE.ID ORDER BY BASE.ID) AS RN
+          FROM (
+            SELECT
+              DISTINCT(AD.ID),
+              C.CLINOM AS CLIENTE,
+              COALESCE(DC.ID_CLIENTE, CC.ID_CLIENTE) AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
+              O.ID AS ID_OPE,
+              O.DESCRIPCION AS OPERACIONES,
+              V.ID_OPE AS ID_OPE_ACTUAL,
+              V.OPERACIONES AS OPERACION_ACTUAL,
+              AD.PLACA,
+              V.ANO,
+              V.COLOR,
+              AD.NROSER,
+              MA.DESCRIPCION AS MARCA,
+              MO.DESCRIPCION AS MODELO,
+              AD.TP_TERRENO AS TERRENO,
+              AD.LEASING,
+              LC.FECHA_INI AS FECHA_INI_LEASING,
+              LC.FECHA_FIN AS FECHA_FIN_LEASING,
+              COALESCE(DC.NRO_DOC, CC.NRO_CONTRATO) AS CONTRATO,
+              COALESCE(DC.DURACION, CC.DURACION) AS PLAZO,
+              AD.FECHA_INI AS FECHA_ENTREGA,
+              AD.FECHA_FIN AS FECHA_DEVOLUCION,
+              COALESCE(DC.FECHA_FIRMA, CC.FECHA_FIRMA) AS FECHA_FIRMA_EFECTIVA,
+              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+              CASE 
+                WHEN CC.MONEDA IS NULL THEN NULL
+                WHEN CC.MONEDA = '1' THEN 'DÓLAR' 
+                ELSE 'SOLES' 
+              END AS MONEDA,
+              AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+              AD.CONDICION AS CONDICION
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+              ON AD.ID_ASIGNACION = AC.ID
+            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+              ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+              ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+              ON (TRIM(AD.CLASE_CONTRATO) = 'P' AND AD.ID_CONTRATO = CC.ID)
+              OR (TRIM(AD.CLASE_CONTRATO) = 'H' AND DC.ID_PADRE = CC.ID)
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+              ON O.ID = AD.ID_OPE
+            ${joinCliente}
+            LEFT JOIN (
+              SELECT
+                V.ID,
+                V.ANO,
+                V.COLOR,
+                O.ID AS ID_OPE,
+                O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
+                V.IDMAR,
+                V.IDMOD
+              FROM ${SCHEMA_BD}.PO_VEHICULO V
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O ON V.SECOPE = O.ID
+            ) V ON V.ID = AD.ID_VEH
+            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA ON MA.ID = V.IDMAR
+            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO ON MO.ID = V.IDMOD
+            ${whereClause}
+          ) BASE
+        ) X
+        WHERE RN = 1
+      `;
 
       const mapRow = (row) => ({
         idAssing: row.ID,
         cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
         idCliCont: row.ID_CLIENTE_CONT,
-        idCliOpe: row.ID_CLIENTE_OPE.trim(),
+        idCliOpe: row.ID_CLIENTE_OPE ? row.ID_CLIENTE_OPE.trim() : "Sin cliente",
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
@@ -937,7 +1163,7 @@ const listPlateTraceability = async (req, res) => {
         fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
         fechaFinLea: convertirFecha(row.FECHA_FIN_LEASING),
         contrato: row.CONTRATO ? row.CONTRATO.trim() : "Sin contrato",
-        plazo: row.PLAZO,
+        plazo: row.PLAZO ?? null,
         fechaIni: row.FECHA_ENTREGA
           ? convertirFecha(row.FECHA_ENTREGA.trim())
           : "Sin fecha",
@@ -946,22 +1172,14 @@ const listPlateTraceability = async (req, res) => {
           : "Sin fecha",
         fechaIniCon: row.FECHA_INI_CONTRATO,
         fechaFinCon: row.FECHA_FIN_CONTRATO,
-        tarifa: row.TARIFA,
+        tarifa: row.TARIFA ?? null,
         moneda: row.MONEDA,
         archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
         condicion: row.CONDICION ? row.CONDICION : "",
       });
 
-      if (typeDoc == "H") {
-        const result = await cn.query(sqlDoc, [...params]);
-        return result.map(mapRow);
-      } else if (typeDoc == "P") {
-        const result = await cn.query(sql, [...params, ...params]);
-        return result.map(mapRow);
-      } else {
-        const result = await cn.query(sql, [...params, ...params]);
-        return result.map(mapRow);
-      }
+      const result = await cn.query(sql, params);
+      return result.map(mapRow);
     });
 
     return res.status(200).json(convertResult);
@@ -970,6 +1188,238 @@ const listPlateTraceability = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Error al listar asignaciones de un contrato",
+    });
+  }
+};
+
+const listVehicleTraceability = async (req, res) => {
+  const { id: idUser, roleId } = req.user;
+  const { idCliente } = req.query;
+
+  if (!idCliente) {
+    return res.status(400).json({
+      success: false,
+      message: "El parametro idCliente es obligatorio",
+    });
+  }
+
+  try {
+    const convertResult = await withConnection(async (cn) => {
+      // Filtro adicional de usuario, solo si aplica por rol
+      let filtroUsuarioVeh = "";
+      const paramsVehiculos = [idCliente, idCliente, idCliente];
+
+      if (roleId == 3) {
+        filtroUsuarioVeh = `
+          AND EXISTS (
+            SELECT 1
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON moxu.CH_CODI_USUARIO = tug.USU
+            WHERE moxu.IDOPERACION = PO.ID
+            AND tug.ID = ?
+          )
+        `;
+        paramsVehiculos.push(idUser);
+      }
+
+      // Conjunto de vehículos que pasaron por el cliente (actuales + históricos vía reasignación)
+      const sqlVehiculos = `
+        SELECT DISTINCT VEHICULO FROM (
+          SELECT AD.ID_VEH AS VEHICULO
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON AD.ID_OPE = PO.ID
+          WHERE TRIM(PO.IDCLI) = ?
+          ${filtroUsuarioVeh}
+
+          UNION
+
+          SELECT AD.ID_VEH AS VEHICULO
+          FROM ${SCHEMA_BD}.T_GC_RE_CAB RC
+          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+              ON RC.ID_ASG_DET = AD.ID
+          LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_A DA
+              ON DA.ID_CAB = RC.ID
+          LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_B DB
+              ON DB.ID_CAB = RC.ID
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_A
+              ON DA.ID_OPE = OPE_A.ID
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_B
+              ON DB.ID_OPE = OPE_B.ID
+          WHERE TRIM(OPE_A.IDCLI) = ?
+          OR TRIM(OPE_B.IDCLI) = ?
+        ) T
+      `;
+
+      // JOIN de cliente para mostrar el nombre — normal o restringido por usuario
+      let joinCliente;
+      const params = [...paramsVehiculos];
+
+      if (roleId == 3) {
+        joinCliente = `
+          LEFT JOIN (
+            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+            LEFT JOIN (
+              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+              FROM ${SCHEMA_BD}.PO_OPERACIONES A
+              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+              WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+            ) PO ON MOXU.IDOPERACION = PO.ID
+            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
+            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
+            WHERE TUG.USU IS NOT NULL
+          ) C
+          ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+        `;
+      } else {
+        joinCliente = `
+          LEFT JOIN (
+            SELECT DISTINCT A.IDCLI, B.CLINOM
+            FROM ${SCHEMA_BD}.PO_OPERACIONES A
+            INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+            WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+          ) C
+          ON O.IDCLI = C.IDCLI
+        `;
+      }
+
+      // Misma base unificada de listAssingByContract/listPlateTraceability,
+      // pero filtrando por el conjunto de vehículos (sin filtrar por cliente actual)
+      const sql = `
+        SELECT *
+        FROM (
+          SELECT
+            BASE.*,
+            CASE WHEN BASE.FECHA_FIRMA_EFECTIVA IS NULL THEN NULL
+              ELSE DATE(
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 1, 4) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 5, 2) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 7, 2)
+              )
+            END AS FECHA_INI_CONTRATO,
+            CASE WHEN BASE.FECHA_FIRMA_EFECTIVA IS NULL OR BASE.PLAZO IS NULL THEN NULL
+              ELSE DATE(
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 1, 4) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 5, 2) || '-' ||
+                SUBSTR(BASE.FECHA_FIRMA_EFECTIVA, 7, 2)
+              ) + CAST(BASE.PLAZO AS INTEGER) MONTHS
+            END AS FECHA_FIN_CONTRATO,
+            ROW_NUMBER() OVER(PARTITION BY BASE.ID ORDER BY BASE.ID) AS RN
+          FROM (
+            SELECT
+              DISTINCT(AD.ID),
+              C.CLINOM AS CLIENTE,
+              COALESCE(DC.ID_CLIENTE, CC.ID_CLIENTE) AS ID_CLIENTE_CONT,
+              V.IDCLI AS ID_CLIENTE_OPE,
+              O.ID AS ID_OPE,
+              O.DESCRIPCION AS OPERACIONES,
+              V.ID_OPE AS ID_OPE_ACTUAL,
+              V.OPERACIONES AS OPERACION_ACTUAL,
+              AD.PLACA,
+              V.ANO,
+              V.COLOR,
+              AD.NROSER,
+              MA.DESCRIPCION AS MARCA,
+              MO.DESCRIPCION AS MODELO,
+              AD.TP_TERRENO AS TERRENO,
+              AD.LEASING,
+              LC.FECHA_INI AS FECHA_INI_LEASING,
+              LC.FECHA_FIN AS FECHA_FIN_LEASING,
+              COALESCE(DC.NRO_DOC, CC.NRO_CONTRATO) AS CONTRATO,
+              COALESCE(DC.DURACION, CC.DURACION) AS PLAZO,
+              AD.FECHA_INI AS FECHA_ENTREGA,
+              AD.FECHA_FIN AS FECHA_DEVOLUCION,
+              COALESCE(DC.FECHA_FIRMA, CC.FECHA_FIRMA) AS FECHA_FIRMA_EFECTIVA,
+              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
+              CASE 
+                WHEN CC.MONEDA IS NULL THEN NULL
+                WHEN CC.MONEDA = '1' THEN 'DÓLAR' 
+                ELSE 'SOLES' 
+              END AS MONEDA,
+              AD.ARCHIVO_PDF AS ARCHIVO_PDF,
+              AD.CONDICION AS CONDICION
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
+              ON AD.ID_ASIGNACION = AC.ID
+            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
+              ON LC.NRO_LEASING = AD.LEASING
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+              ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
+            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+              ON (TRIM(AD.CLASE_CONTRATO) = 'P' AND AD.ID_CONTRATO = CC.ID)
+              OR (TRIM(AD.CLASE_CONTRATO) = 'H' AND DC.ID_PADRE = CC.ID)
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+              ON O.ID = AD.ID_OPE
+            ${joinCliente}
+            LEFT JOIN (
+              SELECT
+                V.ID,
+                V.ANO,
+                V.COLOR,
+                O.ID AS ID_OPE,
+                O.DESCRIPCION AS OPERACIONES,
+                O.IDCLI,
+                V.IDMAR,
+                V.IDMOD
+              FROM ${SCHEMA_BD}.PO_VEHICULO V
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O ON V.SECOPE = O.ID
+            ) V ON V.ID = AD.ID_VEH
+            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA ON MA.ID = V.IDMAR
+            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO ON MO.ID = V.IDMOD
+            WHERE AD.ID_VEH IN (${sqlVehiculos})
+          ) BASE
+        ) X
+        WHERE RN = 1
+      `;
+
+      const mapRow = (row) => ({
+        idAssing: row.ID,
+        cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
+        idCliCont: row.ID_CLIENTE_CONT,
+        idCliOpe: row.ID_CLIENTE_OPE ? row.ID_CLIENTE_OPE.trim() : "Sin cliente",
+        idOpe: row.ID_OPE,
+        operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
+        idOpeActual: row.ID_OPE_ACTUAL,
+        opeActual: row.OPERACION_ACTUAL
+          ? row.OPERACION_ACTUAL.trim()
+          : "Sin operacion",
+        placa: row.PLACA ? row.PLACA.trim() : "Sin placa",
+        año: row.ANO,
+        color: row.COLOR ? row.COLOR.trim() : "Sin color",
+        marca: row.MARCA ? row.MARCA.trim() : "Sin marca",
+        modelo: row.MODELO ? row.MODELO.trim() : "Sin modelo",
+        nroSer: row.NROSER ? row.NROSER.trim() : "Sin serie",
+        terreno: row.TERRENO,
+        leasing: row.LEASING ? row.LEASING.trim() : "Sin leasing",
+        fechaIniLea: convertirFecha(row.FECHA_INI_LEASING),
+        fechaFinLea: convertirFecha(row.FECHA_FIN_LEASING),
+        contrato: row.CONTRATO ? row.CONTRATO.trim() : "Sin contrato",
+        plazo: row.PLAZO ?? null,
+        fechaIni: row.FECHA_ENTREGA
+          ? convertirFecha(row.FECHA_ENTREGA.trim())
+          : "Sin fecha",
+        fechaFin: row.FECHA_DEVOLUCION
+          ? convertirFecha(row.FECHA_DEVOLUCION.trim())
+          : "Sin fecha",
+        fechaIniCon: row.FECHA_INI_CONTRATO,
+        fechaFinCon: row.FECHA_FIN_CONTRATO,
+        tarifa: row.TARIFA ?? null,
+        moneda: row.MONEDA,
+        archivoPdf: row.ARCHIVO_PDF ? row.ARCHIVO_PDF : "",
+        condicion: row.CONDICION ? row.CONDICION : "",
+      });
+
+      const result = await cn.query(sql, params);
+      return result.map(mapRow);
+    });
+
+    return res.status(200).json(convertResult);
+  } catch (error) {
+    console.error("Error al listar trazabilidad de vehículos", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al listar trazabilidad de vehículos",
     });
   }
 };
@@ -1076,4 +1526,5 @@ module.exports = {
   listYearByModelGen,
   listPlateTraceability,
   listPlateByRegion,
+  listVehicleTraceability
 };

@@ -8,7 +8,8 @@ const {
   listModelGen,
   listYearByModelGen,
   listPlateTraceability,
-  listPlateByRegion
+  listPlateByRegion,
+  listVehicleTraceability
 } = require("./vehicle.controller.js");
 const validUser = require("../../shared/middleware/user-valid.js");
 const authenticateToken = require("../../shared/middleware/jwt-valid.js");
@@ -21,6 +22,7 @@ Router.get("/vehiculosPorContrato", authenticateToken, validUser, listVehiclesBy
 Router.get("/modedosGenericos", authenticateToken, validUser, listModelGen);
 Router.get("/aniosPorModelo", authenticateToken, validUser, listYearByModelGen);
 Router.get("/trazabilidadPlaca", authenticateToken, validUser, listPlateTraceability);
+Router.get("/trazabilidadPlacasPorCliente", authenticateToken, validUser, listVehicleTraceability);
 Router.get("/vehiculosPorRegion", authenticateToken, validUser, listPlateByRegion);
 
 module.exports = Router;

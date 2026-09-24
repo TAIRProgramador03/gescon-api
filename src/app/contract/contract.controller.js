@@ -178,7 +178,7 @@ const contractPending = async (req, res) => {
         ID: row.ID,
         DESCRIPCION: row.DESCRIPCION,
         CLIENTE: row.CLIENTE,
-        LEASINGS: row.LEASINGS
+        LEASINGS: row.LEASINGS,
       }));
     });
 
@@ -203,8 +203,17 @@ const tableContract = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const query = `
-        SELECT ID, NRO_CONTRATO AS DESCRIPCION, FECHA_FIRMA AS FECHACREA, CANT_VEHI AS TOTVEH, DURACION
-        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
+        SELECT 
+          TC.ID, 
+          TC.NRO_CONTRATO AS DESCRIPCION, 
+          TC.FECHA_FIRMA AS FECHACREA, 
+          TC.CANT_VEHI + COALESCE(
+            (SELECT SUM(TD2.CANT_VEHI) 
+            FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2 
+            WHERE TD2.ID_PADRE = TC.ID), 
+          0) AS TOTVEH, 
+          TC.DURACION
+        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
         WHERE ID_CLIENTE = ? ${id ? "AND ID = ?" : ""}
       `;
       const result = await cn.query(query, id ? [idCli, id] : [idCli]);
@@ -232,111 +241,566 @@ const tableContract = async (req, res) => {
     res.json(cleanedResult);
   } catch (error) {
     console.error("Error al obtener los datos:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error al obtener los datos. Por favor intente más tarde.",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener los datos. Por favor intente más tarde.",
+    });
   }
 };
+
+// const detailContract = async (req, res) => {
+//   const { id: idUser, roleId } = req.user;
+//   const { contratoId, clienteId } = req.query;
+
+//   if (!clienteId) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "El parametro clienteId es obligatorio",
+//     });
+//   }
+
+//   try {
+//     const data = await withConnection(async (cn) => {
+//       let filtroContrato = "";
+//       const params = [clienteId];
+
+//       if (roleId == 3) {
+//         if (contratoId) {
+//           filtroContrato = `
+//             AND (
+//               (TRIM(tad.CLASE_CONTRATO) = 'P' AND tad.ID_CONTRATO = ?)
+//               OR
+//               (TRIM(tad.CLASE_CONTRATO) = 'H' AND tdc.ID_PADRE = ?)
+//             )
+//           `;
+//           params.push(contratoId, contratoId);
+//         }
+//       } else {
+//         if (contratoId) {
+//           params.push(contratoId);
+//         }
+//       }
+
+//       let sqlTotalVeh = `
+//         SELECT
+//             SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
+//             SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
+//             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
+//             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+//         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//             ON PO.ID = TAD.ID_OPE
+//         WHERE PO.IDCLI = ?
+//         ${contratoId ? `AND tad.ID_CONTRATO = ? AND TAD.CLASE_CONTRATO = 'P'` : ""}
+//       `;
+
+//       let sqlTotalGesoper = `
+//         SELECT 
+//             TRIM(C.CLINOM) AS CLIENTE,
+//             TRIM(PO.IDCLI) AS ID_CLIENTE,
+//             COUNT(PV.ID) AS TOTVEHOP
+//         FROM ${SCHEMA_BD}.PO_VEHICULO PV
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//             ON PV.SECOPE = PO.ID
+//         LEFT JOIN ${SCHEMA_BD}.TCLIE C
+//             ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+//         WHERE PO.IDCLI = ?
+//         GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+//         ORDER BY CLIENTE
+//       `;
+
+//       let sqlTotalAsign = `
+//         SELECT
+//             TRIM(C.CLINOM) AS CLIENTE,
+//             TRIM(PO.IDCLI) AS ID_CLIENTE,
+//             COUNT(PV.ID) AS TOTVEHOP
+//         FROM ${SCHEMA_BD}.PO_VEHICULO PV
+//         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//             ON PV.SECOPE = PO.ID
+//         LEFT JOIN ${SCHEMA_BD}.TCLIE C
+//             ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+//         WHERE TRIM(PO.IDCLI) = ?
+//         AND EXISTS (
+//             SELECT 1
+//             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
+//                 ON TAD.ID_OPE = OPE.ID
+//             WHERE TAD.ID_VEH = PV.ID
+//             AND TRIM(OPE.IDCLI) = ?
+//         )
+//         GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+//       `;
+
+//       const sqlLeasing = `
+//         SELECT COUNT(*) AS TOTAL_LEASINGS FROM ${SCHEMA_BD}.TBL_LEASING_CAB LC
+//         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//         ON LC.ID_CONTRATO = CC.ID AND LC.TIPCON = 'P'
+//         WHERE CC.ID_CLIENTE = ?
+//         ${contratoId ? `AND CC.ID = ?` : "AND (DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS) > CURRENT DATE"}
+//       `;
+
+//       const sqlDocumentos = `
+//         SELECT COUNT(*) AS TOTAL_DOCUMENTOS FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
+//         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
+//         ON CC.ID = DC.ID_PADRE
+//         WHERE CC.ID_CLIENTE = ?
+//         ${contratoId ? `AND CC.ID = ?` : "AND (DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS) > CURRENT DATE "}
+//       `;
+
+//       const sqlContrato = `
+//         SELECT 
+//           TC.NRO_CONTRATO, 
+//           TC.DESCRIPCION, 
+//           TC.FECHA_FIRMA, 
+//           TC.DURACION, 
+//           TC.ARCHIVO_PDF 
+//         FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+//         WHERE TC.ID_CLIENTE = ?
+//         ${contratoId ? `AND TC.ID = ?` : ""}
+//       `;
+
+//       const sqlTotalContrato = `
+//         SELECT
+//           SUM(sub.TOTVEH) AS TOTVEH,
+//           SUM(sub.TOTVEHDOC) AS TOTVEHDOC,
+//           SUM(sub.TOTVEHGENERAL) AS TOTVEHGENERAL
+//         FROM (
+//           SELECT
+//               TC.CANT_VEHI AS TOTVEH,
+//               COALESCE(
+//                   (SELECT SUM(TD2.CANT_VEHI)
+//                   FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
+//                   WHERE TD2.ID_PADRE = TC.ID),
+//               0) AS TOTVEHDOC,
+//               TC.CANT_VEHI + COALESCE(
+//                   (SELECT SUM(TD2.CANT_VEHI)
+//                   FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
+//                   WHERE TD2.ID_PADRE = TC.ID),
+//               0) AS TOTVEHGENERAL
+//           FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+//           WHERE TC.ID_CLIENTE = ?
+//           ${contratoId ? `AND TC.ID = ?` : ""}
+//         ) sub
+//       `;
+
+//       const sqlPendientes = `
+//         SELECT COUNT(*) AS TOTAL_PENDIENTES FROM (
+//           SELECT DISTINCT A.CODINI, A.PLACA, TRIM(D.DESCRIPCION) AS MARCA, TRIM(A.MODELO) AS MODELO, A.NRO_LEASING
+//           FROM (
+//             SELECT A.ID, A.ID_CLIENTE, TRIM(B.ID_VEH) AS CODINI, TRIM(B.PLACA) AS PLACA, A.NRO_LEASING, B.ID_VEH, B.MODELO
+//             FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
+//             INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B
+//             ON A.ID = B.ID_LEA_CAB) A
+//             LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO C
+//             ON A.ID_VEH = C.ID
+//             LEFT JOIN ${SCHEMA_BD}.PO_MARCA D
+//             ON C.IDMAR = D.ID
+//             LEFT JOIN (
+//               SELECT * FROM (
+//                 SELECT A.ID, A.ID_CLIENTE, A.NRO_LEASING, A.CANT_VEH, B.PLACA, B.ID_VEH AS VEHICULO
+//                 FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
+//                 INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B ON A.ID=B.ID_LEA_CAB) A
+//                 LEFT JOIN (
+//                   SELECT ID_CLIENTE, ID_ASIGNACION, LEASING, ID_VEH
+//                   FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A
+//                   INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B
+//                   ON A.ID=B.ID_ASIGNACION
+//                 ) B
+//                 ON TRIM(A.NRO_LEASING)=TRIM(B.LEASING) AND A.VEHICULO=B.ID_VEH
+//               ) E
+//               ON A.NRO_LEASING=E.LEASING AND A.ID_VEH=E.VEHICULO
+//           WHERE (A.ID_CLIENTE = ?) AND E.VEHICULO IS NULL
+//           GROUP BY A.CODINI, A.PLACA, TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.NRO_LEASING
+//           ORDER BY TRIM(D.DESCRIPCION), TRIM(A.MODELO), A.PLACA
+//         )
+//       `;
+
+//       const sqlTrazabilidad = `
+//         SELECT COUNT(DISTINCT VEHICULO) AS TOTAL_VEH_TRAZABILIDAD
+//         FROM (
+//             SELECT AD.ID_VEH AS VEHICULO
+//             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//                 ON AD.ID_OPE = PO.ID
+//             WHERE TRIM(PO.IDCLI) = ?
+
+//             UNION
+
+//             SELECT AD.ID_VEH AS VEHICULO
+//             FROM ${SCHEMA_BD}.T_GC_RE_CAB RC
+//             LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+//                 ON RC.ID_ASG_DET = AD.ID
+//             LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_A DA
+//                 ON DA.ID_CAB = RC.ID
+//             LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_B DB
+//                 ON DB.ID_CAB = RC.ID
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_A
+//                 ON DA.ID_OPE = OPE_A.ID
+//             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_B
+//                 ON DB.ID_OPE = OPE_B.ID
+//             WHERE TRIM(OPE_A.IDCLI) = ? 
+//             OR TRIM(OPE_B.IDCLI) = ?
+//         ) T
+//       `;
+
+//       if (roleId == 3) {
+//         sqlTotalGesoper = `
+//           SELECT 
+//               TRIM(C.CLINOM) AS CLIENTE,
+//               TRIM(PO.IDCLI) AS ID_CLIENTE,
+//               COUNT(PV.ID) AS TOTVEHOP
+//           FROM ${SCHEMA_BD}.PO_VEHICULO PV
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//               ON PV.SECOPE = PO.ID
+//           LEFT JOIN ${SCHEMA_BD}.TCLIE C
+//               ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+//           LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                   FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                   INNER JOIN ${SCHEMA_BD}.TCLIE B
+//                   ON A.IDCLI = B.CLICVE
+//                   WHERE A.ID <> 86
+//                   AND B.CLINOM <> '*** ANULADO ***'
+//               ) PO
+//               ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+//               ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+//               ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//           ) U
+//               ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
+//           WHERE PO.IDCLI = ?
+//           AND U.ID_USU = ${idUser}
+//           GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+//           ORDER BY CLIENTE
+//         `;
+
+//         sqlTotalVeh = `
+//           SELECT
+//               SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
+//               SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
+//               SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
+//               SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+//           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//               ON PO.ID = TAD.ID_OPE
+//           LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
+//               ON tad.ID_CONTRATO = tdc.ID AND TRIM(tad.CLASE_CONTRATO) = 'H'
+//           LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                   FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                   INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+//                   WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+//               ) PO ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//           ) C
+//               ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
+//           WHERE PO.IDCLI = ?
+//           AND C.ID_USU = ${idUser}
+//           ${filtroContrato}
+//         `;
+
+//         sqlTotalAsign = `
+//           SELECT
+//               TRIM(C.CLINOM) AS CLIENTE,
+//               TRIM(PO.IDCLI) AS ID_CLIENTE,
+//               COUNT(PV.ID) AS TOTVEHOP
+//           FROM ${SCHEMA_BD}.PO_VEHICULO PV
+//           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+//               ON PV.SECOPE = PO.ID
+//           LEFT JOIN ${SCHEMA_BD}.TCLIE C
+//               ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+//           LEFT JOIN (
+//               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+//               FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+//               LEFT JOIN (
+//                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+//                   FROM ${SCHEMA_BD}.PO_OPERACIONES A
+//                   INNER JOIN ${SCHEMA_BD}.TCLIE B
+//                   ON A.IDCLI = B.CLICVE
+//                   WHERE A.ID <> 86
+//                   AND B.CLINOM <> '*** ANULADO ***'
+//               ) PO
+//               ON MOXU.IDOPERACION = PO.ID
+//               LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+//               ON MOXU.CH_CODI_USUARIO = TUG.USU
+//               LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+//               ON TUG.ID_RL = TRG.ID
+//               WHERE TUG.USU IS NOT NULL
+//           ) U
+//               ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
+//           WHERE TRIM(PO.IDCLI) = ?
+//           AND EXISTS (
+//               SELECT 1
+//               FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+//               LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
+//                   ON TAD.ID_OPE = OPE.ID
+//               WHERE TAD.ID_VEH = PV.ID
+//               AND TRIM(OPE.IDCLI) = ?
+//           )
+//           AND U.ID_USU = ${idUser}
+//           GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+//         `;
+//       }
+
+//       const resultCont = await cn.query(
+//         sqlContrato,
+//         contratoId ? [clienteId, contratoId] : [clienteId],
+//       );
+//       const resultTotalCont = await cn.query(
+//         sqlTotalContrato,
+//         contratoId ? [clienteId, contratoId] : [clienteId],
+//       );
+//       const resultDoc = await cn.query(
+//         sqlDocumentos,
+//         contratoId ? [clienteId, contratoId] : [clienteId],
+//       );
+//       const resultLea = await cn.query(
+//         sqlLeasing,
+//         contratoId ? [clienteId, contratoId] : [clienteId],
+//       );
+//       const resultTotalGesoper = await cn.query(sqlTotalGesoper, [clienteId]);
+//       const resultTotalVeh = await cn.query(sqlTotalVeh, params);
+//       const resultTotalAssign = await cn.query(sqlTotalAsign, [
+//         clienteId,
+//         clienteId,
+//       ]);
+//       const resultTotalPending = await cn.query(sqlPendientes, [clienteId]);
+//       const resultTrazabilidad = await cn.query(sqlTrazabilidad, [clienteId, clienteId, clienteId]);
+
+//       return {
+//         contrato: contratoId ? resultCont[0] : null,
+//         totalCont: resultTotalCont[0],
+//         documento: resultDoc[0],
+//         leasing: resultLea[0],
+//         totalGesoper: resultTotalGesoper[0],
+//         totalVeh: resultTotalVeh[0],
+//         totalVehAssign: resultTotalAssign[0],
+//         totalPending: resultTotalPending[0],
+//         totalTrazabilidad: resultTrazabilidad[0],
+//       };
+//     });
+
+//     const {
+//       contrato,
+//       totalCont,
+//       documento,
+//       leasing,
+//       totalGesoper,
+//       totalVeh,
+//       totalVehAssign,
+//       totalPending,
+//       totalTrazabilidad
+//     } = data;
+
+//     res.json({
+//       success: true,
+//       data: {
+//         isTemp: contrato
+//           ? contrato.NRO_CONTRATO.trim().toUpperCase().startsWith("CPEN-")
+//           : false,
+//         descripcion: contrato ? contrato.DESCRIPCION.trim() : "",
+//         fechaFirma: contrato ? contrato.FECHA_FIRMA : "",
+//         duracion: contrato ? contrato.DURACION.trim() : "",
+//         totalVeh: totalCont.TOTVEH,
+//         totalVehDoc: totalCont.TOTVEHDOC,
+//         totalVehGeneral: totalCont.TOTVEHGENERAL,
+//         vehiculoSup: totalVeh.TOTAL_VEH_SUP,
+//         vehiculoSev: totalVeh.TOTAL_VEH_SEV,
+//         vehiculoSoc: totalVeh.TOTAL_VEH_SOC,
+//         vehiculoCiu: totalVeh.TOTAL_VEH_CIU,
+//         cantidadDocumentos: documento.TOTAL_DOCUMENTOS,
+//         cantidadLeasing: leasing.TOTAL_LEASINGS,
+//         cantidadAsignados: totalVehAssign ? totalVehAssign.TOTVEHOP : 0,
+//         cantidadGesoper: totalGesoper ? totalGesoper.TOTVEHOP : 0,
+//         cantidadTrazabilidad: totalTrazabilidad ? totalTrazabilidad.TOTAL_VEH_TRAZABILIDAD : 0,
+//         pendientes: totalPending.TOTAL_PENDIENTES,
+//         archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : "",
+//       },
+//     });
+//   } catch (error) {
+//     console.error("Error al obtener los detalles del contrato:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Error al obtener los detalles del contrato",
+//     });
+//   }
+// };
 
 const detailContract = async (req, res) => {
   const { id: idUser, roleId } = req.user;
   const { contratoId, clienteId } = req.query;
 
   if (!clienteId) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "El parametro clienteId es obligatorio",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "El parametro clienteId es obligatorio",
+    });
   }
 
   try {
     const data = await withConnection(async (cn) => {
+      let filtroContrato = "";
+      const params = [clienteId];
+
+      if (roleId == 3) {
+        if (contratoId) {
+          filtroContrato = `
+            AND (
+              (TRIM(tad.CLASE_CONTRATO) = 'P' AND tad.ID_CONTRATO = ?)
+              OR
+              (TRIM(tad.CLASE_CONTRATO) = 'H' AND tdc.ID_PADRE = ?)
+            )
+          `;
+          params.push(contratoId, contratoId);
+        }
+      } else {
+        if (contratoId) {
+          params.push(contratoId);
+        }
+      }
+
+      // Filtro reutilizable: vehículo asociado a ese contrato específico según TBL_ASIGNACION_DET
+      const filtroContratoGesoper = contratoId
+        ? `
+          AND EXISTS (
+              SELECT 1
+              FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+              LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
+                  ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
+              WHERE TAD.ID_VEH = PV.ID
+              AND (
+                  (TRIM(TAD.CLASE_CONTRATO) = 'P' AND TAD.ID_CONTRATO = ?)
+                  OR
+                  (TRIM(TAD.CLASE_CONTRATO) = 'H' AND TDC.ID_PADRE = ?)
+              )
+          )
+        `
+        : "";
+
+      const filtroContratoAsign = contratoId
+        ? `
+          AND (
+              (TRIM(TAD.CLASE_CONTRATO) = 'P' AND TAD.ID_CONTRATO = ?)
+              OR
+              (TRIM(TAD.CLASE_CONTRATO) = 'H' AND TDC.ID_PADRE = ?)
+          )
+        `
+        : "";
+
       let sqlTotalVeh = `
         SELECT
-          SUM(TOTAL_VEH_SU) AS TOTAL_VEH_SUP,
-          SUM(TOTAL_VEH_SOC) AS TOTAL_VEH_SOC,
-          SUM(TOTAL_VEH_CIU) AS TOTAL_VEH_CIU,
-          SUM(TOTAL_VEH_SEV) AS TOTAL_VEH_SEV
-        FROM (
-          SELECT
-            SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
+            SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
             SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-          ON tad.ID_ASIGNACION  = tac.ID
-          WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'P'
-          ${contratoId ? `AND tad.ID_CONTRATO = ?` : ""}
-          UNION ALL
-          SELECT
-            SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
-            SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
-            SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
-            SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-          ON tad.ID_ASIGNACION  = tac.ID
-          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
-          ON tad.ID_CONTRATO = tdc.ID
-          WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'H'
-          ${contratoId ? `AND tdc.ID_PADRE = ?` : ""}
-        )
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+            ON PO.ID = TAD.ID_OPE
+        WHERE PO.IDCLI = ?
+        ${contratoId ? `AND tad.ID_CONTRATO = ? AND TAD.CLASE_CONTRATO = 'P'` : ""}
+      `;
+
+      let sqlTotalGesoper = `
+        SELECT 
+            TRIM(C.CLINOM) AS CLIENTE,
+            TRIM(PO.IDCLI) AS ID_CLIENTE,
+            COUNT(PV.ID) AS TOTVEHOP
+        FROM ${SCHEMA_BD}.PO_VEHICULO PV
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+            ON PV.SECOPE = PO.ID
+        LEFT JOIN ${SCHEMA_BD}.TCLIE C
+            ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+        WHERE PO.IDCLI = ?
+        ${filtroContratoGesoper}
+        GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+        ORDER BY CLIENTE
       `;
 
       let sqlTotalAsign = `
-        SELECT COUNT(*) AS TOTAL_ASIGNADOS FROM (
-          SELECT AD.ID, AD.ID_CONTRATO, AD.CLASE_CONTRATO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-          ON AD.ID_ASIGNACION = AC.ID
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-          ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON O.ID = AD.ID_OPE
-          WHERE O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P'
-          ${contratoId ? "AND CC.ID = ?" : ""}
-
-          UNION ALL
-
-          SELECT AD.ID, AD.ID_CONTRATO, AD.CLASE_CONTRATO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-          ON AD.ID_ASIGNACION = AC.ID
-          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-          ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-          ON DC.ID_PADRE = CC.ID
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON O.ID = AD.ID_OPE
-          WHERE O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H'
-          ${contratoId ? "AND CC.ID = ?" : ""}
+        SELECT
+            TRIM(C.CLINOM) AS CLIENTE,
+            TRIM(PO.IDCLI) AS ID_CLIENTE,
+            COUNT(PV.ID) AS TOTVEHOP
+        FROM ${SCHEMA_BD}.PO_VEHICULO PV
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+            ON PV.SECOPE = PO.ID
+        LEFT JOIN ${SCHEMA_BD}.TCLIE C
+            ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+        WHERE TRIM(PO.IDCLI) = ?
+        AND EXISTS (
+            SELECT 1
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
+                ON TAD.ID_OPE = OPE.ID
+            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
+                ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
+            WHERE TAD.ID_VEH = PV.ID
+            AND TRIM(OPE.IDCLI) = ?
+            ${filtroContratoAsign}
         )
+        GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
       `;
 
       const sqlLeasing = `
         SELECT COUNT(*) AS TOTAL_LEASINGS FROM ${SCHEMA_BD}.TBL_LEASING_CAB LC
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
         ON LC.ID_CONTRATO = CC.ID AND LC.TIPCON = 'P'
-        WHERE CC.ID_CLIENTE = ?
-        ${contratoId ? `AND CC.ID = ?` : "AND (DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS) > CURRENT DATE"}
+        WHERE CAST(LC.ID_CLIENTE AS VARCHAR(10)) = ?
+        ${contratoId ? `AND CC.ID = ?` : ""}
       `;
 
       const sqlDocumentos = `
         SELECT COUNT(*) AS TOTAL_DOCUMENTOS FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
         ON CC.ID = DC.ID_PADRE
-        WHERE CC.ID_CLIENTE = ?
-        ${contratoId ? `AND CC.ID = ?` : "AND (DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS) > CURRENT DATE "}
+        WHERE CAST(DC.ID_CLIENTE AS VARCHAR(10)) = ?
+        ${contratoId ? `AND CC.ID = ?` : ""}
       `;
 
       const sqlContrato = `
-        SELECT NRO_CONTRATO, DESCRIPCION, FECHA_FIRMA, DURACION, ARCHIVO_PDF FROM ${SCHEMA_BD}.TBLCONTRATO_CAB
-        WHERE ID_CLIENTE = ?
-        ${contratoId ? `AND ID = ?` : ""}
+        SELECT 
+          TC.NRO_CONTRATO, 
+          TC.DESCRIPCION, 
+          TC.FECHA_FIRMA, 
+          TC.DURACION, 
+          TC.ARCHIVO_PDF 
+        FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+        WHERE TC.ID_CLIENTE = ?
+        ${contratoId ? `AND TC.ID = ?` : ""}
+      `;
+
+      const sqlTotalContrato = `
+        SELECT
+          SUM(sub.TOTVEH) AS TOTVEH,
+          SUM(sub.TOTVEHDOC) AS TOTVEHDOC,
+          SUM(sub.TOTVEHGENERAL) AS TOTVEHGENERAL
+        FROM (
+          SELECT
+              TC.CANT_VEHI AS TOTVEH,
+              COALESCE(
+                  (SELECT SUM(TD2.CANT_VEHI)
+                  FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
+                  WHERE TD2.ID_PADRE = TC.ID),
+              0) AS TOTVEHDOC,
+              TC.CANT_VEHI + COALESCE(
+                  (SELECT SUM(TD2.CANT_VEHI)
+                  FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD2
+                  WHERE TD2.ID_PADRE = TC.ID),
+              0) AS TOTVEHGENERAL
+          FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+          WHERE TC.ID_CLIENTE = ?
+          ${contratoId ? `AND TC.ID = ?` : ""}
+        ) sub
       `;
 
       const sqlPendientes = `
@@ -371,466 +835,165 @@ const detailContract = async (req, res) => {
         )
       `;
 
-      let filtrosA =
-        " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'P' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      let filtrosB =
-        " O.IDCLI = ? AND AD.CLASE_CONTRATO = 'H' AND O.ID = V.ID_OPE AND V.ID_OPE != 109";
-      const params = [clienteId];
-
-      if (contratoId) {
-        filtrosA += " AND CC.ID = ?";
-        filtrosB += " AND CC.ID = ?";
-        params.push(contratoId);
-      }
-
-      let sqlTotalPlacasActivas = `
-        SELECT COUNT(*) AS TOTAL_ACTIVAS FROM (
-        SELECT *
+      const sqlTrazabilidad = `
+        SELECT COUNT(DISTINCT VEHICULO) AS TOTAL_VEH_TRAZABILIDAD
         FROM (
-        SELECT
-          T.*,
-          ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-        FROM (
-          SELECT
-            DISTINCT(AD.ID),
-            C.CLINOM AS CLIENTE,
-            O.ID AS ID_OPE,
-            O.DESCRIPCION AS OPERACIONES,
-            V.ID_OPE AS ID_OPE_ACTUAL,
-            V.OPERACIONES AS OPERACION_ACTUAL,
-            AD.PLACA,
-            V.ANO,
-            V.COLOR,
-            MA.DESCRIPCION AS MARCA,
-            MO.DESCRIPCION AS MODELO,
-            AD.TP_TERRENO AS TERRENO,
-            AD.LEASING,
-            LC.FECHA_INI AS FECHA_INI_LEASING,
-            LC.FECHA_FIN AS FECHA_FIN_LEASING,
-            CC.NRO_CONTRATO AS CONTRATO,
-            CC.DURACION AS PLAZO,
-            AD.FECHA_INI AS FECHA_ENTREGA,
-            AD.FECHA_FIN,
-            DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-            DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-            CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-            CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
-          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-          ON AD.ID_ASIGNACION = AC.ID
-          LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-          ON LC.NRO_LEASING = AD.LEASING
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-            WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-            ORDER BY CLINOM ASC
-          ) C
-          ON AC.ID_CLIENTE = C.IDCLI
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON O.ID = AD.ID_OPE
-          LEFT JOIN (
-            SELECT
-              V.ID,
-              V.ANO,
-              V.COLOR,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.IDMAR,
-              V.IDMOD
-            FROM ${SCHEMA_BD}.PO_VEHICULO V
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON V.SECOPE = O.ID
-          ) V
-          ON V.ID = AD.ID_VEH
-          LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-          ON MA.ID = V.IDMAR
-          LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-          ON MO.ID = V.IDMOD
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-          ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-          WHERE ${filtrosA}
+            SELECT AD.ID_VEH AS VEHICULO
+            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+                ON AD.ID_OPE = PO.ID
+            WHERE TRIM(PO.IDCLI) = ?
 
-          UNION ALL
+            UNION
 
-          SELECT
-            DISTINCT(AD.ID),
-            C.CLINOM AS CLIENTE,
-            O.ID AS ID_OPE,
-            O.DESCRIPCION AS OPERACIONES,
-            V.ID_OPE AS ID_OPE_ACTUAL,
-            V.OPERACIONES AS OPERACION_ACTUAL,
-            AD.PLACA,
-            V.ANO,
-            V.COLOR,
-            MA.DESCRIPCION AS MARCA,
-            MO.DESCRIPCION AS MODELO,
-            AD.TP_TERRENO AS TERRENO,
-            AD.LEASING,
-            LC.FECHA_INI AS FECHA_INI_LEASING,
-            LC.FECHA_FIN AS FECHA_FIN_LEASING,
-            DC.NRO_DOC AS CONTRATO,
-            DC.DURACION AS PLAZO,
-            AD.FECHA_INI AS FECHA_ENTREGA,
-            AD.FECHA_FIN,
-            DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-            DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-            CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-            CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
-          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-          ON AD.ID_ASIGNACION = AC.ID
-          LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-          ON LC.NRO_LEASING = AD.LEASING
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-            WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-            ORDER BY CLINOM ASC
-          ) C
-          ON AC.ID_CLIENTE = C.IDCLI
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON O.ID = AD.ID_OPE
-          LEFT JOIN (
-            SELECT
-              V.ID,
-              V.ANO,
-              V.COLOR,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.IDMAR,
-              V.IDMOD
-            FROM ${SCHEMA_BD}.PO_VEHICULO V
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON V.SECOPE = O.ID
-          ) V
-          ON V.ID = AD.ID_VEH
-          LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-          ON MA.ID = V.IDMAR
-          LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-          ON MO.ID = V.IDMOD
-          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-          ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-          ON DC.ID_PADRE = CC.ID
-          WHERE ${filtrosB}
-          ) T
-        ) X
-        WHERE RN = 1
-        )
+            SELECT AD.ID_VEH AS VEHICULO
+            FROM ${SCHEMA_BD}.T_GC_RE_CAB RC
+            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
+                ON RC.ID_ASG_DET = AD.ID
+            LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_A DA
+                ON DA.ID_CAB = RC.ID
+            LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DET_B DB
+                ON DB.ID_CAB = RC.ID
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_A
+                ON DA.ID_OPE = OPE_A.ID
+            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_B
+                ON DB.ID_OPE = OPE_B.ID
+            WHERE TRIM(OPE_A.IDCLI) = ? 
+            OR TRIM(OPE_B.IDCLI) = ?
+        ) T
       `;
 
-      const paramsTotalVeh = contratoId
-        ? [clienteId, contratoId, clienteId, contratoId]
-        : [clienteId, clienteId];
-
       if (roleId == 3) {
-        filtrosA += ` AND C.ID_USU = ${idUser}`;
-        filtrosB += ` AND C.ID_USU = ${idUser}`;
-
-        sqlTotalPlacasActivas = `
-          SELECT COUNT(*) AS TOTAL_ACTIVAS FROM (
-          SELECT *
-          FROM (
-          SELECT
-            T.*,
-            ROW_NUMBER() OVER(PARTITION BY T.ID ORDER BY T.ID) AS RN
-          FROM (
-            SELECT
-              DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL,
-              AD.PLACA,
-              V.ANO,
-              V.COLOR,
-              MA.DESCRIPCION AS MARCA,
-              MO.DESCRIPCION AS MODELO,
-              AD.TP_TERRENO AS TERRENO,
-              AD.LEASING,
-              LC.FECHA_INI AS FECHA_INI_LEASING,
-              LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              CC.NRO_CONTRATO AS CONTRATO,
-              CC.DURACION AS PLAZO,
-              AD.FECHA_INI AS FECHA_ENTREGA,
-              AD.FECHA_FIN,
-              DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-              DATE(SUBSTR(CC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(CC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(CC.FECHA_FIRMA, 7, 2)) + CAST(CC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-              CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-            ON LC.NRO_LEASING = AD.LEASING
-            LEFT JOIN (
-                SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                LEFT JOIN (
+        sqlTotalGesoper = `
+          SELECT 
+              TRIM(C.CLINOM) AS CLIENTE,
+              TRIM(PO.IDCLI) AS ID_CLIENTE,
+              COUNT(PV.ID) AS TOTVEHOP
+          FROM ${SCHEMA_BD}.PO_VEHICULO PV
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PV.SECOPE = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.TCLIE C
+              ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+          LEFT JOIN (
+              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+              LEFT JOIN (
                   SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
                   FROM ${SCHEMA_BD}.PO_OPERACIONES A
                   INNER JOIN ${SCHEMA_BD}.TCLIE B
                   ON A.IDCLI = B.CLICVE
                   WHERE A.ID <> 86
                   AND B.CLINOM <> '*** ANULADO ***'
-                )PO
-                ON MOXU.IDOPERACION = PO.ID
-                LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                ON MOXU.CH_CODI_USUARIO = TUG.USU
-                LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                ON TUG.ID_RL = TRG.ID
-                WHERE TUG.USU IS NOT NULL
-            ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON O.ID = AD.ID_OPE
-            LEFT JOIN (
-              SELECT
-                V.ID,
-                V.ANO,
-                V.COLOR,
-                O.ID AS ID_OPE,
-                O.DESCRIPCION AS OPERACIONES,
-                V.IDMAR,
-                V.IDMOD
-              FROM ${SCHEMA_BD}.PO_VEHICULO V
-              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-              ON V.SECOPE = O.ID
-            ) V
-            ON V.ID = AD.ID_VEH
-            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-            ON MA.ID = V.IDMAR
-            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-            ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-            WHERE ${filtrosA}
-
-            UNION ALL
-
-            SELECT
-              DISTINCT(AD.ID),
-              C.CLINOM AS CLIENTE,
-              O.ID AS ID_OPE,
-              O.DESCRIPCION AS OPERACIONES,
-              V.ID_OPE AS ID_OPE_ACTUAL,
-              V.OPERACIONES AS OPERACION_ACTUAL,
-              AD.PLACA,
-              V.ANO,
-              V.COLOR,
-              MA.DESCRIPCION AS MARCA,
-              MO.DESCRIPCION AS MODELO,
-              AD.TP_TERRENO AS TERRENO,
-              AD.LEASING,
-              LC.FECHA_INI AS FECHA_INI_LEASING,
-              LC.FECHA_FIN AS FECHA_FIN_LEASING,
-              DC.NRO_DOC AS CONTRATO,
-              DC.DURACION AS PLAZO,
-              AD.FECHA_INI AS FECHA_ENTREGA,
-              AD.FECHA_FIN,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) AS FECHA_INI_CONTRATO,
-              DATE(SUBSTR(DC.FECHA_FIRMA, 1, 4) || '-' || SUBSTR(DC.FECHA_FIRMA, 5, 2) || '-' || SUBSTR(DC.FECHA_FIRMA, 7, 2)) + CAST(DC.DURACION AS INTEGER) MONTHS AS FECHA_FIN_CONTRATO,
-              CAST(AD.TARIFA AS DECIMAL(10, 2)) AS TARIFA,
-              CASE WHEN CC.MONEDA = '1' THEN 'SOLES' ELSE 'DÓLAR' END AS MONEDA
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN ${SCHEMA_BD}.TBL_LEASING_CAB LC
-            ON LC.NRO_LEASING = AD.LEASING
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                LEFT JOIN (
-                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                  INNER JOIN ${SCHEMA_BD}.TCLIE B
-                  ON A.IDCLI = B.CLICVE
-                  WHERE A.ID <> 86
-                  AND B.CLINOM <> '*** ANULADO ***'
-                )PO
-                ON MOXU.IDOPERACION = PO.ID
-                LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                ON MOXU.CH_CODI_USUARIO = TUG.USU
-                LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                ON TUG.ID_RL = TRG.ID
-                WHERE TUG.USU IS NOT NULL
-            ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-            ON O.ID = AD.ID_OPE
-            LEFT JOIN (
-              SELECT
-                V.ID,
-                V.ANO,
-                V.COLOR,
-                O.ID AS ID_OPE,
-                O.DESCRIPCION AS OPERACIONES,
-                V.IDMAR,
-                V.IDMOD
-              FROM ${SCHEMA_BD}.PO_VEHICULO V
-              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-              ON V.SECOPE = O.ID
-            ) V
-            ON V.ID = AD.ID_VEH
-            LEFT JOIN ${SCHEMA_BD}.PO_MARCA MA
-            ON MA.ID = V.IDMAR
-            LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
-            ON MO.ID = V.IDMOD
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
-            WHERE ${filtrosB}
-            ) T
-          ) X
-          WHERE RN = 1
-          )
-        `;
-
-        sqlTotalAsign = `
-          SELECT COUNT(*) AS TOTAL_ASIGNADOS FROM (
-            SELECT AD.ID, AD.ID_CONTRATO, AD.CLASE_CONTRATO
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
-            ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON AD.ID_CONTRATO = CC.ID AND TRIM(AD.CLASE_CONTRATO) = 'P'
-            WHERE AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'P' AND C.ID_USU = ${idUser}
-            ${contratoId ? "AND CC.ID = ?" : ""}
-
-            UNION ALL
-
-            SELECT AD.ID, AD.ID_CONTRATO, AD.CLASE_CONTRATO
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-            ON AD.ID_ASIGNACION = AC.ID
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
-            ) C
-            ON AC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = AD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB DC
-            ON AD.ID_CONTRATO = DC.ID AND TRIM(AD.CLASE_CONTRATO) = 'H'
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB CC
-            ON DC.ID_PADRE = CC.ID
-            WHERE AC.ID_CLIENTE = ? AND AD.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
-            ${contratoId ? "AND CC.ID = ?" : ""}
-          )
+              ) PO
+              ON MOXU.IDOPERACION = PO.ID
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+              ON MOXU.CH_CODI_USUARIO = TUG.USU
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+              ON TUG.ID_RL = TRG.ID
+              WHERE TUG.USU IS NOT NULL
+          ) U
+              ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
+          WHERE PO.IDCLI = ?
+          AND U.ID_USU = ${idUser}
+          ${filtroContratoGesoper}
+          GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
+          ORDER BY CLIENTE
         `;
 
         sqlTotalVeh = `
           SELECT
-            SUM(TOTAL_VEH_SU) AS TOTAL_VEH_SUP,
-            SUM(TOTAL_VEH_SOC) AS TOTAL_VEH_SOC,
-            SUM(TOTAL_VEH_CIU) AS TOTAL_VEH_CIU,
-            SUM(TOTAL_VEH_SEV) AS TOTAL_VEH_SEV
-          FROM (
-            SELECT
-              SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
+              SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
               SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
               SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
               SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-            ON tad.ID_ASIGNACION  = tac.ID
-            LEFT JOIN (
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.ID = TAD.ID_OPE
+          LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
+              ON tad.ID_CONTRATO = tdc.ID AND TRIM(tad.CLASE_CONTRATO) = 'H'
+          LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
-            ) C
-            ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = TAD.ID_OPE
-            WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'P' AND C.ID_USU = ${idUser}
-            ${contratoId ? `AND tad.ID_CONTRATO = ?` : ""}
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+              LEFT JOIN (
+                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                  INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
+                  WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
+              ) PO ON MOXU.IDOPERACION = PO.ID
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
+              WHERE TUG.USU IS NOT NULL
+          ) C
+              ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
+          WHERE PO.IDCLI = ?
+          AND C.ID_USU = ${idUser}
+          ${filtroContrato}
+        `;
 
-            UNION ALL
-
-            SELECT
-              SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SU,
-              SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
-              SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
-              SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
-            FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-            LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-            ON tad.ID_ASIGNACION  = tac.ID
-            LEFT JOIN (
+        sqlTotalAsign = `
+          SELECT
+              TRIM(C.CLINOM) AS CLIENTE,
+              TRIM(PO.IDCLI) AS ID_CLIENTE,
+              COUNT(PV.ID) AS TOTVEHOP
+          FROM ${SCHEMA_BD}.PO_VEHICULO PV
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PV.SECOPE = PO.ID
+          LEFT JOIN ${SCHEMA_BD}.TCLIE C
+              ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
+          LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
-            ) C
-            ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = TAD.ID_OPE
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
-            ON tad.ID_CONTRATO = tdc.ID
-            WHERE tac.ID_CLIENTE = ? AND tad.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
-            ${contratoId ? `AND tdc.ID_PADRE = ?` : ""}
+              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
+              LEFT JOIN (
+                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
+                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
+                  INNER JOIN ${SCHEMA_BD}.TCLIE B
+                  ON A.IDCLI = B.CLICVE
+                  WHERE A.ID <> 86
+                  AND B.CLINOM <> '*** ANULADO ***'
+              ) PO
+              ON MOXU.IDOPERACION = PO.ID
+              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
+              ON MOXU.CH_CODI_USUARIO = TUG.USU
+              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
+              ON TUG.ID_RL = TRG.ID
+              WHERE TUG.USU IS NOT NULL
+          ) U
+              ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
+          WHERE TRIM(PO.IDCLI) = ?
+          AND EXISTS (
+              SELECT 1
+              FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
+                  ON TAD.ID_OPE = OPE.ID
+              LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
+                  ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
+              WHERE TAD.ID_VEH = PV.ID
+              AND TRIM(OPE.IDCLI) = ?
+              ${filtroContratoAsign}
           )
+          AND U.ID_USU = ${idUser}
+          GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
         `;
       }
 
+      // Construcción de params por query, en el mismo orden que aparecen los "?"
+      const paramsGesoper = [clienteId];
+      if (contratoId) paramsGesoper.push(contratoId, contratoId);
+
+      const paramsAsign = [clienteId, clienteId];
+      if (contratoId) paramsAsign.push(contratoId, contratoId);
+
+      const paramsTraza = [clienteId];
+      if (contratoId) paramsTraza.push(contratoId, contratoId);
+      paramsTraza.push(clienteId, clienteId);
+      if (contratoId) paramsTraza.push(contratoId, contratoId);
+
       const resultCont = await cn.query(
         sqlContrato,
+        contratoId ? [clienteId, contratoId] : [clienteId],
+      );
+      const resultTotalCont = await cn.query(
+        sqlTotalContrato,
         contratoId ? [clienteId, contratoId] : [clienteId],
       );
       const resultDoc = await cn.query(
@@ -841,33 +1004,35 @@ const detailContract = async (req, res) => {
         sqlLeasing,
         contratoId ? [clienteId, contratoId] : [clienteId],
       );
-      const resultTotalActivas = await cn.query(
-        sqlTotalPlacasActivas,
-        paramsTotalVeh,
-      );
-      const resultTotalVeh = await cn.query(sqlTotalVeh, paramsTotalVeh);
-      const resultTotalAssign = await cn.query(sqlTotalAsign, paramsTotalVeh);
+      const resultTotalGesoper = await cn.query(sqlTotalGesoper, paramsGesoper);
+      const resultTotalVeh = await cn.query(sqlTotalVeh, params);
+      const resultTotalAssign = await cn.query(sqlTotalAsign, paramsAsign);
       const resultTotalPending = await cn.query(sqlPendientes, [clienteId]);
+      const resultTrazabilidad = await cn.query(sqlTrazabilidad, [clienteId, clienteId, clienteId]);
 
       return {
         contrato: contratoId ? resultCont[0] : null,
+        totalCont: resultTotalCont[0],
         documento: resultDoc[0],
         leasing: resultLea[0],
-        totalActivas: resultTotalActivas[0],
+        totalGesoper: resultTotalGesoper[0],
         totalVeh: resultTotalVeh[0],
         totalVehAssign: resultTotalAssign[0],
         totalPending: resultTotalPending[0],
+        totalTrazabilidad: resultTrazabilidad[0],
       };
     });
 
     const {
       contrato,
+      totalCont,
       documento,
       leasing,
-      totalActivas,
+      totalGesoper,
       totalVeh,
       totalVehAssign,
       totalPending,
+      totalTrazabilidad,
     } = data;
 
     res.json({
@@ -879,27 +1044,28 @@ const detailContract = async (req, res) => {
         descripcion: contrato ? contrato.DESCRIPCION.trim() : "",
         fechaFirma: contrato ? contrato.FECHA_FIRMA : "",
         duracion: contrato ? contrato.DURACION.trim() : "",
+        totalVeh: totalCont.TOTVEH,
+        totalVehDoc: totalCont.TOTVEHDOC,
+        totalVehGeneral: totalCont.TOTVEHGENERAL,
         vehiculoSup: totalVeh.TOTAL_VEH_SUP,
         vehiculoSev: totalVeh.TOTAL_VEH_SEV,
         vehiculoSoc: totalVeh.TOTAL_VEH_SOC,
         vehiculoCiu: totalVeh.TOTAL_VEH_CIU,
-        hayActivos: totalActivas.TOTAL_ACTIVAS > 0,
-        cantidadVehiculos: totalActivas.TOTAL_ACTIVAS,
         cantidadDocumentos: documento.TOTAL_DOCUMENTOS,
         cantidadLeasing: leasing.TOTAL_LEASINGS,
-        cantidadAsignados: totalVehAssign.TOTAL_ASIGNADOS,
+        cantidadAsignados: totalVehAssign ? totalVehAssign.TOTVEHOP : 0,
+        cantidadGesoper: totalGesoper ? totalGesoper.TOTVEHOP : 0,
+        cantidadTrazabilidad: totalTrazabilidad ? totalTrazabilidad.TOTAL_VEH_TRAZABILIDAD : 0,
         pendientes: totalPending.TOTAL_PENDIENTES,
         archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : "",
       },
     });
   } catch (error) {
     console.error("Error al obtener los detalles del contrato:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error al obtener los detalles del contrato",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener los detalles del contrato",
+    });
   }
 };
 
@@ -907,12 +1073,10 @@ const detailVehByCont = async (req, res) => {
   const { contratoId, tipoTerr } = req.query;
 
   if (!contratoId)
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "El parametro contratoId es obligatorio",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "El parametro contratoId es obligatorio",
+    });
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -968,12 +1132,10 @@ const detailVehByCont = async (req, res) => {
     return res.status(200).json(cleanedResult);
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error al obtener placas por documento",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener placas por documento",
+    });
   }
 };
 
@@ -1157,12 +1319,10 @@ const updateContract = async (req, res) => {
   const contractId = Number(id);
 
   if (isNaN(contractId))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "El parametro id no es un dato numérico",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "El parametro id no es un dato numérico",
+    });
 
   const {
     idCliente,
@@ -1349,12 +1509,10 @@ const getContractById = async (req, res) => {
   const contractId = Number(id);
 
   if (isNaN(contractId))
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "El parametro id no es un dato numérico",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "El parametro id no es un dato numérico",
+    });
 
   try {
     const data = await withConnection(async (cn) => {
@@ -1371,12 +1529,10 @@ const getContractById = async (req, res) => {
     });
 
     if (!data)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No se encontró el contrato solicitado",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el contrato solicitado",
+      });
 
     const { result, resultDet } = data;
     return res.status(200).json({
@@ -1439,12 +1595,10 @@ const getContractAdiById = async (req, res) => {
     });
 
     if (!data)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No se encontró el contrato solicitado",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No se encontró el contrato solicitado",
+      });
 
     return res.status(200).json({
       idCliente: data.ID_CLIENTE,
@@ -1529,12 +1683,10 @@ const verifyContractsTemp = async (req, res) => {
     });
   } catch (error) {
     console.error("Error al verificar contratos temporales", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error al verificar contratos temporales",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Error al verificar contratos temporales",
+    });
   }
 };
 
