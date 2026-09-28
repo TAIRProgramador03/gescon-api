@@ -1707,7 +1707,7 @@ const changeOperation = async (req, res) => {
           terreno: terrain,
           fechaIni:
             !isDelivery && !isSelf && !isLoser
-              ? convertirFecha(dateInit)
+              ? dateInit ? convertirFecha(dateInit) : null
               : null,
           fechaFin: isDelivery
             ? dateFinish
@@ -1721,7 +1721,7 @@ const changeOperation = async (req, res) => {
                 : null
               : isLoser
                 ? null
-                : convertirFecha(dateFinish),
+                : dateFinish ? convertirFecha(dateFinish) : null,
           fechaTraslado: isDelivery
             ? dateTransffer
               ? convertirFecha(dateTransffer)

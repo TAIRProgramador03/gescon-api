@@ -1499,8 +1499,8 @@ const listPlateByRegion = async (req, res) => {
           3: "Pendiente",
         }),
         anio: row.ANIO,
-        fechaIni: row.FECHA_INICIO.trim(),
-        fechaFin: row.FECHA_FIN.trim(),
+        fechaIni: row.FECHA_INICIO?.trim() ?? "",
+        fechaFin: row.FECHA_FIN?.trim() ?? "",
         operacion: row.OPERACION.trim(),
         cliente: row.CLIENTE.trim(),
       }));

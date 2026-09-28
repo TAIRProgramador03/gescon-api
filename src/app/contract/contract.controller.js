@@ -669,34 +669,6 @@ const detailContract = async (req, res) => {
         }
       }
 
-      // Filtro reutilizable: vehículo asociado a ese contrato específico según TBL_ASIGNACION_DET
-      const filtroContratoGesoper = contratoId
-        ? `
-          AND EXISTS (
-              SELECT 1
-              FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-              LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
-                  ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
-              WHERE TAD.ID_VEH = PV.ID
-              AND (
-                  (TRIM(TAD.CLASE_CONTRATO) = 'P' AND TAD.ID_CONTRATO = ?)
-                  OR
-                  (TRIM(TAD.CLASE_CONTRATO) = 'H' AND TDC.ID_PADRE = ?)
-              )
-          )
-        `
-        : "";
-
-      const filtroContratoAsign = contratoId
-        ? `
-          AND (
-              (TRIM(TAD.CLASE_CONTRATO) = 'P' AND TAD.ID_CONTRATO = ?)
-              OR
-              (TRIM(TAD.CLASE_CONTRATO) = 'H' AND TDC.ID_PADRE = ?)
-          )
-        `
-        : "";
-
       let sqlTotalVeh = `
         SELECT
             SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
@@ -721,7 +693,6 @@ const detailContract = async (req, res) => {
         LEFT JOIN ${SCHEMA_BD}.TCLIE C
             ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
         WHERE PO.IDCLI = ?
-        ${filtroContratoGesoper}
         GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
         ORDER BY CLIENTE
       `;
@@ -742,11 +713,8 @@ const detailContract = async (req, res) => {
             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
                 ON TAD.ID_OPE = OPE.ID
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
-                ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
             WHERE TAD.ID_VEH = PV.ID
             AND TRIM(OPE.IDCLI) = ?
-            ${filtroContratoAsign}
         )
         GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
       `;
@@ -895,7 +863,6 @@ const detailContract = async (req, res) => {
               ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
           WHERE PO.IDCLI = ?
           AND U.ID_USU = ${idUser}
-          ${filtroContratoGesoper}
           GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
           ORDER BY CLIENTE
         `;
@@ -965,11 +932,8 @@ const detailContract = async (req, res) => {
               FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
               LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE
                   ON TAD.ID_OPE = OPE.ID
-              LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TDC
-                  ON TAD.ID_CONTRATO = TDC.ID AND TRIM(TAD.CLASE_CONTRATO) = 'H'
               WHERE TAD.ID_VEH = PV.ID
               AND TRIM(OPE.IDCLI) = ?
-              ${filtroContratoAsign}
           )
           AND U.ID_USU = ${idUser}
           GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
@@ -978,15 +942,8 @@ const detailContract = async (req, res) => {
 
       // Construcción de params por query, en el mismo orden que aparecen los "?"
       const paramsGesoper = [clienteId];
-      if (contratoId) paramsGesoper.push(contratoId, contratoId);
 
       const paramsAsign = [clienteId, clienteId];
-      if (contratoId) paramsAsign.push(contratoId, contratoId);
-
-      const paramsTraza = [clienteId];
-      if (contratoId) paramsTraza.push(contratoId, contratoId);
-      paramsTraza.push(clienteId, clienteId);
-      if (contratoId) paramsTraza.push(contratoId, contratoId);
 
       const resultCont = await cn.query(
         sqlContrato,
