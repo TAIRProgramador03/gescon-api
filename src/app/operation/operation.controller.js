@@ -1233,12 +1233,25 @@ const listVehPending = async (req, res) => {
       `;
 
       const EXCLUDED_OPERATIONS = [
-        OPERACIONES_TAIR.AJENAS,
+        OPERACIONES_TAIR.DIRECTORIO_LIMA,
         OPERACIONES_TAIR.AREQUIPA,
         OPERACIONES_TAIR.LIMA,
         OPERACIONES_TAIR.PENDIENTES,
         OPERACIONES_TAIR.PERDIDAS,
+        OPERACIONES_TAIR.AJENAS,
         OPERACIONES_TAIR.VENDIDAS,
+        OPERACIONES_TAIR.SUBCONTRATADAS,
+        OPERACIONES_TAIR.DIRECTORIO_AREQ,
+      ];
+
+      const IBARCENA_OPERATIONS = [
+        OPERACIONES_TAIR.DIRECTORIO_LIMA,
+        OPERACIONES_TAIR.AREQUIPA,
+        OPERACIONES_TAIR.LIMA,
+        OPERACIONES_TAIR.PENDIENTES,
+        OPERACIONES_TAIR.AJENAS,
+        OPERACIONES_TAIR.SUBCONTRATADAS,
+        OPERACIONES_TAIR.DIRECTORIO_AREQ,
       ];
 
       const result = await cn.query(sql, params);
@@ -1265,13 +1278,10 @@ const listVehPending = async (req, res) => {
           row.ID_OPE_ACTUAL == OPERACIONES_TAIR.VENDIDAS ? true : false,
         esPerdida:
           row.ID_OPE_ACTUAL == OPERACIONES_TAIR.PERDIDAS ? true : false,
-        esDirecta:
-          row.ID_OPE_ASIGN != OPERACIONES_TAIR.AREQUIPA &&
-          row.ID_OPE_ASIGN != OPERACIONES_TAIR.LIMA,
-        esEntrega:
+        esDirecta: !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ASIGN),
+        esDevolucion:
           !EXCLUDED_OPERATIONS.includes(row.ID_OPE_ASIGN) &&
-          (row.ID_OPE_ACTUAL == OPERACIONES_TAIR.LIMA ||
-            row.ID_OPE_ACTUAL == OPERACIONES_TAIR.AREQUIPA),
+          IBARCENA_OPERATIONS.includes(row.ID_OPE_ACTUAL),
       }));
     });
 
@@ -1347,7 +1357,7 @@ const listVehNoPending = async (req, res) => {
       LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
       ON TC.ID = TAD.ID_CONTRATO AND TAD.CLASE_CONTRATO = 'P'
       WHERE PT.RN = 1 AND TAD.ID_OPE = PV.SECOPE 
-      AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.LIMA}, ${OPERACIONES_TAIR.AREQUIPA}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PENDIENTES}, ${OPERACIONES_TAIR.PERDIDAS}) 
+      AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.LIMA}, ${OPERACIONES_TAIR.AREQUIPA}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PENDIENTES}, ${OPERACIONES_TAIR.PERDIDAS}, ${OPERACIONES_TAIR.DIRECTORIO_AREQ}, ${OPERACIONES_TAIR.DIRECTORIO_LIMA}, ${OPERACIONES_TAIR.SUBCONTRATADAS}) 
       ${filtros}
       ORDER BY TAD.ID ASC
     `;
@@ -1439,23 +1449,33 @@ const changeOperation = async (req, res) => {
   } = req.body;
 
   const EXCLUDED_OPERATIONS = [
-    OPERACIONES_TAIR.AJENAS,
+    OPERACIONES_TAIR.DIRECTORIO_LIMA,
     OPERACIONES_TAIR.AREQUIPA,
     OPERACIONES_TAIR.LIMA,
     OPERACIONES_TAIR.PENDIENTES,
     OPERACIONES_TAIR.PERDIDAS,
+    OPERACIONES_TAIR.AJENAS,
     OPERACIONES_TAIR.VENDIDAS,
+    OPERACIONES_TAIR.SUBCONTRATADAS,
+    OPERACIONES_TAIR.DIRECTORIO_AREQ,
+  ];
+
+  const IBARCENA_OPERATIONS = [
+    OPERACIONES_TAIR.DIRECTORIO_LIMA,
+    OPERACIONES_TAIR.AREQUIPA,
+    OPERACIONES_TAIR.LIMA,
+    OPERACIONES_TAIR.PENDIENTES,
+    OPERACIONES_TAIR.AJENAS,
+    OPERACIONES_TAIR.SUBCONTRATADAS,
+    OPERACIONES_TAIR.DIRECTORIO_AREQ,
   ];
 
   const isSelf = operation == OPERACIONES_TAIR.VENDIDAS;
-  const isDirect =
-    beforeOperation != OPERACIONES_TAIR.LIMA &&
-    beforeOperation != OPERACIONES_TAIR.AREQUIPA;
+  const isDirect = !EXCLUDED_OPERATIONS.includes(beforeOperation);
   const isLoser = operation == OPERACIONES_TAIR.PERDIDAS;
   const isDelivery =
     !EXCLUDED_OPERATIONS.includes(beforeOperation) &&
-    (operation == OPERACIONES_TAIR.LIMA ||
-      operation == OPERACIONES_TAIR.AREQUIPA);
+    IBARCENA_OPERATIONS.includes(operation);
 
   const convertDate = convertirFecha(date);
 
@@ -1656,10 +1676,10 @@ const changeOperation = async (req, res) => {
         `;
 
         const oldAssign = {
-          idContrato: findAssign[0].ID_CONTRATO,
-          tipo: findAssign[0].CLASE_CONTRATO.trim(),
+          idContrato: findAssign[0].ID_CONTRATO ?? null,
+          tipo: findAssign[0].CLASE_CONTRATO?.trim() ?? null,
           condicion: findAssign[0].CONDICION.trim(),
-          tarifa: findAssign[0].TARIFA,
+          tarifa: findAssign[0].TARIFA ?? null,
           terreno: String(findAssign[0].TP_TERRENO),
           fechaIni: isDelivery
             ? convertirFecha(findAssign[0].FECHA_INI.trim())
@@ -1667,7 +1687,11 @@ const changeOperation = async (req, res) => {
               ? isDirect
                 ? convertirFecha(findAssign[0].FECHA_INI.trim())
                 : null
-              : convertirFecha(findAssign[0].FECHA_INI.trim()),
+              : isLoser
+                ? isDirect
+                  ? convertirFecha(findAssign[0].FECHA_INI.trim())
+                  : null
+                : convertirFecha(findAssign[0].FECHA_INI.trim()),
           fechaFin: isDelivery
             ? convertirFecha(findAssign[0].FECHA_FIN.trim())
             : isSelf
@@ -1676,11 +1700,13 @@ const changeOperation = async (req, res) => {
                 : dateFinish
                   ? convertirFecha(dateFinish)
                   : null
-              : convertirFecha(findAssign[0].FECHA_FIN.trim()),
-          fechaTraslado: !isDelivery
-            ? dateTransffer
-              ? convertirFecha(dateTransffer)
-              : null
+              : isLoser
+                ? isDirect
+                  ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+                  : null
+                : convertirFecha(findAssign[0].FECHA_FIN.trim()),
+          fechaTraslado: isDelivery
+            ? null
             : isSelf
               ? isDirect
                 ? null
@@ -1696,19 +1722,24 @@ const changeOperation = async (req, res) => {
           actaEntrega: findAssign[0].ARCHIVO_PDF ?? null,
           actaDevol: validDocReturn,
           actaTraslado: validDocTransfer,
-          cliente: findBeforeClient[0].IDCLI,
+          cliente: findBeforeClient[0].IDCLI.trim(),
         };
 
         const newAssing = {
-          idContrato: Number(contract.split("_")[1]),
-          tipo: contract.split("_")[0],
+          idContrato:
+            isDelivery || isSelf || isLoser
+              ? null
+              : Number(contract.split("_")[1]),
+          tipo: isDelivery || isSelf || isLoser ? null : contract.split("_")[0],
           condicion: condition,
-          tarifa: Number(tariff),
+          tarifa: isDelivery || isSelf || isLoser ? null : Number(tariff),
           terreno: terrain,
           fechaIni:
-            !isDelivery && !isSelf && !isLoser
-              ? dateInit ? convertirFecha(dateInit) : null
-              : null,
+            isDelivery || isSelf || isLoser
+              ? null
+              : dateInit
+                ? convertirFecha(dateInit)
+                : null,
           fechaFin: isDelivery
             ? dateFinish
               ? convertirFecha(dateFinish)
@@ -1721,7 +1752,9 @@ const changeOperation = async (req, res) => {
                 : null
               : isLoser
                 ? null
-                : dateFinish ? convertirFecha(dateFinish) : null,
+                : dateFinish
+                  ? convertirFecha(dateFinish)
+                  : null,
           fechaTraslado: isDelivery
             ? dateTransffer
               ? convertirFecha(dateTransffer)
@@ -1738,7 +1771,7 @@ const changeOperation = async (req, res) => {
             !isSelf && !isLoser && validDocReceipt ? validDocReceipt : null,
           actaVenta: isSelf && validDocSelf ? validDocSelf : null,
           cartaPerdida: isLoser && validDocLoser ? validDocLoser : null,
-          cliente: findNewClient[0].IDCLI,
+          cliente: findNewClient[0].IDCLI.trim(),
         };
 
         // CABECERA
@@ -1749,6 +1782,8 @@ const changeOperation = async (req, res) => {
           isSelf ? "V" : isLoser ? "P" : "C",
           user,
         ]);
+
+        console.log("PASA REASIGNACION CABECERA");
 
         // DETALLE ANTIGUO
         await cn.query(sqlInsertReassignDetA, [
@@ -1766,6 +1801,8 @@ const changeOperation = async (req, res) => {
           oldAssign.cliente,
         ]);
 
+        console.log("PASA REASIGNACION A");
+
         // DETALLE NUEVO
         await cn.query(sqlInsertReassignDetB, [
           newCab[0].ID,
@@ -1781,6 +1818,8 @@ const changeOperation = async (req, res) => {
           newAssing.fechaTraslado,
           newAssing.cliente,
         ]);
+
+        console.log("PASA REASIGNACION B");
 
         // DOCUMENTO ENTREGA OLD
         if (oldAssign.actaEntrega) {
@@ -1851,6 +1890,8 @@ const changeOperation = async (req, res) => {
               user,
             ]);
           }
+
+          console.log("PASA VENTA");
         }
 
         // DETALLE PERDIDATOTAL
@@ -1875,6 +1916,8 @@ const changeOperation = async (req, res) => {
               user,
             ]);
           }
+
+          console.log("PASA PERDIDA");
         }
 
         // ACTUALIZAMOS LA ASIGNACION
@@ -1886,19 +1929,23 @@ const changeOperation = async (req, res) => {
           newAssing.tarifa,
           newAssing.actaEntrega,
           newAssing.terreno,
-          !isDelivery
-            ? convertirFecha(dateInit)
-            : isSelf
-              ? convertirFecha(dateSelf)
-              : convertirFecha(findAssign[0].FECHA_INI.trim()),
-          !isDelivery
-            ? convertirFecha(dateFinish)
-            : isSelf
-              ? convertirFecha(dateSelf)
-              : convertirFecha(findAssign[0].FECHA_FIN.trim()),
+          isDelivery || isSelf || isLoser ? null : convertirFecha(dateInit), // Fecha Inicio Asignación
+          // !isDelivery
+          //   ? convertirFecha(dateInit)
+          //   : isSelf
+          //     ? convertirFecha(dateSelf)
+          //     : convertirFecha(findAssign[0].FECHA_INI.trim()),
+          isDelivery || isSelf || isLoser ? null : convertirFecha(dateFinish), // Fecha Fin Asignación
+          // !isDelivery
+          //   ? convertirFecha(dateFinish)
+          //   : isSelf
+          //     ? convertirFecha(dateSelf)
+          //     : convertirFecha(findAssign[0].FECHA_FIN.trim()),
           user,
           id,
         ]);
+
+        console.log("PASA ACTUALIZAR ASIGNACION");
 
         // MOVEMOS ARCHIVOS TEMP A SUS RESPECTIVAS CARPETAS DE LA NUBE
         if (docReceipt && validDocReceipt) {
@@ -2129,12 +2176,12 @@ const getReassignById = async (req, res) => {
       tipo_rea: cabReassing[0].TRE.trim(),
       anterior: {
         operacion: cabReassing[0].OPE_ANTERIOR.trim(),
-        contrato: cabReassing[0].CONT_ANTERIOR.trim(),
-        tipo: cabReassing[0].TCON_ANTERIOR,
-        fecEntrega: cabReassing[0].FEN_ANTERIOR,
-        fecDevol: cabReassing[0].FDV_ANTERIOR,
-        fecTras: cabReassing[0].FTR_ANTERIOR,
-        tarifa: cabReassing[0].TRF_ANTERIOR,
+        contrato: cabReassing[0].CONT_ANTERIOR?.trim() ?? null,
+        tipo: cabReassing[0].TCON_ANTERIOR ?? null,
+        fecEntrega: cabReassing[0].FEN_ANTERIOR ?? null,
+        fecDevol: cabReassing[0].FDV_ANTERIOR ?? null,
+        fecTras: cabReassing[0].FTR_ANTERIOR ?? null,
+        tarifa: cabReassing[0].TRF_ANTERIOR ?? null,
         condicion: transformType(cabReassing[0].CND_ANTERIOR, {
           0: "Titular",
           1: "Retén",
@@ -2159,12 +2206,12 @@ const getReassignById = async (req, res) => {
       },
       nuevo: {
         operacion: cabReassing[0].OPE_NUEVO.trim(),
-        contrato: cabReassing[0].CONT_NUEVO.trim(),
-        tipo: cabReassing[0].TCON_NUEVO,
-        fecEntrega: cabReassing[0].FEN_NUEVO,
-        fecDevol: cabReassing[0].FDV_NUEVO,
-        fecTras: cabReassing[0].FTR_NUEVO,
-        tarifa: cabReassing[0].TRF_NUEVO,
+        contrato: cabReassing[0].CONT_NUEVO?.trim() ?? null,
+        tipo: cabReassing[0].TCON_NUEVO ?? null,
+        fecEntrega: cabReassing[0].FEN_NUEVO ?? null,
+        fecDevol: cabReassing[0].FDV_NUEVO ?? null,
+        fecTras: cabReassing[0].FTR_NUEVO ?? null,
+        tarifa: cabReassing[0].TRF_NUEVO ?? null,
         condicion: transformType(cabReassing[0].CND_NUEVO, {
           0: "Titular",
           1: "Retén",
