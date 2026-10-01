@@ -1424,6 +1424,229 @@ const listVehicleTraceability = async (req, res) => {
   }
 };
 
+const listPlateHistory = async (req, res) => {
+  const { placa } = req.query;
+ 
+  if (!placa) {
+    return res.status(400).json({
+      success: false,
+      message: "El parametro placa es obligatorio",
+    });
+  }
+ 
+  try {
+    const result = await withConnection(async (cn) => {
+      // -----------------------------------------------------------------
+      // PASO 1: ID de asignacion a partir de la placa (el mas reciente)
+      // -----------------------------------------------------------------
+      const sqlAsignacion = `
+        SELECT ID AS ID_ASIGNACION
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
+        WHERE TRIM(PLACA) = TRIM(CAST(? AS CHAR(50)))
+        ORDER BY ID DESC
+        FETCH FIRST 1 ROW ONLY
+      `;
+      const [asignacion] = await cn.query(sqlAsignacion, [placa]);
+ 
+      if (!asignacion) {
+        return { placa, idAsignacion: null, historial: [] };
+      }
+ 
+      const idAsignacion = asignacion.ID_ASIGNACION;
+ 
+      // -----------------------------------------------------------------
+      // PASO 2: ¿esta asignacion tiene movimientos de reasignacion?
+      // -----------------------------------------------------------------
+      const sqlCabeceras = `
+        SELECT ID AS ID_CAB
+        FROM ${SCHEMA_BD}.T_GC_RE_CAB
+        WHERE ID_ASG_DET = ?
+      `;
+      const cabeceras = await cn.query(sqlCabeceras, [idAsignacion]);
+ 
+      let eventos = [];
+      let documentos = [];
+ 
+      if (cabeceras.length > 0) {
+        // ---------------------------------------------------------------
+        // CASO CON reasignaciones: PASO 3 (anterior + nuevo + extra) + PASO 4
+        // ---------------------------------------------------------------
+        const sqlEventos = `
+          SELECT
+              cab.ID                                   AS ID_CAB,
+              CAST(TRIM(cab.FRE) AS CHAR(8))          AS FECHA_REASIGNACION,
+              TRIM(cab.TRE)                            AS TIPO_REASIGNACION,
+ 
+              ta.CLICVE                                AS ANT_COD_CLIENTE,
+              TRIM(ta.CLINOM)                           AS ANT_CLIENTE,
+              poa.ID                                    AS ANT_ID_OPERACION,
+              TRIM(poa.DESCRIPCION)                     AS ANT_OPERACION,
+              CAST(TRIM(da.FEN) AS CHAR(8))            AS ANT_FECHA_ENTREGA,
+              CAST(TRIM(da.FDV) AS CHAR(8))            AS ANT_FECHA_DEVOLUCION,
+              CAST(TRIM(da.FTR) AS CHAR(8))            AS ANT_FECHA_TRASLADO,
+ 
+              tn.CLICVE                                AS NUE_COD_CLIENTE,
+              TRIM(tn.CLINOM)                           AS NUE_CLIENTE,
+              pon.ID                                    AS NUE_ID_OPERACION,
+              TRIM(pon.DESCRIPCION)                     AS NUE_OPERACION,
+              CAST(TRIM(db.FEN) AS CHAR(8))            AS NUE_FECHA_ENTREGA,
+              CAST(TRIM(db.FDV) AS CHAR(8))            AS NUE_FECHA_DEVOLUCION,
+              CAST(TRIM(db.FTR) AS CHAR(8))            AS NUE_FECHA_TRASLADO,
+ 
+              CAST(TRIM(ea.FVE) AS CHAR(8))            AS VENTA_FECHA,
+              ea.PVE                                    AS VENTA_PRECIO,
+              ea.MND                                    AS VENTA_MONEDA,
+ 
+              TRIM(eb.NST)                               AS PERDIDA_NST,
+              CAST(TRIM(eb.FCP) AS CHAR(8))              AS PERDIDA_FECHA_CARTA,
+              eb.ASG                                      AS PERDIDA_ASG,
+              TRIM(eb.NCT)                                AS PERDIDA_NCT,
+              CAST(NULL AS CHAR(300))                     AS ARCHIVO_PDF
+          FROM ${SCHEMA_BD}.T_GC_RE_CAB        cab
+          JOIN ${SCHEMA_BD}.T_GC_RE_DET_A      da  ON da.ID_CAB = cab.ID
+          JOIN ${SCHEMA_BD}.PO_OPERACIONES     poa ON poa.ID = da.ID_OPE
+          JOIN ${SCHEMA_BD}.TCLIE              ta  ON TRIM(ta.CLICVE) = TRIM(CAST(poa.IDCLI AS CHAR(10)))
+          JOIN ${SCHEMA_BD}.T_GC_RE_DET_B      db  ON db.ID_CAB = cab.ID
+          JOIN ${SCHEMA_BD}.PO_OPERACIONES     pon ON pon.ID = db.ID_OPE
+          JOIN ${SCHEMA_BD}.TCLIE              tn  ON TRIM(tn.CLICVE) = TRIM(CAST(pon.IDCLI AS CHAR(10)))
+          LEFT JOIN ${SCHEMA_BD}.T_GC_RE_EXT_A ea  ON ea.ID_CAB = cab.ID
+          LEFT JOIN ${SCHEMA_BD}.T_GC_RE_EXT_B eb  ON eb.ID_CAB = cab.ID
+          WHERE cab.ID_ASG_DET = ?
+          ORDER BY cab.FRE
+        `;
+        eventos = await cn.query(sqlEventos, [idAsignacion]);
+ 
+        const sqlDocumentos = `
+          SELECT
+              doc.ID_CAB                 AS ID_CAB,
+              TRIM(tip.DSC)              AS TIPO_DOCUMENTO,
+              doc.ACH                     AS ARCHIVO,
+              doc.FCH_REG                 AS FECHA_REGISTRO,
+              TRIM(doc.USU_REG)           AS USUARIO_REGISTRO
+          FROM ${SCHEMA_BD}.T_GC_RE_DOC          doc
+          LEFT JOIN ${SCHEMA_BD}.T_GC_RE_DOC_TIP tip ON tip.ID = doc.ID_TIP
+          WHERE doc.ID_CAB IN (
+              SELECT ID FROM ${SCHEMA_BD}.T_GC_RE_CAB WHERE ID_ASG_DET = ?
+          )
+          ORDER BY doc.ID_CAB, doc.FCH_REG
+        `;
+        documentos = await cn.query(sqlDocumentos, [idAsignacion]);
+      } else {
+        // ---------------------------------------------------------------
+        // CASO SIN reasignaciones: PASO 3B, fallback a TBL_ASIGNACION_DET
+        // ---------------------------------------------------------------
+        const sqlFallback = `
+          SELECT
+              CAST(NULL AS INTEGER)                           AS ID_CAB,
+              CAST(NULLIF(TRIM(ad.FECHA_INI), 'undefined') AS CHAR(8)) AS FECHA_REASIGNACION,
+              CAST(NULL AS CHAR(1))                           AS TIPO_REASIGNACION,
+ 
+              CAST(NULL AS CHAR(10))                          AS ANT_COD_CLIENTE,
+              CAST(NULL AS CHAR(40))                          AS ANT_CLIENTE,
+              CAST(NULL AS INTEGER)                           AS ANT_ID_OPERACION,
+              CAST(NULL AS CHAR(50))                          AS ANT_OPERACION,
+              CAST(NULL AS CHAR(8))                           AS ANT_FECHA_ENTREGA,
+              CAST(NULL AS CHAR(8))                           AS ANT_FECHA_DEVOLUCION,
+              CAST(NULL AS CHAR(8))                           AS ANT_FECHA_TRASLADO,
+ 
+              t.CLICVE                                        AS NUE_COD_CLIENTE,
+              TRIM(t.CLINOM)                                   AS NUE_CLIENTE,
+              po.ID                                            AS NUE_ID_OPERACION,
+              TRIM(po.DESCRIPCION)                             AS NUE_OPERACION,
+              CAST(NULLIF(TRIM(ad.FECHA_INI), 'undefined') AS CHAR(8)) AS NUE_FECHA_ENTREGA,
+              CAST(NULLIF(TRIM(ad.FECHA_FIN), 'undefined') AS CHAR(8)) AS NUE_FECHA_DEVOLUCION,
+              CAST(NULL AS CHAR(8))                           AS NUE_FECHA_TRASLADO,
+ 
+              CAST(NULL AS CHAR(8))         AS VENTA_FECHA,
+              CAST(NULL AS DECIMAL(10,2))   AS VENTA_PRECIO,
+              CAST(NULL AS CHAR(1))         AS VENTA_MONEDA,
+              CAST(NULL AS CHAR(30))        AS PERDIDA_NST,
+              CAST(NULL AS CHAR(8))         AS PERDIDA_FECHA_CARTA,
+              CAST(NULL AS CHAR(1))         AS PERDIDA_ASG,
+              CAST(NULL AS CHAR(50))        AS PERDIDA_NCT,
+              TRIM(ad.ARCHIVO_PDF)           AS ARCHIVO_PDF
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET ad
+          JOIN ${SCHEMA_BD}.PO_OPERACIONES     po ON po.ID = ad.ID_OPE
+          JOIN ${SCHEMA_BD}.TCLIE              t  ON TRIM(t.CLICVE) = TRIM(CAST(po.IDCLI AS CHAR(10)))
+          WHERE ad.ID = ?
+        `;
+        eventos = await cn.query(sqlFallback, [idAsignacion]);
+        // No hay tabla 1:N de documentos para este caso; se arma mas abajo
+        // desde la columna ARCHIVO_PDF de cada "evento".
+      }
+ 
+      // Agrupar documentos por ID_CAB para adjuntarlos a cada evento
+      const docsPorCab = documentos.reduce((acc, d) => {
+        (acc[d.ID_CAB] ??= []).push({
+          tipo: d.TIPO_DOCUMENTO,
+          archivo: d.ARCHIVO,
+          fechaRegistro: d.FECHA_REGISTRO,
+          usuarioRegistro: d.USUARIO_REGISTRO,
+        });
+        return acc;
+      }, {});
+ 
+      const historial = eventos.map((ev) => ({
+        idCab: ev.ID_CAB,
+        fechaReasignacion: ev.FECHA_REASIGNACION,
+        tipoReasignacion: ev.TIPO_REASIGNACION,
+        anterior: ev.ANT_COD_CLIENTE
+          ? {
+              cliente: { cod: ev.ANT_COD_CLIENTE, nombre: ev.ANT_CLIENTE },
+              operacion: { id: ev.ANT_ID_OPERACION, nombre: ev.ANT_OPERACION },
+              fechaEntrega: ev.ANT_FECHA_ENTREGA,
+              fechaDevolucion: ev.ANT_FECHA_DEVOLUCION,
+              fechaTraslado: ev.ANT_FECHA_TRASLADO,
+            }
+          : null,
+        nuevo: {
+          cliente: { cod: ev.NUE_COD_CLIENTE, nombre: ev.NUE_CLIENTE },
+          operacion: { id: ev.NUE_ID_OPERACION, nombre: ev.NUE_OPERACION },
+          fechaEntrega: ev.NUE_FECHA_ENTREGA,
+          fechaDevolucion: ev.NUE_FECHA_DEVOLUCION,
+          fechaTraslado: ev.NUE_FECHA_TRASLADO,
+        },
+        venta: ev.VENTA_FECHA
+          ? { fecha: ev.VENTA_FECHA, precio: ev.VENTA_PRECIO, moneda: ev.VENTA_MONEDA }
+          : null,
+        perdida: ev.PERDIDA_FECHA_CARTA
+          ? {
+              nst: ev.PERDIDA_NST,
+              fechaCarta: ev.PERDIDA_FECHA_CARTA,
+              asg: ev.PERDIDA_ASG,
+              nct: ev.PERDIDA_NCT,
+            }
+          : null,
+        documentos:
+          docsPorCab[ev.ID_CAB] ??
+          (ev.ARCHIVO_PDF ? [{ archivo: ev.ARCHIVO_PDF }] : []),
+      }));
+ 
+      const ultimoTramo = historial[historial.length - 1] ?? null;
+ 
+      return {
+        placa: placa.trim().toUpperCase(),
+        idAsignacion,
+        clienteActual: ultimoTramo?.nuevo ?? null,
+        totalClientesDistintos: new Set(
+          historial.flatMap((h) =>
+            [h.anterior?.cliente?.cod, h.nuevo?.cliente?.cod].filter(Boolean)
+          )
+        ).size,
+        historial,
+      };
+    });
+ 
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error al listar historial de la placa", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al listar historial de la placa",
+    });
+  }
+};
+
 const listPlateByRegion = async (req, res) => {
   const { region, clienteId } = req.query;
 
@@ -1526,5 +1749,6 @@ module.exports = {
   listYearByModelGen,
   listPlateTraceability,
   listPlateByRegion,
-  listVehicleTraceability
+  listVehicleTraceability,
+  listPlateHistory 
 };

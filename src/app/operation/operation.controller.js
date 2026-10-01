@@ -1039,14 +1039,15 @@ const updateAssign = async (req, res) => {
       .json({ success: false, message: "El parametro id debe ser numerico" });
   }
 
-  const { fechaInicio, fechaFin, condicion, terreno, archivoPdf } = req.body;
+  const { fechaInicio, fechaFin, condicion, terreno, archivoPdf, tarifa } =
+    req.body;
 
   try {
     await withConnection(async (cn) => {
       // await cn.beginTransaction();
 
       const sqlFind = `
-      SELECT CONDICION, ARCHIVO_PDF, TP_TERRENO FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
+      SELECT ID FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET
       WHERE ID = ?
     `;
 
@@ -1062,12 +1063,6 @@ const updateAssign = async (req, res) => {
         throw err;
       }
 
-      const sqlMovements = `
-      SELECT ID FROM ${SCHEMA_BD}.TBL_REASIGNACION WHERE ID_ASIGNACION = ? ORDER BY ID DESC FETCH FIRST 1 ROW ONLY
-    `;
-
-      const findMovement = await cn.query(sqlMovements, [id]);
-
       const fields = [];
       const params = [];
 
@@ -1079,6 +1074,11 @@ const updateAssign = async (req, res) => {
       if (terreno !== undefined) {
         fields.push(`TP_TERRENO = ?`);
         params.push(terreno);
+      }
+
+      if (tarifa !== undefined) {
+        fields.push(`TARIFA = ?`);
+        params.push(tarifa);
       }
 
       if (archivoPdf) {
@@ -1109,42 +1109,80 @@ const updateAssign = async (req, res) => {
       }
 
       const sqlUpd = `
-      UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
-      SET ${fields.join(", ")}
-      WHERE ID = ?
-    `;
+        UPDATE ${SCHEMA_BD}.TBL_ASIGNACION_DET
+        SET ${fields.join(", ")}
+        WHERE ID = ?
+      `;
 
       await cn.query(sqlUpd, [...params, id]);
 
+      const sqlMovements = `
+        SELECT ID FROM ${SCHEMA_BD}.T_GC_RE_CAB WHERE ID_ASG_DET = ? ORDER BY ID DESC FETCH FIRST 1 ROW ONLY
+      `;
+
+      const findMovement = await cn.query(sqlMovements, [id]);
+
       if (findMovement[0] && findMovement.length > 0) {
         const findIdMov = findMovement[0].ID;
+
+        // OBTENER INFORMACIÓN NUEVA (DETALLE B)
+        const sqlFindNewDetail = `SELECT ID FROM ${SCHEMA_BD}.T_GC_RE_DET_B tgrda WHERE ID_CAB = ?`;
+        const findNewDetail = await cn.query(sqlFindNewDetail, [
+          findIdMov,
+        ]);
+
+        // OBTENER DOCUMENTO DE LADO B Y TIPO 1
+        const sqlFindDocDetail = `SELECT ID FROM ${SCHEMA_BD}.T_GC_RE_DOC tgrda WHERE ID_CAB = ? AND LDO = 'B' AND ID_TIP = ${TIPOS_DOC_REA.ENTREGA}`;
+        const findDocDetail = await cn.query(sqlFindDocDetail, [
+          findIdMov,
+        ]);
+
         const fieldMov = [];
         const paramsMov = [];
 
+        // fechaInicio, fechaFin, condicion, terreno, archivoPdf, tarifa
+
+        if (tarifa !== undefined) {
+          fieldMov.push(`TRF = ?`);
+          paramsMov.push(tarifa);
+        }
+
+        if (terreno !== undefined) {
+          fieldMov.push(`TRN = ?`);
+          paramsMov.push(terreno);
+        }
+
         if (condicion !== undefined) {
-          fieldMov.push(`SEC_CONDICION = ?`);
+          fieldMov.push(`CND = ?`);
           paramsMov.push(condicion);
         }
 
-        if (archivoPdf) {
-          fieldMov.push(`SEC_ARCHIVO = ?`);
+        fieldMov.push(`FEN = ?`, `FDV = ?`);
+        paramsMov.push(convertirFecha(fechaInicio), convertirFecha(fechaFin));
 
+        const sqlUpdMovement = `
+          UPDATE ${SCHEMA_BD}.T_GC_RE_DET_B
+          SET ${fieldMov.join(", ")}
+          WHERE ID = ?
+        `;
+
+        await cn.query(sqlUpdMovement, [...paramsMov, findNewDetail[0].ID]);
+
+        if (archivoPdf && findDocDetail) {
           let keyFile = archivoPdf;
 
           if (archivoPdf.startsWith("temp/")) {
             keyFile = archivoPdf.replace(/^temp\//, "");
           }
 
-          paramsMov.push(keyFile);
+          const sqlUpdMovementDoc = `
+            UPDATE ${SCHEMA_BD}.T_GC_RE_DOC
+            SET ACH = ?
+            WHERE ID = ?
+          `;
+
+          await cn.query(sqlUpdMovementDoc, [keyFile, findDocDetail[0].ID]);
         }
-
-        const sqlUpdMovement = `
-        UPDATE ${SCHEMA_BD}.TBL_REASIGNACION
-        SET ${fieldMov.join(", ")}
-        WHERE ID = ?
-      `;
-
-        await cn.query(sqlUpdMovement, [...paramsMov, findIdMov]);
       }
 
       // await cn.commit();
