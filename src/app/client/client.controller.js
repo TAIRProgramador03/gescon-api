@@ -218,6 +218,62 @@ const getClientsByDocumentPending = async (req, res) => {
   }
 };
 
+const getClientsWithAssignPending = async (req, res) => {
+  try {
+    const result = await withConnection(async (cn) => {
+      const sql = `
+        SELECT DISTINCT
+          CAST(A.ID_CLIENTE AS VARCHAR(10)) AS ID_CLIENTE,
+          TRIM(T.CLINOM) AS CLIENTE
+        FROM (
+          SELECT
+              A.ID,
+              A.ID_CLIENTE,
+              A.NRO_LEASING,
+              B.ID_VEH AS VEHICULO
+          FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
+          INNER JOIN ${SCHEMA_BD}.TBL_LEASING_DET B
+              ON A.ID = B.ID_LEA_CAB
+        ) A
+        LEFT JOIN (
+          SELECT
+              ID_CLIENTE,
+              ID_ASIGNACION,
+              LEASING,
+              ID_VEH
+          FROM ${SCHEMA_BD}.TBL_ASIGNACION_CAB A
+          INNER JOIN ${SCHEMA_BD}.TBL_ASIGNACION_DET B
+              ON A.ID = B.ID_ASIGNACION
+        ) E
+          ON TRIM(A.NRO_LEASING) = TRIM(E.LEASING) 
+          AND A.VEHICULO = E.ID_VEH
+        LEFT JOIN ${SCHEMA_BD}.TCLIE T
+          ON T.CLICVE = CAST(A.ID_CLIENTE AS VARCHAR(10))
+        WHERE E.ID_VEH IS NULL
+        ORDER BY CLIENTE
+      `;
+
+      const result = await cn.query(sql);
+
+      return result.map((row) => ({
+        IDCLI: row.ID_CLIENTE.trim(),
+        CLINOM: row.CLIENTE.trim(),
+      }));
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error(
+      "Error al obtener los clientes con vehiculos pendientes:",
+      error,
+    );
+    res.status(500).json({
+      success: false,
+      message: "Error al obtener clientes con vehiculos pendiente",
+    });
+  }
+}
+
 const getClientAbr = async (req, res) => {
   const { onlyAbr } = req.query;
   const isOnlyAbr = onlyAbr == "true" || onlyAbr == true;
@@ -554,6 +610,7 @@ module.exports = {
   tableClientLea,
   getClientsByContractPending,
   getClientsByDocumentPending,
+  getClientsWithAssignPending,
   getClientAbr,
   updateClientAbr,
   getClientSummary,

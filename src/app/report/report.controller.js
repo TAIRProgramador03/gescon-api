@@ -413,17 +413,19 @@ const contAssign = async (req, res) => {
             COUNT(CASE WHEN  ${condMayor90Vencidos} THEN 1 END) AS "MAYOR_90_DIAS"
           FROM (
             SELECT
-              COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE,
+              PO.IDCLI AS ID_CLIENTE,
               DAYS(
                 DATE(
                   SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2)
                 )
               ) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-            LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-            ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
-            ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+            LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+            ON PO.ID = TAD.ID_OPE
+            WHERE TAD.FECHA_FIN IS NOT NULL
+            AND TRIM(TAD.FECHA_FIN) <> ''
+            AND LENGTH(TRIM(TAD.FECHA_FIN)) = 8
+            AND TRIM(TAD.FECHA_FIN) <> '11111111'
           ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
         `;
 
@@ -436,17 +438,19 @@ const contAssign = async (req, res) => {
             COUNT(CASE WHEN  ${condMayor90PorVencer} THEN 1 END) AS "MAYOR_90_DIAS"
           FROM (
             SELECT
-              COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE,
+              PO.IDCLI AS ID_CLIENTE,
               DAYS(
                 DATE(
                   SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2)
                 )
               ) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
             FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-          LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-            ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
-            LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
-            ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
+            LEFT JOIN SPEED400AT.PO_OPERACIONES PO
+            ON PO.ID = TAD.ID_OPE
+            WHERE TAD.FECHA_FIN IS NOT NULL
+            AND TRIM(TAD.FECHA_FIN) <> ''
+            AND LENGTH(TRIM(TAD.FECHA_FIN)) = 8
+            AND TRIM(TAD.FECHA_FIN) <> '11111111'
           ) ${clienteId ? "WHERE ID_CLIENTE = ?" : ""}
         `;
 
@@ -530,12 +534,8 @@ const listVehicleAssignExpired = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, TAD.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT TAD.ID, C.IDCLI AS ID_CLIENTE, C.CLINOM AS CLIENTE, PO.ID AS ID_OPERACION, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, TAD.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-	      ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
-	      LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
-	      ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
         LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
         ON TAD.ID_VEH = V.ID
         LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
@@ -550,15 +550,12 @@ const listVehicleAssignExpired = async (req, res) => {
               INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
-        ) C ON TC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-              ORDER BY CLINOM ASC
-        ) C2 ON TC2.ID_CLIENTE = C2.IDCLI
-      ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
+        ) C ON PO.IDCLI = C.IDCLI
+        WHERE TAD.FECHA_FIN IS NOT NULL
+        AND TRIM(TAD.FECHA_FIN) <> ''
+        AND LENGTH(TRIM(TAD.FECHA_FIN)) = 8
+        AND TRIM(TAD.FECHA_FIN) <> '11111111'
+      ) AS T WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY CLIENTE, PLACA
     `;
 
@@ -575,9 +572,10 @@ const listVehicleAssignExpired = async (req, res) => {
         nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
-        fechaIni: row.FECHA_INI.trim(),
-        fechaFin: row.FECHA_FIN.trim(),
+        fechaIni: row.FECHA_INI?.trim() ?? "",
+        fechaFin: row.FECHA_FIN?.trim() ?? "",
         cliente: row.CLIENTE.trim(),
+        idOpe: row.ID_OPERACION,
         operacion: row.OPERACION.trim(),
       }));
     });
@@ -632,12 +630,8 @@ const listVehicleAssignExpiring = async (req, res) => {
       const sql = `
       SELECT *
       FROM (
-        SELECT TAD.ID, COALESCE(TC.ID_CLIENTE, TC2.ID_CLIENTE) AS ID_CLIENTE, COALESCE(C.CLINOM, C2.CLINOM) AS CLIENTE, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, TAD.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
+        SELECT TAD.ID, C.IDCLI AS ID_CLIENTE, C.CLINOM AS CLIENTE, PO.ID AS ID_OPERACION, PO.DESCRIPCION AS OPERACION, MO.DESCRIPCION AS MODELO, TAD.PLACA, TAD.NROSER, M.DESCRIPCION AS MARCA, TAD.FECHA_INI AS FECHA_INI, TAD.FECHA_FIN AS FECHA_FIN, DAYS(DATE(SUBSTR(TAD.FECHA_FIN, 1, 4) || '-' || SUBSTR(TAD.FECHA_FIN, 5, 2) || '-' || SUBSTR(TAD.FECHA_FIN, 7, 2))) - DAYS(CURRENT DATE) AS DIFERENCIA_DIAS
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-        LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-	    ON TAD.ID_CONTRATO = TC.ID AND TAD.CLASE_CONTRATO = 'P'
-	    LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC2
-	    ON TAD.ID_CONTRATO = TC2.ID AND TAD.CLASE_CONTRATO = 'H'
         LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
         ON TAD.ID_VEH = V.ID
         LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
@@ -652,14 +646,11 @@ const listVehicleAssignExpiring = async (req, res) => {
               INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
               WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
               ORDER BY CLINOM ASC
-        ) C ON TC.ID_CLIENTE = C.IDCLI
-        LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI=B.CLICVE
-              WHERE A.ID<>86 AND B.CLINOM <> '*** ANULADO ***'
-              ORDER BY CLINOM ASC
-        ) C2 ON TC2.ID_CLIENTE = C2.IDCLI
+        ) C ON PO.IDCLI = C.IDCLI
+        WHERE TAD.FECHA_FIN IS NOT NULL
+        AND TRIM(TAD.FECHA_FIN) <> ''
+        AND LENGTH(TRIM(TAD.FECHA_FIN)) = 8
+        AND TRIM(TAD.FECHA_FIN) <> '11111111'
       ) WHERE ${sentences} ${clienteId ? "AND ID_CLIENTE = ?" : ""}
       ORDER BY CLIENTE, PLACA
     `;
@@ -677,9 +668,10 @@ const listVehicleAssignExpiring = async (req, res) => {
         nroSer: row.NROSER.trim(),
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
-        fechaIni: row.FECHA_INI.trim(),
-        fechaFin: row.FECHA_FIN.trim(),
+        fechaIni: row.FECHA_INI?.trim() ?? "",
+        fechaFin: row.FECHA_FIN?.trim() ?? "",
         cliente: row.CLIENTE.trim(),
+        idOpe: row.ID_OPERACION,
         operacion: row.OPERACION.trim(),
       }));
     });
@@ -941,8 +933,8 @@ const listVehicleLeasingExpire = async (req, res) => {
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         nroLeasing: row.NRO_LEASING.trim(),
-        fechaIni: row.FECHA_INI.trim(),
-        fechaFin: row.FECHA_FIN.trim(),
+        fechaIni: row.FECHA_INI?.trim() ?? "",
+        fechaFin: row.FECHA_FIN?.trim() ?? "",
         cliente: row.CLIENTE.trim(),
         clienteAsoc: row.CLIENTE_ASOCIADO
           ? row.CLIENTE_ASOCIADO.trim()
@@ -1042,8 +1034,8 @@ const listVehicleLeasingToExpire = async (req, res) => {
         modelo: row.MODELO.trim(),
         marca: row.MARCA.trim(),
         nroLeasing: row.NRO_LEASING.trim(),
-        fechaIni: row.FECHA_INI.trim(),
-        fechaFin: row.FECHA_FIN.trim(),
+        fechaIni: row.FECHA_INI?.trim() ?? "",
+        fechaFin: row.FECHA_FIN?.trim() ?? "",
         cliente: row.CLIENTE.trim(),
         clienteAsoc: row.CLIENTE_ASOCIADO
           ? row.CLIENTE_ASOCIADO.trim()
