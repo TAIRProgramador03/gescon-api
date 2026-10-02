@@ -628,12 +628,12 @@ const listLeasingGeneral = async (req, res) => {
 };
 
 const detailLeasing = async (req, res) => {
-  const { leasingId, clienteId } = req.query;
+  const { leasingId, clienteId, contratoId ,tipoCont } = req.query;
 
-  if (!leasingId || !clienteId)
+  if (!leasingId || !clienteId || !contratoId || !tipoCont)
     return res.status(400).json({
       success: false,
-      message: "El parametro leasingId y clienteId son obligatorios",
+      message: "Los parametros contratoId, tipoCont, leasingId y clienteId son obligatorios",
     });
 
   try {
@@ -654,11 +654,13 @@ const detailLeasing = async (req, res) => {
       FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
       LEFT JOIN (
       	SELECT TAD.* FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-      	LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-      	ON TAD.ID_ASIGNACION = TAC.ID
-      	WHERE TAC.ID_CLIENTE = ?
+      	LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
+        ON TAD.ID_OPE = O.ID
+      	WHERE O.IDCLI = ?
+        AND TAD.ID_CONTRATO = ?
+        AND TAD.CLASE_CONTRATO = ?
       ) A
-      ON L.NRO_LEASING = A.LEASING
+      ON TRIM(L.NRO_LEASING) = TRIM(A.LEASING)
       LEFT JOIN (
         SELECT DISTINCT A.IDCLI, B.CLINOM
           FROM ${SCHEMA_BD}.PO_OPERACIONES A
@@ -667,7 +669,7 @@ const detailLeasing = async (req, res) => {
           WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) C
-      ON L.ID_CLIENTE = C.IDCLI
+      ON CAST(L.ID_CLIENTE AS VARCHAR(10)) = C.IDCLI
       LEFT JOIN (
         SELECT DISTINCT A.IDCLI, B.CLINOM
           FROM ${SCHEMA_BD}.PO_OPERACIONES A
@@ -676,12 +678,12 @@ const detailLeasing = async (req, res) => {
           WHERE A.ID <> 86
           AND B.CLINOM <> '*** ANULADO ***'
       ) C2
-      ON L.ID_CLIENTE_ASOCIADO = C2.IDCLI
+      ON CAST(L.ID_CLIENTE_ASOCIADO AS VARCHAR(10)) = C2.IDCLI
       WHERE L.ID = ?
       GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON, C.CLINOM, C2.CLINOM
     `;
 
-      const result = await cn.query(sql, [clienteId, leasingId]);
+      const result = await cn.query(sql, [clienteId, contratoId, tipoCont, leasingId]);
 
       return result;
     });
@@ -888,23 +890,21 @@ const detailAssignByLeasing = async (req, res) => {
   try {
     const cleanedResult = await withConnection(async (cn) => {
       const sql = `
-      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, AD.NROSER, V.ANO, V.COLOR, O.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
+      SELECT AD.PLACA, MO.DESCRIPCION AS MODELO, M.DESCRIPCION AS MARCA, AD.TP_TERRENO AS TERRENO, AD.NROSER, V.ANO, V.COLOR, PO.DESCRIPCION AS OPERACION, AD.CONDICION, LC.NRO_LEASING, LC.FECHA_INI, LC.FECHA_FIN
       FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET AD
-      LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB AC
-      ON AC.ID = AD.ID_ASIGNACION
+      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+      ON PO.ID = AD.ID_OPE
       LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
       ON AD.ID_VEH = V.ID
       LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
       ON V.IDMOD = MO.ID
       LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
       ON V.IDMAR = M.ID
-      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-      ON V.SECOPE = O.ID
       LEFT JOIN (
       	SELECT DISTINCT NRO_LEASING, FECHA_INI, FECHA_FIN FROM ${SCHEMA_BD}.TBL_LEASING_CAB
       ) LC
       ON LC.NRO_LEASING = AD.LEASING
-      WHERE  AD.LEASING = ? AND  AC.ID_CLIENTE = ? AND AD.ID_CONTRATO = ? AND CLASE_CONTRATO = ?
+      WHERE AD.LEASING = ? AND  PO.IDCLI = ? AND AD.ID_CONTRATO = ? AND CLASE_CONTRATO = ?
     `;
 
       const result = await cn.query(sql, [

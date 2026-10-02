@@ -143,12 +143,12 @@ const documentPending = async (req, res) => {
 const detailDocument = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const { documentoId } = req.query;
+  const { clienteId, documentoId } = req.query;
 
-  if (!documentoId)
+  if (!clienteId || !documentoId)
     return res.status(400).json({
       success: false,
-      message: "El parametro documentoId es obligatorio",
+      message: "Los parametros clienteId y documentoId son obligatorio",
     });
 
   try {
@@ -175,11 +175,11 @@ const detailDocument = async (req, res) => {
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-          ON tad.ID_ASIGNACION  = tac.ID
           LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
           ON tad.ID_CONTRATO = tdc.ID
-          WHERE tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ?
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+            ON PO.ID = TAD.ID_OPE
+          WHERE PO.IDCLI = ? AND tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ?
         )
       `;
 
@@ -197,8 +197,8 @@ const detailDocument = async (req, res) => {
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
             SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-          ON tad.ID_ASIGNACION  = tac.ID
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+          ON PO.ID = TAD.ID_OPE
           LEFT JOIN (
           	SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
                 FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
@@ -217,16 +217,16 @@ const detailDocument = async (req, res) => {
                 ON TUG.ID_RL = TRG.ID
                 WHERE TUG.USU IS NOT NULL
           ) C
-          ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = TAD.ID_OPE
+          ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
           LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
           ON tad.ID_CONTRATO = tdc.ID
-          WHERE tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ? AND C.ID_USU = ${idUser}
+          WHERE PO.IDCLI = ? AND tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ? AND C.ID_USU = ${idUser}
         )
         `;
       }
 
       const result = await cn.query(sql, [documentoId]);
-      const resultTotal = await cn.query(sqlTotal, [documentoId]);
+      const resultTotal = await cn.query(sqlTotal, [clienteId, documentoId]);
 
       if (result.length == 0 || !result[0]) return "not_found";
 
@@ -289,12 +289,12 @@ const detailDocument = async (req, res) => {
 const detailVehByDocu = async (req, res) => {
   const { id: idUser, roleId } = req.user;
 
-  const { documentoId, tipoTerr } = req.query;
+  const { clienteId, documentoId, tipoTerr } = req.query;
 
-  if (!documentoId || !tipoTerr)
+  if (!clienteId || !documentoId || !tipoTerr)
     return res.status(400).json({
       success: false,
-      message: "Los parametros documentoId y tipoTerr son obligatorios",
+      message: "Los parametros clienteId, documentoId y tipoTerr son obligatorios",
     });
 
   try {
@@ -333,25 +333,25 @@ const detailVehByDocu = async (req, res) => {
       // `;
 
       let sqlDet = `
-        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+        SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, PO.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET L
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+        ON L.ID_OPE = PO.ID
         LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
         ON L.ID_VEH = V.ID
         LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
         ON V.IDMAR = M.ID
         LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
         ON V.IDMOD = MO.ID
-        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-        ON V.SECOPE = O.ID
-        WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
+        WHERE PO.IDCLI = ? AND L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
       `;
 
       if (roleId == 3) {
         sqlDet = `
-          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, O.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
+          SELECT MO.DESCRIPCION AS MODELO, L.PLACA, L.NROSER, V.ANO, V.COLOR, M.DESCRIPCION AS MARCA, PO.DESCRIPCION AS OPERACION, L.FECHA_FIN, L.LEASING
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET L
-          LEFT JOIN ${SCHEMA_BD}.TBL_ASIGNACION_CAB tac
-          ON L.ID_ASIGNACION = TAC.ID
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+          ON L.ID_OPE = PO.ID
           LEFT JOIN (
               SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
                   FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
@@ -370,20 +370,18 @@ const detailVehByDocu = async (req, res) => {
                   ON TUG.ID_RL = TRG.ID
                   WHERE TUG.USU IS NOT NULL
             ) C
-            ON TAC.ID_CLIENTE = C.IDCLI AND C.ID_OPERACION = L.ID_OPE
+            ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
           LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
           ON L.ID_VEH = V.ID
           LEFT JOIN ${SCHEMA_BD}.PO_MARCA M
           ON V.IDMAR = M.ID
           LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
           ON V.IDMOD = MO.ID
-          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES O
-          ON V.SECOPE = O.ID
-          WHERE L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
+          WHERE PO.IDCLI = ? AND L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
         `;
       }
 
-      const resultDet = await cn.query(sqlDet, [tipoTerr, documentoId]);
+      const resultDet = await cn.query(sqlDet, [clienteId, tipoTerr, documentoId]);
 
       // if (resultDet.length == 0)
       //   return res
