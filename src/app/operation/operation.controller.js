@@ -1821,8 +1821,6 @@ const changeOperation = async (req, res) => {
           user,
         ]);
 
-        console.log("PASA REASIGNACION CABECERA");
-
         // DETALLE ANTIGUO
         await cn.query(sqlInsertReassignDetA, [
           newCab[0].ID,
@@ -1839,8 +1837,6 @@ const changeOperation = async (req, res) => {
           oldAssign.cliente,
         ]);
 
-        console.log("PASA REASIGNACION A");
-
         // DETALLE NUEVO
         await cn.query(sqlInsertReassignDetB, [
           newCab[0].ID,
@@ -1856,8 +1852,6 @@ const changeOperation = async (req, res) => {
           newAssing.fechaTraslado,
           newAssing.cliente,
         ]);
-
-        console.log("PASA REASIGNACION B");
 
         // DOCUMENTO ENTREGA OLD
         if (oldAssign.actaEntrega) {
@@ -1928,8 +1922,6 @@ const changeOperation = async (req, res) => {
               user,
             ]);
           }
-
-          console.log("PASA VENTA");
         }
 
         // DETALLE PERDIDATOTAL
@@ -1954,8 +1946,6 @@ const changeOperation = async (req, res) => {
               user,
             ]);
           }
-
-          console.log("PASA PERDIDA");
         }
 
         // ACTUALIZAMOS LA ASIGNACION
@@ -1982,8 +1972,6 @@ const changeOperation = async (req, res) => {
           user,
           id,
         ]);
-
-        console.log("PASA ACTUALIZAR ASIGNACION");
 
         // MOVEMOS ARCHIVOS TEMP A SUS RESPECTIVAS CARPETAS DE LA NUBE
         if (docReceipt && validDocReceipt) {
