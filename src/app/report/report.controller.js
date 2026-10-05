@@ -1814,38 +1814,37 @@ const notifications = async (req, res) => {
     const result = await withConnection(async (cn) => {
       let sql = `
       SELECT
-      (
-          SELECT COUNT(*)
-          FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-          WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
-      ) AS TOTAL_CONTRATOS,
-      (
-          SELECT COUNT(*)
-          FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
-          WHERE TD.NRO_DOC LIKE 'DPEN-%'
-      ) AS TOTAL_DOCUMENTOS,
-      (
-          SELECT COUNT(*)
-          FROM (
-              SELECT
-                  TAD.ID
-              FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+        (
+            SELECT COUNT(*)
+            FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
+            WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
+        ) AS TOTAL_CONTRATOS,
+        (
+            SELECT COUNT(*)
+            FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
+            WHERE TD.NRO_DOC LIKE 'DPEN-%'
+        ) AS TOTAL_DOCUMENTOS,
+        (
+            SELECT COUNT(*)
+            FROM (
+                SELECT
+                    TAD.ID
+                FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
 
-              JOIN ${SCHEMA_BD}.PO_VEHICULO PV
-              ON PV.ID = TAD.ID_VEH
+                JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+                ON PV.ID = TAD.ID_VEH
 
-              WHERE PA.RN = 1
-              AND TAD.ID_OPE <> PV.SECOPE
-              AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
-          ) X
-      ) AS TOTAL_REASIGNACIONES
+                WHERE TAD.ID_OPE <> PV.SECOPE
+                AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
+            ) X
+        ) AS TOTAL_REASIGNACIONES
       FROM SYSIBM.SYSDUMMY1
     `;
 
       if (roleId == 3) {
         sql = `
         SELECT
-          (
+            (
               SELECT COUNT(*)
                 FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
                 LEFT JOIN (
@@ -1923,11 +1922,11 @@ const notifications = async (req, res) => {
                   JOIN ${SCHEMA_BD}.PO_VEHICULO PV
                   ON PV.ID = TAD.ID_VEH
 
-                  WHERE PA.RN = 1 AND CL.ID_USU = ${idUser}
+                  WHERE CL.ID_USU = ${idUser}
                   AND TAD.ID_OPE <> PV.SECOPE
                   AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
-            ) X
-          ) AS TOTAL_REASIGNACIONES
+                ) X
+            ) AS TOTAL_REASIGNACIONES
         FROM SYSIBM.SYSDUMMY1
       `;
       }
