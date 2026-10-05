@@ -20,8 +20,6 @@ const login = async (req, res) => {
       if (!result[0].CLV)
         return { code: 403, message: "El usuario no cuenta con contraseña" };
 
-      console.log(result[0].ACTIVO);
-
       if (result[0].ACTIVO != "1")
         return { code: 403, message: "El usuario no puede acceder al sistema" };
 
