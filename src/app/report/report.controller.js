@@ -1,5 +1,6 @@
 const { withConnection } = require("../../shared/utils.js");
 const { SCHEMA_BD } = require("../../shared/conf.js");
+const { OPERACIONES_TAIR } = require("../../shared/constant/operations.js");
 
 const contVehicleFeet = async (req, res) => {
   const { clienteId, status } = req.query; // Obtiene el idCli de los parámetros de consulta
@@ -1830,20 +1831,12 @@ const notifications = async (req, res) => {
                   TAD.ID
               FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
 
-              JOIN (
-                  SELECT
-                      IDVEH,
-                      SECOPE,
-                      ROW_NUMBER() OVER (
-                          PARTITION BY IDVEH
-                          ORDER BY ID DESC
-                      ) AS RN
-                  FROM ${SCHEMA_BD}.PO_ASIGNACION
-              ) PA
-                  ON TAD.ID_VEH = PA.IDVEH
+              JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+              ON PV.ID = TAD.ID_VEH
 
               WHERE PA.RN = 1
-              AND TAD.ID_OPE <> PA.SECOPE
+              AND TAD.ID_OPE <> PV.SECOPE
+              AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
           ) X
       ) AS TOTAL_REASIGNACIONES
       FROM SYSIBM.SYSDUMMY1
@@ -1927,19 +1920,12 @@ const notifications = async (req, res) => {
                     WHERE TUG.USU IS NOT NULL
                     ) CL
                     ON TAC.ID_CLIENTE = CL.IDCLI
-                  JOIN (
-                    SELECT
-                    IDVEH,
-                    SECOPE,
-                    ROW_NUMBER() OVER (
-                      PARTITION BY IDVEH
-                    ORDER BY ID DESC
-                    ) AS RN
-                  FROM ${SCHEMA_BD}.PO_ASIGNACION
-                  ) PA
-                  ON TAD.ID_VEH = PA.IDVEH
+                  JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+                  ON PV.ID = TAD.ID_VEH
+
                   WHERE PA.RN = 1 AND CL.ID_USU = ${idUser}
-                AND TAD.ID_OPE <> PA.SECOPE
+                  AND TAD.ID_OPE <> PV.SECOPE
+                  AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
             ) X
           ) AS TOTAL_REASIGNACIONES
         FROM SYSIBM.SYSDUMMY1
