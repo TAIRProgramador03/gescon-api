@@ -88,8 +88,8 @@ app.use(
     origin: [
       "http://localhost:8080",
       "http://localhost:5173",
-      "http://192.168.4.22:8080",
-      "http://192.168.4.22:5173",
+      "http://192.168.4.31:8080",
+      "http://192.168.4.31:5173",
       "https://gescon.tair360.net",
       "https://tair360.net",
       "http://104.21.60.95",

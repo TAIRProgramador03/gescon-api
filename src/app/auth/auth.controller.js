@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const { withConnection } = require("../../shared/utils.js");
-const { SCHEMA_BD } = require("../../shared/conf.js");
+const { SCHEMA_BD, CODE_SYSTEM } = require("../../shared/conf.js");
 const bcryptjs = require("bcryptjs");
 
 const login = async (req, res) => {
@@ -9,12 +9,20 @@ const login = async (req, res) => {
   try {
     const data = await withConnection(async (cn) => {
       const sql = `
-        SELECT U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.COD_EMP, U.V_TK, U.ACTIVO, R.DESCRIPCION FROM ${SCHEMA_BD}.T_US_GC U
-        JOIN ${SCHEMA_BD}.T_RL_GC R
-        ON U.ID_RL = R.ID
+        SELECT
+          U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.CLV, U.COD_EMP, U.V_TK, U.ACTIVO,
+          US.ID_RL, US.ACTIVO AS ACCESO_ACTIVO, R.DESCRIPCION
+        FROM ${SCHEMA_BD}.T_US_GC U
+        LEFT JOIN (
+            SELECT X.ID_US, X.ID_RL, X.ACTIVO
+            FROM ${SCHEMA_BD}.T_US_SY_GC X
+            INNER JOIN ${SCHEMA_BD}.T_SYS_G360 S
+              ON S.ID = X.ID_SYS AND TRIM(S.CODIGO) = ? AND S.ACTIVO = 'S'
+        ) US ON US.ID_US = U.ID
+        LEFT JOIN ${SCHEMA_BD}.T_RL_GC R ON R.ID = US.ID_RL
         WHERE USU = ?
       `;
-      const result = await cn.query(sql, [dbUser]);
+      const result = await cn.query(sql, [CODE_SYSTEM, dbUser]);
       if (result.length == 0)
         return { code: 404, message: "El usuario es incorrecto" };
       if (!result[0].CLV)
@@ -26,15 +34,21 @@ const login = async (req, res) => {
       const hashed = await bcryptjs.compare(password, result[0].CLV);
       if (!hashed) return { code: 401, message: "La contraseña es incorrecta" };
 
+      if (!result[0].ID_RL || result[0].ACCESO_ACTIVO !== "S")
+        return {
+          code: 403,
+          message: "El usuario no tiene acceso a este sistema",
+        };
+
       const sqlPs = `
         SELECT P.DESCRIPCION
-        FROM ${SCHEMA_BD}.T_US_GC U
-        JOIN ${SCHEMA_BD}.T_RL_GC R ON U.ID_RL = R.ID
-        JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON R.ID = RP.ID_RL
-        JOIN ${SCHEMA_BD}.T_PS_GC P ON RP.ID_PS = P.ID
-        WHERE U.USU = ?
+        FROM ${SCHEMA_BD}.T_US_SY_GC US
+        INNER JOIN ${SCHEMA_BD}.T_SYS_G360 S ON S.ID = US.ID_SYS AND TRIM(S.CODIGO) = ?
+        INNER JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON RP.ID_RL = US.ID_RL
+        INNER JOIN ${SCHEMA_BD}.T_PS_GC P ON P.ID = RP.ID_PS AND P.ID_SYS = S.ID
+        WHERE US.ID_US = ?
       `;
-      const resultPs = await cn.query(sqlPs, [dbUser]);
+      const resultPs = await cn.query(sqlPs, [CODE_SYSTEM, result[0].ID]);
       const permissions = resultPs.map((row) => row.DESCRIPCION);
 
       return { code: 200, user: result[0], permissions };
@@ -88,6 +102,7 @@ const logout = async (_req, res) => {
     httpOnly: false,
     secure: false,
     sameSite: "strict",
+    path: "/",
   });
   res.json({ success: true, message: "Cierre de sesión exitoso" });
 };
@@ -108,8 +123,18 @@ const verify = async (req, res) => {
 
   try {
     const usuario = await withConnection(async (cn) => {
-      const sql = `SELECT U.V_TK, U.ACTIVO FROM ${SCHEMA_BD}.T_US_GC U WHERE U.ID = ?`;
-      const result = await cn.query(sql, [decoded.id]);
+      const sql = `
+        SELECT U.V_TK, U.ACTIVO, US.ACTIVO AS ACCESO_ACTIVO
+        FROM ${SCHEMA_BD}.T_US_GC U
+        LEFT JOIN (
+            SELECT X.ID_US, X.ACTIVO
+            FROM ${SCHEMA_BD}.T_US_SY_GC X
+            INNER JOIN ${SCHEMA_BD}.T_SYS_G360 S
+              ON S.ID = X.ID_SYS AND TRIM(S.CODIGO) = ? AND S.ACTIVO = 'S'
+        ) US ON US.ID_US = U.ID
+        WHERE U.ID = ?
+      `;
+      const result = await cn.query(sql, [CODE_SYSTEM, decoded.id]);
       return result[0];
     });
 
@@ -120,6 +145,12 @@ const verify = async (req, res) => {
     }
 
     if (usuario.ACTIVO != "1") {
+      return res
+        .status(401)
+        .json({ success: false, message: "Sesión no válida" });
+    }
+
+    if (usuario.ACCESO_ACTIVO !== "S") {
       return res
         .status(401)
         .json({ success: false, message: "Sesión no válida" });
