@@ -6,22 +6,22 @@ const {
   putPermissionsByRole,
   getUserById,
   putUser,
-  getNewUsers,
   getUserByField,
   postUser,
-  postUserGesoper,
-  getRolesGesoper,
-  getUserGesoperByField,
   getPermissions,
   postRole,
   putPasswordUser,
+  getFindUserSystemAccess,
+  putStatusAccessSystem,
+  postAssignUsersToSystem,
+  getListOthersUsers,
 } = require("./user.service.js");
 
 const bcryptjs = require("bcryptjs");
 
 /* USUARIOS */
 
-const listUsers = async (req, res) => {
+const listUsers = async (_req, res) => {
   try {
     const users = await getUsers();
 
@@ -33,7 +33,10 @@ const listUsers = async (req, res) => {
         usuario: user.usuario,
         codEmp: user.codEmp,
         estado: user.estado,
+        conClave: user.conClave,
+        accesoSistema: user.accesoSistema,
         rol: user.rol,
+        sistemas: user.sistemas,
       })),
     );
   } catch (error) {
@@ -42,16 +45,21 @@ const listUsers = async (req, res) => {
   }
 };
 
-// const listNewUsers = async (req, res) => {
-//   try {
-//     const users = await getNewUsers();
+const listOthersUsers = async (_req, res) => {
+  try {
+    const result = await getListOthersUsers();
 
-//     return res.status(200).json(users);
-//   } catch (error) {
-//     console.error(error.message);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// };
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("[USER] Error al obtener lista de otros usuarios: ", error);
+    return res
+      .status(500)
+      .json({
+        message: "Error al obtener lista de otros usuarios",
+        error: error.message,
+      });
+  }
+};
 
 const findUserById = async (req, res) => {
   const id = Number(req.params.id);
@@ -79,38 +87,32 @@ const findUserById = async (req, res) => {
 
 const createUser = async (req, res) => {
   const { user } = req.user;
-
   const body = req.body;
+  const { usuario, codEmp, clave } = body;
 
   try {
-    const findUsername = await getUserByField("usuario", body.usuario);
+    const findUser = await getFindUserSystemAccess(
+      { username: usuario },
+      { scope: "global" },
+    );
 
-    if (findUsername)
-      return res.status(409).json({
-        success: false,
-        message: "El usuario ingresado ya se encuentra registrado",
-      });
+    if (findUser)
+      return res
+        .status(409)
+        .json({ message: "Este usuario ya esta registrado en el sistema" });
 
-    // if (body.inGesoper) {
-    //   const findUsernameGesoper = await getUserGesoperByField(
-    //     "usuario",
-    //     body.usuario,
-    //   );
+    const findCode = await getFindUserSystemAccess(
+      { codEmp },
+      { scope: "global" },
+    );
 
-    //   if (findUsernameGesoper)
-    //     return res.status(409).json({
-    //       success: false,
-    //       message:
-    //         "El usuario ingresado ya se encuentra registrado dentro del GesOper",
-    //     });
-
-    //   await postUserGesoper(body);
-    // }
+    if (findCode)
+      return res
+        .status(409)
+        .json({ message: "Este codigo ya esta registrado en el sistema" });
 
     const salt = await bcryptjs.genSalt(Number(process.env.SALT_NUMBER));
-
-    const passHash = await bcryptjs.hash(body.clave, salt);
-
+    const passHash = await bcryptjs.hash(clave, salt);
     body.clave = passHash;
 
     const create = await postUser(body, user);
@@ -119,6 +121,45 @@ const createUser = async (req, res) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+const assignUsersToSystem = async (req, res) => {
+  const { user } = req.user;
+  const { usersId, roleId } = req.body;
+
+  if (!Array.isArray(usersId) || usersId.length === 0) {
+    return res
+      .status(400)
+      .json({ message: "Debe enviar al menos un usuario." });
+  }
+
+  if (!roleId || !Number.isInteger(Number(roleId))) {
+    return res.status(400).json({ message: "Debe indicar un rol valido." });
+  }
+
+  try {
+    const result = await postAssignUsersToSystem(usersId, roleId, user);
+
+    return res.status(201).json({
+      message: "Los usuarios fueron asignados con exito",
+      inserted: result.inserted,
+    });
+  } catch (error) {
+    console.error("[USER] Error al asignar usuarios al sistema: ", error);
+
+    if (error.message === "ROLE_NOT_VALID_FOR_SYSTEM") {
+      return res
+        .status(400)
+        .json({ message: "El rol indicado no es valido para este sistema." });
+    }
+
+    return res
+      .status(500)
+      .json({
+        message: "Error al asignar usuarios al sistema",
+        error: error.message,
+      });
   }
 };
 
@@ -188,7 +229,7 @@ const updatePasswordUser = async (req, res) => {
 
 /* ROLES */
 
-const listRoles = async (req, res) => {
+const listRoles = async (_req, res) => {
   try {
     const roles = await getRoles();
 
@@ -198,17 +239,6 @@ const listRoles = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// const listRolesGesoper = async (req, res) => {
-//   try {
-//     const roles = await getRolesGesoper();
-
-//     return res.status(200).json(roles);
-//   } catch (error) {
-//     console.error(error);
-//     return res.status(500).json({ success: false, message: error.message });
-//   }
-// };
 
 const createRole = async (req, res) => {
   const { user } = req.user;
@@ -303,18 +333,64 @@ const updatePermissionsByRole = async (req, res) => {
   }
 };
 
+/* SISTEMAS */
+const statusAccessSystem = async (req, res) => {
+  const { status, userId } = req.body;
+
+  try {
+    const target = await getFindUserSystemAccess({ id: userId });
+    if (!target)
+      return res
+        .status(404)
+        .json({ message: "El usuario no pertenece a este sistema" });
+
+    if (userId === req.user.id)
+      return res
+        .status(403)
+        .json({ message: "No puede cambiar su propio acceso" });
+
+    if (target.isSuper)
+      return res
+        .status(403)
+        .json({ message: "No se puede modificar el acceso de un super" });
+
+    if (target.hasAccess === status)
+      return res.status(409).json({
+        message: status
+          ? "El usuario ya tiene acceso"
+          : "El usuario ya no tiene acceso",
+      });
+
+    await putStatusAccessSystem(status, userId);
+
+    return res.status(200).json({
+      message: `Se ${status ? "concedio" : "revoco"} el acceso al sistema con exito`,
+    });
+  } catch (error) {
+    console.error(
+      "[USER] Error al cambiar el acceso al sistema del usuario: ",
+      error,
+    );
+    return res.status(500).json({
+      message: "Error al cambiar el acceso al sistema del usuario",
+      error,
+    });
+  }
+};
+
 module.exports = {
   listUsers,
-  // listNewUsers,
+  listOthersUsers,
   findUserById,
   createUser,
+  assignUsersToSystem,
   updateUser,
   updatePasswordUser,
   listRoles,
-  // listRolesGesoper,
   createRole,
   listPermissions,
   listPermissionsByUser,
   listPermissionsByRole,
   updatePermissionsByRole,
+  statusAccessSystem,
 };
