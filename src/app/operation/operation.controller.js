@@ -1534,23 +1534,32 @@ const changeOperation = async (req, res) => {
       cn = connection;
 
       const sqlFind = `
-        SELECT TAD.ID_CONTRATO , TAD.CONDICION, TAD.FECHA_INI , TAD.FECHA_FIN, TAD.CLASE_CONTRATO , TAD.TARIFA, TAD.ARCHIVO_PDF , TAD.TP_TERRENO, PT.KILOMETRAJE 
+        SELECT
+            TAD.ID_CONTRATO,
+            TAD.CONDICION,
+            TAD.FECHA_INI,
+            TAD.FECHA_FIN,
+            TAD.CLASE_CONTRATO,
+            TAD.TARIFA,
+            TAD.ARCHIVO_PDF,
+            TAD.TP_TERRENO,
+            COALESCE(PT.KILOMETRAJE, 0) AS KILOMETRAJE
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
-        JOIN (
-          SELECT
-          IDVEH,
-          pt.KILOMETRAJE,
-          ROW_NUMBER() OVER (
-            PARTITION BY IDVEH
-            ORDER BY FECHA DESC, KILOMETRAJE DESC
-          ) AS RN
-          FROM ${SCHEMA_BD}.PO_TEMPREGTAB PT
+        LEFT JOIN (
+            SELECT
+                IDVEH,
+                KILOMETRAJE,
+                ROW_NUMBER() OVER (
+                    PARTITION BY IDVEH
+                    ORDER BY FECHA DESC, KILOMETRAJE DESC
+                ) AS RN
+            FROM ${SCHEMA_BD}.PO_TEMPREGTAB
         ) PT
-        ON TAD.ID_VEH = PT.IDVEH
-        WHERE PT.RN = 1 AND TAD.ID = ?
+            ON PT.IDVEH = TAD.ID_VEH
+          AND PT.RN = 1
+        WHERE TAD.ID = ?
         FETCH FIRST 1 ROW ONLY
       `;
-
       const findAssign = await cn.query(sqlFind, [id]);
 
       if (!findAssign[0] || findAssign.length === 0) {
@@ -1720,29 +1729,29 @@ const changeOperation = async (req, res) => {
           tarifa: findAssign[0].TARIFA ?? null,
           terreno: String(findAssign[0].TP_TERRENO),
           fechaIni: isDelivery
-            ? convertirFecha(findAssign[0].FECHA_INI.trim())
+            ? findAssign[0].FECHA_INI ? convertirFecha(findAssign[0].FECHA_INI.trim()) : null
             : isSelf
               ? isDirect
-                ? convertirFecha(findAssign[0].FECHA_INI.trim())
+                ? findAssign[0].FECHA_INI ? convertirFecha(findAssign[0].FECHA_INI.trim()) : null
                 : null
               : isLoser
                 ? isDirect
-                  ? convertirFecha(findAssign[0].FECHA_INI.trim())
+                  ? findAssign[0].FECHA_INI ? convertirFecha(findAssign[0].FECHA_INI.trim()) : null
                   : null
-                : convertirFecha(findAssign[0].FECHA_INI.trim()),
+                : findAssign[0].FECHA_INI ? convertirFecha(findAssign[0].FECHA_INI.trim()) : null,
           fechaFin: isDelivery
-            ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+            ? findAssign[0].FECHA_FIN ? convertirFecha(findAssign[0].FECHA_FIN.trim()) : null
             : isSelf
               ? isDirect
-                ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+                ? findAssign[0].FECHA_FIN ? convertirFecha(findAssign[0].FECHA_FIN.trim()) : null
                 : dateFinish
                   ? convertirFecha(dateFinish)
                   : null
               : isLoser
                 ? isDirect
-                  ? convertirFecha(findAssign[0].FECHA_FIN.trim())
+                  ? findAssign[0].FECHA_FIN ? convertirFecha(findAssign[0].FECHA_FIN.trim()) : null
                   : null
-                : convertirFecha(findAssign[0].FECHA_FIN.trim()),
+                : findAssign[0].FECHA_FIN ? convertirFecha(findAssign[0].FECHA_FIN.trim()) : null,
           fechaTraslado: isDelivery
             ? null
             : isSelf
