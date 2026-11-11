@@ -1,7 +1,32 @@
 const jwt = require("jsonwebtoken");
 const { withConnection } = require("../../shared/utils.js");
-const { SCHEMA_BD, CODE_SYSTEM } = require("../../shared/conf.js");
+const { SCHEMA_BD, CODE_SYSTEM, COOKIE_DOMAIN } = require("../../shared/conf.js");
 const bcryptjs = require("bcryptjs");
+const { signSsoToken, verifySsoToken } = require("../../shared/auth/sso.js");
+
+const JWT_SECRET =
+  process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w";
+
+function getAccessTokenCookieOptions() {
+  return {
+    httpOnly: false,
+    secure: false,
+    sameSite: "strict",
+    path: "/",
+    maxAge: 24 * 60 * 60 * 1000,
+  };
+}
+
+function getSsoCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    domain: COOKIE_DOMAIN,
+    maxAge: 24 * 60 * 60 * 1000,
+  };
+}
 
 const login = async (req, res) => {
   const { dbUser, password } = req.body;
@@ -70,19 +95,20 @@ const login = async (req, res) => {
       tokenVersion: data.user.V_TK,
       permissions: data.permissions,
     };
-    const token = jwt.sign(
-      payload,
-      process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w",
-      { expiresIn: "24h", algorithm: "HS256" },
-    );
-
-    res.cookie("access_token", token, {
-      httpOnly: false,
-      secure: false,
-      sameSite: "strict",
-      path: "/",
-      maxAge: 24 * 60 * 60 * 1000,
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: "24h",
+      algorithm: "HS256",
     });
+
+    res.cookie("access_token", token, getAccessTokenCookieOptions());
+
+    const ssoToken = signSsoToken({
+      sub: data.user.ID,
+      user: data.user.USU,
+      vtk: data.user.V_TK,
+    });
+    res.cookie("ges360_sso", ssoToken, getSsoCookieOptions());
+
     res.status(200).json({
       success: true,
       message: "Ingreso autorizado",
@@ -97,13 +123,138 @@ const login = async (req, res) => {
   }
 };
 
-const logout = async (_req, res) => {
-  res.clearCookie("access_token", {
-    httpOnly: false,
-    secure: false,
-    sameSite: "strict",
-    path: "/",
-  });
+const ssoLogin = async (req, res) => {
+  const ssoCookie = req.cookies.ges360_sso;
+
+  if (!ssoCookie) {
+    return res.status(401).json({
+      success: false,
+      code: "NO_SSO_COOKIE",
+      message: "No hay sesión compartida disponible",
+    });
+  }
+
+  let decoded;
+  try {
+    decoded = verifySsoToken(ssoCookie);
+  } catch (err) {
+    return res.status(401).json({
+      success: false,
+      code: "INVALID_SSO_TOKEN",
+      message: "La sesión compartida no es válida",
+    });
+  }
+
+  try {
+    const data = await withConnection(async (cn) => {
+      const sql = `
+        SELECT
+          U.ID, U.NOMBRE, U.APELLIDO, U.USU, U.V_TK, U.ACTIVO,
+          US.ID_RL, US.ACTIVO AS ACCESO_ACTIVO, R.DESCRIPCION
+        FROM ${SCHEMA_BD}.T_US_GC U
+        LEFT JOIN (
+            SELECT X.ID_US, X.ID_RL, X.ACTIVO
+            FROM ${SCHEMA_BD}.T_US_SY_GC X
+            INNER JOIN ${SCHEMA_BD}.T_SYS_G360 S
+              ON S.ID = X.ID_SYS AND TRIM(S.CODIGO) = ? AND S.ACTIVO = 'S'
+        ) US ON US.ID_US = U.ID
+        LEFT JOIN ${SCHEMA_BD}.T_RL_GC R ON R.ID = US.ID_RL
+        WHERE U.ID = ?
+      `;
+      const result = await cn.query(sql, [CODE_SYSTEM, decoded.sub]);
+      if (result.length == 0) return { code: 403 };
+      if (result[0].ACTIVO != "1") return { code: 403 };
+      if (!result[0].ID_RL || result[0].ACCESO_ACTIVO !== "S")
+        return { code: 403 };
+
+      const sqlPs = `
+        SELECT P.DESCRIPCION
+        FROM ${SCHEMA_BD}.T_US_SY_GC US
+        INNER JOIN ${SCHEMA_BD}.T_SYS_G360 S ON S.ID = US.ID_SYS AND TRIM(S.CODIGO) = ?
+        INNER JOIN ${SCHEMA_BD}.T_RL_PS_GC RP ON RP.ID_RL = US.ID_RL
+        INNER JOIN ${SCHEMA_BD}.T_PS_GC P ON P.ID = RP.ID_PS AND P.ID_SYS = S.ID
+        WHERE US.ID_US = ?
+      `;
+      const resultPs = await cn.query(sqlPs, [CODE_SYSTEM, result[0].ID]);
+      const permissions = resultPs.map((row) => row.DESCRIPCION);
+
+      return { code: 200, user: result[0], permissions };
+    });
+
+    if (data.code !== 200) {
+      return res.status(403).json({
+        success: false,
+        code: "NO_SYSTEM_ACCESS",
+        message: "No tiene acceso a este sistema, contacte al área de sistemas",
+      });
+    }
+
+    // vtk desactualizado en la cookie puente => se cerró sesión en otro sistema
+    if (Number(decoded.vtk) !== Number(data.user.V_TK)) {
+      return res.status(401).json({
+        success: false,
+        code: "SESSION_INVALIDATED",
+        message: "Tu sesión ya no es válida, inicia sesión nuevamente.",
+      });
+    }
+
+    const payload = {
+      id: data.user.ID,
+      user: data.user.USU,
+      nombre:
+        data.user.NOMBRE && data.user.APELLIDO
+          ? `${data.user.NOMBRE} ${data.user.APELLIDO}`
+          : data.user.USU,
+      role: data.user.DESCRIPCION,
+      tokenVersion: data.user.V_TK,
+      permissions: data.permissions,
+    };
+    const token = jwt.sign(payload, JWT_SECRET, {
+      expiresIn: "24h",
+      algorithm: "HS256",
+    });
+
+    res.cookie("access_token", token, getAccessTokenCookieOptions());
+
+    return res.status(200).json({
+      success: true,
+      message: "Ingreso autorizado",
+      permissions: data.permissions,
+    });
+  } catch (error) {
+    console.error("Error en sso-login:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al validar la sesión compartida",
+    });
+  }
+};
+
+const logout = async (req, res) => {
+  const token = req.cookies.access_token;
+
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+
+      await withConnection(async (cn) => {
+        await cn.query(
+          `UPDATE ${SCHEMA_BD}.T_US_GC
+             SET V_TK = COALESCE(V_TK, 0) + 1,
+                 ACTUALIZADO_EL = CURRENT TIMESTAMP,
+                 ACTUALIZADO_POR = ?
+           WHERE ID = ?`,
+          [decoded.user, decoded.id],
+        );
+      });
+    } catch (error) {
+      console.error("Error al invalidar sesión en logout:", error);
+    }
+  }
+
+  res.clearCookie("access_token", getAccessTokenCookieOptions());
+  res.clearCookie("ges360_sso", getSsoCookieOptions());
+
   res.json({ success: true, message: "Cierre de sesión exitoso" });
 };
 
@@ -113,10 +264,7 @@ const verify = async (req, res) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(
-      token,
-      process.env.SECRET_KEY || "3c0FNs1Md90ueIaYmaAZAC75TM1MD77l2JeffvxQY6w",
-    );
+    decoded = jwt.verify(token, JWT_SECRET);
   } catch (err) {
     return res.status(403).send("Token inválido");
   }
@@ -170,4 +318,4 @@ const verify = async (req, res) => {
   }
 };
 
-module.exports = { login, logout, verify };
+module.exports = { login, logout, verify, ssoLogin };
