@@ -6,7 +6,7 @@ const {
 const { SCHEMA_BD } = require("../../shared/conf.js");
 
 const listClient = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -20,22 +20,14 @@ const listClient = async (req, res) => {
 
       if (roleId == 3) {
         sql = `
-          SELECT DISTINCT PO.IDCLI, PO.CLINOM
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B
-            ON A.IDCLI = B.CLICVE
-            WHERE A.ID <> 86
-            AND B.CLINOM <> '*** ANULADO ***'
-          )PO
-          ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-          ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-          ON TUG.ID_RL = TRG.ID
-          WHERE TUG.USU IS NOT NULL AND TUG.ID = ${idUser}
+          SELECT 
+            DISTINCT T.CLICVE IDCLI, 
+            TRIM(T.CLINOM) AS CLINOM 
+          FROM ${SCHEMA_BD}.TCLIE T
+          LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+          ON PO.IDCLI = T.CLICVE
+          WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = ${codEmp}
+          ORDER BY CLINOM
         `;
       }
 
@@ -272,7 +264,7 @@ const getClientsWithAssignPending = async (req, res) => {
       message: "Error al obtener clientes con vehiculos pendiente",
     });
   }
-}
+};
 
 const getClientAbr = async (req, res) => {
   const { onlyAbr } = req.query;
@@ -365,7 +357,7 @@ const updateClientAbr = async (req, res) => {
 const getClientSummary = async (req, res) => {
   const { cliente, fromDate, toDate, onlyAssign } = req.query;
 
-  const onlyDate = onlyAssign == 'true' || onlyAssign == true;
+  const onlyDate = onlyAssign == "true" || onlyAssign == true;
 
   const typeCli = {
     1: "Avicola",
@@ -582,7 +574,14 @@ const getClientOpeSummary = async (req, res) => {
         ORDER BY C.OPERACION
       `;
 
-      const result = await cn.query(sql, [cliente, contrato, clase, cliente, contrato, clase]);
+      const result = await cn.query(sql, [
+        cliente,
+        contrato,
+        clase,
+        cliente,
+        contrato,
+        clase,
+      ]);
 
       return result.map((cli) => ({
         operacion: cli.OPERACION.trim(),
