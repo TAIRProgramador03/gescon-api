@@ -87,6 +87,7 @@ const login = async (req, res) => {
     const payload = {
       id: data.user.ID,
       user: data.user.USU,
+      codEmp: data.user.COD_EMP,
       nombre:
         data.user.NOMBRE && data.user.APELLIDO
           ? `${data.user.NOMBRE} ${data.user.APELLIDO}`
