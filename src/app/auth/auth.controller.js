@@ -91,10 +91,12 @@ const login = async (req, res) => {
         data.user.NOMBRE && data.user.APELLIDO
           ? `${data.user.NOMBRE} ${data.user.APELLIDO}`
           : data.user.USU,
+      roleId: data.user.ID_RL,
       role: data.user.DESCRIPCION,
       tokenVersion: data.user.V_TK,
       permissions: data.permissions,
     };
+
     const token = jwt.sign(payload, JWT_SECRET, {
       expiresIn: "24h",
       algorithm: "HS256",
