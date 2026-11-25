@@ -26,7 +26,7 @@ const listClient = async (req, res) => {
           FROM ${SCHEMA_BD}.TCLIE T
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
           ON PO.IDCLI = T.CLICVE
-          WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = ${codEmp}
+          WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ORDER BY CLINOM
         `;
       }

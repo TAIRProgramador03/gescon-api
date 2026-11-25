@@ -26,7 +26,7 @@ const listVehicles = async (req, res) => {
 };
 
 const tableVehicles = async (req, res) => {
-  const {abreviature} = req.query;
+  const { abreviature } = req.query;
 
   try {
     const cleanedResult = await withConnection(async (cn) => {
@@ -63,7 +63,10 @@ const tableVehicles = async (req, res) => {
       ORDER BY A.ID DESC
     `;
 
-      const result = await cn.query(query, abreviature ? [`${abreviature}-%`] : []);
+      const result = await cn.query(
+        query,
+        abreviature ? [`${abreviature}-%`] : [],
+      );
 
       return result.map((row) => {
         return {
@@ -975,8 +978,10 @@ const listYearByModelGen = async (req, res) => {
 // };
 
 const listPlateTraceability = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
-  const { idContrato, idCliente, idLeasing, tipoTerr, fromDate, toDate } = req.query;
+  const { codEmp, roleId } = req.user;
+
+  const { idContrato, idCliente, idLeasing, tipoTerr, fromDate, toDate } =
+    req.query;
 
   try {
     const convertResult = await withConnection(async (cn) => {
@@ -1023,23 +1028,17 @@ const listPlateTraceability = async (req, res) => {
       let joinCliente;
       if (roleId == 3) {
         joinCliente = `
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
-              WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
-            ) PO ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+            SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) C
-          ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
+          ON O.IDCLI = C.IDCLI
         `;
-        conditions.push("C.ID_USU = ?");
-        params.push(idUser);
       } else {
         joinCliente = `
           LEFT JOIN (
@@ -1052,7 +1051,9 @@ const listPlateTraceability = async (req, res) => {
         `;
       }
 
-      const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const whereClause = conditions.length
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
 
       const sql = `
         SELECT *
@@ -1145,7 +1146,9 @@ const listPlateTraceability = async (req, res) => {
         idAssing: row.ID,
         cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
         idCliCont: row.ID_CLIENTE_CONT,
-        idCliOpe: row.ID_CLIENTE_OPE ? row.ID_CLIENTE_OPE.trim() : "Sin cliente",
+        idCliOpe: row.ID_CLIENTE_OPE
+          ? row.ID_CLIENTE_OPE.trim()
+          : "Sin cliente",
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
@@ -1193,7 +1196,7 @@ const listPlateTraceability = async (req, res) => {
 };
 
 const listVehicleTraceability = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { id: idUser, roleId, codEmp } = req.user;
   const { idCliente } = req.query;
 
   if (!idCliente) {
@@ -1257,18 +1260,15 @@ const listVehicleTraceability = async (req, res) => {
 
       if (roleId == 3) {
         joinCliente = `
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
-              WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
-            ) PO ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+            SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) C
           ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
         `;
@@ -1377,7 +1377,9 @@ const listVehicleTraceability = async (req, res) => {
         idAssing: row.ID,
         cliente: row.CLIENTE ? row.CLIENTE.trim() : "Sin cliente",
         idCliCont: row.ID_CLIENTE_CONT,
-        idCliOpe: row.ID_CLIENTE_OPE ? row.ID_CLIENTE_OPE.trim() : "Sin cliente",
+        idCliOpe: row.ID_CLIENTE_OPE
+          ? row.ID_CLIENTE_OPE.trim()
+          : "Sin cliente",
         idOpe: row.ID_OPE,
         operacion: row.OPERACIONES ? row.OPERACIONES.trim() : "Sin operacion",
         idOpeActual: row.ID_OPE_ACTUAL,
@@ -1426,14 +1428,14 @@ const listVehicleTraceability = async (req, res) => {
 
 const listPlateHistory = async (req, res) => {
   const { placa } = req.query;
- 
+
   if (!placa) {
     return res.status(400).json({
       success: false,
       message: "El parametro placa es obligatorio",
     });
   }
- 
+
   try {
     const result = await withConnection(async (cn) => {
       // -----------------------------------------------------------------
@@ -1447,13 +1449,13 @@ const listPlateHistory = async (req, res) => {
         FETCH FIRST 1 ROW ONLY
       `;
       const [asignacion] = await cn.query(sqlAsignacion, [placa]);
- 
+
       if (!asignacion) {
         return { placa, idAsignacion: null, historial: [] };
       }
- 
+
       const idAsignacion = asignacion.ID_ASIGNACION;
- 
+
       // -----------------------------------------------------------------
       // PASO 2: ¿esta asignacion tiene movimientos de reasignacion?
       // -----------------------------------------------------------------
@@ -1463,10 +1465,10 @@ const listPlateHistory = async (req, res) => {
         WHERE ID_ASG_DET = ?
       `;
       const cabeceras = await cn.query(sqlCabeceras, [idAsignacion]);
- 
+
       let eventos = [];
       let documentos = [];
- 
+
       if (cabeceras.length > 0) {
         // ---------------------------------------------------------------
         // CASO CON reasignaciones: PASO 3 (anterior + nuevo + extra) + PASO 4
@@ -1515,7 +1517,7 @@ const listPlateHistory = async (req, res) => {
           ORDER BY cab.FRE
         `;
         eventos = await cn.query(sqlEventos, [idAsignacion]);
- 
+
         const sqlDocumentos = `
           SELECT
               doc.ID_CAB                 AS ID_CAB,
@@ -1574,7 +1576,7 @@ const listPlateHistory = async (req, res) => {
         // No hay tabla 1:N de documentos para este caso; se arma mas abajo
         // desde la columna ARCHIVO_PDF de cada "evento".
       }
- 
+
       // Agrupar documentos por ID_CAB para adjuntarlos a cada evento
       const docsPorCab = documentos.reduce((acc, d) => {
         (acc[d.ID_CAB] ??= []).push({
@@ -1585,7 +1587,7 @@ const listPlateHistory = async (req, res) => {
         });
         return acc;
       }, {});
- 
+
       const historial = eventos.map((ev) => ({
         idCab: ev.ID_CAB,
         fechaReasignacion: ev.FECHA_REASIGNACION,
@@ -1607,7 +1609,11 @@ const listPlateHistory = async (req, res) => {
           fechaTraslado: ev.NUE_FECHA_TRASLADO,
         },
         venta: ev.VENTA_FECHA
-          ? { fecha: ev.VENTA_FECHA, precio: ev.VENTA_PRECIO, moneda: ev.VENTA_MONEDA }
+          ? {
+              fecha: ev.VENTA_FECHA,
+              precio: ev.VENTA_PRECIO,
+              moneda: ev.VENTA_MONEDA,
+            }
           : null,
         perdida: ev.PERDIDA_FECHA_CARTA
           ? {
@@ -1621,22 +1627,22 @@ const listPlateHistory = async (req, res) => {
           docsPorCab[ev.ID_CAB] ??
           (ev.ARCHIVO_PDF ? [{ archivo: ev.ARCHIVO_PDF }] : []),
       }));
- 
+
       const ultimoTramo = historial[historial.length - 1] ?? null;
- 
+
       return {
         placa: placa.trim().toUpperCase(),
         idAsignacion,
         clienteActual: ultimoTramo?.nuevo ?? null,
         totalClientesDistintos: new Set(
           historial.flatMap((h) =>
-            [h.anterior?.cliente?.cod, h.nuevo?.cliente?.cod].filter(Boolean)
-          )
+            [h.anterior?.cliente?.cod, h.nuevo?.cliente?.cod].filter(Boolean),
+          ),
         ).size,
         historial,
       };
     });
- 
+
     return res.status(200).json(result);
   } catch (error) {
     console.error("Error al listar historial de la placa", error);
@@ -1750,5 +1756,5 @@ module.exports = {
   listPlateTraceability,
   listPlateByRegion,
   listVehicleTraceability,
-  listPlateHistory 
+  listPlateHistory,
 };

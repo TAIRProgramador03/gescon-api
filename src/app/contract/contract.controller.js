@@ -6,6 +6,7 @@ const {
   withConnection,
 } = require("../../shared/utils.js");
 const { moveFile, fileExists } = require("../../shared/service/aws-s3.js");
+const { OPERACIONES_TAIR } = require("../../shared/constant/operations.js");
 
 const contractNro = async (req, res) => {
   const { idCli } = req.query;
@@ -48,7 +49,7 @@ const contractNro = async (req, res) => {
 // };
 
 const contractNroAdi = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
   const { idCli } = req.query;
 
   try {
@@ -64,51 +65,33 @@ const contractNroAdi = async (req, res) => {
           SELECT ID, DESCRIPCION FROM (
             SELECT CONCAT('P_', ID) AS ID, NRO_CONTRATO AS DESCRIPCION
             FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, MOXU.CH_CODI_USUARIO, TUG.ID AS ID_USU, TUG.USU, TRG.DESCRIPCION AS ROL
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                INNER JOIN ${SCHEMA_BD}.TCLIE B
-                ON A.IDCLI = B.CLICVE
-                WHERE A.ID <> 86
-                AND B.CLINOM <> '*** ANULADO ***'
-              )PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
+            INNER JOIN (
+              SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
             ) TU
             ON CAST(TC.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
-            WHERE TU.ID_USU = ${idUser} ${idCli ? "AND ID_CLIENTE= ?" : ""}
+            ${idCli ? "WHERE ID_CLIENTE= ?" : ""}
 
             UNION ALL
 
             SELECT CONCAT('H_', ID) AS ID, NRO_DOC AS DESCRIPCION
             FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TC
-            LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, MOXU.CH_CODI_USUARIO, TUG.ID AS ID_USU, TUG.USU, TRG.DESCRIPCION AS ROL
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                INNER JOIN ${SCHEMA_BD}.TCLIE B
-                ON A.IDCLI = B.CLICVE
-                WHERE A.ID <> 86
-                AND B.CLINOM <> '*** ANULADO ***'
-              )PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
+            INNER JOIN (
+              SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
             ) TU
             ON CAST(TC.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
-            WHERE TU.ID_USU = ${idUser} ${idCli ? "AND ID_CLIENTE= ?" : ""}
+            ${idCli ? "WHERE ID_CLIENTE= ?" : ""}
           ) AS CONTRATOS
           ORDER BY DESCRIPCION ASC
         `;
@@ -295,7 +278,7 @@ const tableContract = async (req, res) => {
 //       `;
 
 //       let sqlTotalGesoper = `
-//         SELECT 
+//         SELECT
 //             TRIM(C.CLINOM) AS CLIENTE,
 //             TRIM(PO.IDCLI) AS ID_CLIENTE,
 //             COUNT(PV.ID) AS TOTVEHOP
@@ -348,12 +331,12 @@ const tableContract = async (req, res) => {
 //       `;
 
 //       const sqlContrato = `
-//         SELECT 
-//           TC.NRO_CONTRATO, 
-//           TC.DESCRIPCION, 
-//           TC.FECHA_FIRMA, 
-//           TC.DURACION, 
-//           TC.ARCHIVO_PDF 
+//         SELECT
+//           TC.NRO_CONTRATO,
+//           TC.DESCRIPCION,
+//           TC.FECHA_FIRMA,
+//           TC.DURACION,
+//           TC.ARCHIVO_PDF
 //         FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
 //         WHERE TC.ID_CLIENTE = ?
 //         ${contratoId ? `AND TC.ID = ?` : ""}
@@ -438,14 +421,14 @@ const tableContract = async (req, res) => {
 //                 ON DA.ID_OPE = OPE_A.ID
 //             LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES OPE_B
 //                 ON DB.ID_OPE = OPE_B.ID
-//             WHERE TRIM(OPE_A.IDCLI) = ? 
+//             WHERE TRIM(OPE_A.IDCLI) = ?
 //             OR TRIM(OPE_B.IDCLI) = ?
 //         ) T
 //       `;
 
 //       if (roleId == 3) {
 //         sqlTotalGesoper = `
-//           SELECT 
+//           SELECT
 //               TRIM(C.CLINOM) AS CLIENTE,
 //               TRIM(PO.IDCLI) AS ID_CLIENTE,
 //               COUNT(PV.ID) AS TOTVEHOP
@@ -637,7 +620,7 @@ const tableContract = async (req, res) => {
 // };
 
 const detailContract = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
   const { contratoId, clienteId } = req.query;
 
   if (!clienteId) {
@@ -674,7 +657,8 @@ const detailContract = async (req, res) => {
             SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
             SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
             SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
-            SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+            SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV,
+            SUM(CASE WHEN tad.TP_TERRENO = 4 THEN 1 ELSE 0 END) AS TOTAL_VEH_PEN
         FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
         LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
             ON PO.ID = TAD.ID_OPE
@@ -803,6 +787,18 @@ const detailContract = async (req, res) => {
         )
       `;
 
+      const sqlPendientesReasignar = `
+        SELECT COUNT(*) AS TOTAL
+        FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET TAD
+        JOIN ${SCHEMA_BD}.PO_VEHICULO PV
+          ON TAD.ID_VEH = PV.ID
+        LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+          ON PO.ID = TAD.ID_OPE
+        WHERE TAD.ID_OPE <> PV.SECOPE
+        AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
+        AND PO.IDCLI = ?
+      `;
+
       const sqlTrazabilidad = `
         SELECT COUNT(DISTINCT VEHICULO) AS TOTAL_VEH_TRAZABILIDAD
         FROM (
@@ -842,27 +838,18 @@ const detailContract = async (req, res) => {
               ON PV.SECOPE = PO.ID
           LEFT JOIN ${SCHEMA_BD}.TCLIE C
               ON TRIM(PO.IDCLI) = TRIM(C.CLICVE)
-          LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                  INNER JOIN ${SCHEMA_BD}.TCLIE B
-                  ON A.IDCLI = B.CLICVE
-                  WHERE A.ID <> 86
-                  AND B.CLINOM <> '*** ANULADO ***'
-              ) PO
-              ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-              ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-              ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+              SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) U
               ON TRIM(PO.IDCLI) = TRIM(U.IDCLI) AND U.ID_OPERACION = PO.ID
           WHERE PO.IDCLI = ?
-          AND U.ID_USU = ${idUser}
           GROUP BY TRIM(C.CLINOM), TRIM(PO.IDCLI)
           ORDER BY CLIENTE
         `;
@@ -872,28 +859,25 @@ const detailContract = async (req, res) => {
               SUM(CASE WHEN tad.TP_TERRENO = 0 THEN 1 ELSE 0 END) AS TOTAL_VEH_SUP,
               SUM(CASE WHEN tad.TP_TERRENO = 1 THEN 1 ELSE 0 END) AS TOTAL_VEH_SOC,
               SUM(CASE WHEN tad.TP_TERRENO = 2 THEN 1 ELSE 0 END) AS TOTAL_VEH_CIU,
-              SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV
+              SUM(CASE WHEN tad.TP_TERRENO = 3 THEN 1 ELSE 0 END) AS TOTAL_VEH_SEV,
+              SUM(CASE WHEN tad.TP_TERRENO = 4 THEN 1 ELSE 0 END) AS TOTAL_VEH_PEN
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
               ON PO.ID = TAD.ID_OPE
           LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
               ON tad.ID_CONTRATO = tdc.ID AND TRIM(tad.CLASE_CONTRATO) = 'H'
-          LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-              FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-              LEFT JOIN (
-                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                  INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
-                  WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
-              ) PO ON MOXU.IDOPERACION = PO.ID
-              LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
-              LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
-              WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+              SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) C
               ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
           WHERE PO.IDCLI = ?
-          AND C.ID_USU = ${idUser}
           ${filtroContrato}
         `;
 
@@ -965,7 +949,15 @@ const detailContract = async (req, res) => {
       const resultTotalVeh = await cn.query(sqlTotalVeh, params);
       const resultTotalAssign = await cn.query(sqlTotalAsign, paramsAsign);
       const resultTotalPending = await cn.query(sqlPendientes, [clienteId]);
-      const resultTrazabilidad = await cn.query(sqlTrazabilidad, [clienteId, clienteId, clienteId]);
+      const resultTrazabilidad = await cn.query(sqlTrazabilidad, [
+        clienteId,
+        clienteId,
+        clienteId,
+      ]);
+
+      const resultPendReasign = await cn.query(sqlPendientesReasignar, [
+        clienteId,
+      ]);
 
       return {
         contrato: contratoId ? resultCont[0] : null,
@@ -977,6 +969,7 @@ const detailContract = async (req, res) => {
         totalVehAssign: resultTotalAssign[0],
         totalPending: resultTotalPending[0],
         totalTrazabilidad: resultTrazabilidad[0],
+        pendientesReasignar: resultPendReasign[0],
       };
     });
 
@@ -990,6 +983,7 @@ const detailContract = async (req, res) => {
       totalVehAssign,
       totalPending,
       totalTrazabilidad,
+      pendientesReasignar,
     } = data;
 
     res.json({
@@ -1012,8 +1006,11 @@ const detailContract = async (req, res) => {
         cantidadLeasing: leasing.TOTAL_LEASINGS,
         cantidadAsignados: totalVehAssign ? totalVehAssign.TOTVEHOP : 0,
         cantidadGesoper: totalGesoper ? totalGesoper.TOTVEHOP : 0,
-        cantidadTrazabilidad: totalTrazabilidad ? totalTrazabilidad.TOTAL_VEH_TRAZABILIDAD : 0,
+        cantidadTrazabilidad: totalTrazabilidad
+          ? totalTrazabilidad.TOTAL_VEH_TRAZABILIDAD
+          : 0,
         pendientes: totalPending.TOTAL_PENDIENTES,
+        pendientesReasignar: pendientesReasignar.TOTAL,
         archivoPdf: contrato ? contrato.ARCHIVO_PDF.trim() : "",
       },
     });
@@ -1571,7 +1568,7 @@ const getContractAdiById = async (req, res) => {
 };
 
 const verifyContractsTemp = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   try {
     const result = await withConnection(async (cn) => {
@@ -1602,26 +1599,17 @@ const verifyContractsTemp = async (req, res) => {
             cl.IDCLI,
             cl.CLINOM AS CLIENTE
           FROM ${SCHEMA_BD}.TBLCONTRATO_CAB tc
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B
-              ON A.IDCLI = B.CLICVE
-              WHERE A.ID <> 86
-              AND B.CLINOM <> '*** ANULADO ***'
-            )PO
-            ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-            ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-            ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+            SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) cl
           ON tc.ID_CLIENTE = cl.IDCLI
-          WHERE tc.NRO_CONTRATO LIKE '%CPEN-%' AND cl.ID_USU = ${idUser}
+          WHERE tc.NRO_CONTRATO LIKE '%CPEN-%'
           GROUP BY cl.IDCLI, cl.CLINOM
           ORDER BY cl.CLINOM
         `;

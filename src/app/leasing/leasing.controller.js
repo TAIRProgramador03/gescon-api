@@ -92,7 +92,7 @@ const listLeasingAdi = async (req, res) => {
 };
 
 const listAllLeasing = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   const { bank, clientId, contractId, typeContract, leasingId } = req.query;
 
@@ -205,30 +205,20 @@ const listAllLeasing = async (req, res) => {
           L.ID_CONTRATO,
           COALESCE(L.ID_CLIENTE_ASOCIADO, L.ID_CONTRATO) AS ID_CLIENTE_ASOCIADO,
           CL.CLINOM AS CLIENTE,
-          COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN,
-          CL.ID_USU
+          COALESCE(CLA.CLINOM, CL.CLINOM) AS CLIENTE_ORIGEN
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB L
         LEFT JOIN ${SCHEMA_BD}.TBLCONTRATO_CAB tc
         ON L.ID_CONTRATO = tc.ID AND L.TIPCON = 'P'
         LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tc2
         ON L.ID_CONTRATO = TC2.ID AND L.TIPCON = 'H'
-        LEFT JOIN (
-          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B
-            ON A.IDCLI = B.CLICVE
-            WHERE A.ID <> 86
-            AND B.CLINOM <> '*** ANULADO ***'
-          )PO
-          ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-          ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-          ON TUG.ID_RL = TRG.ID
-          WHERE TUG.USU IS NOT NULL
+        INNER JOIN (
+          SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
         ) CL
         ON CL.IDCLI = L.ID_CLIENTE
         LEFT JOIN (
@@ -250,7 +240,7 @@ const listAllLeasing = async (req, res) => {
           WHERE TUG.USU IS NOT NULL
         ) CLA
         ON CLA.IDCLI = L.ID_CLIENTE_ASOCIADO
-        WHERE CL.ID_USU = ${idUser} ${filtros}
+        ${filtros}
         ORDER BY L.ID ASC
       `;
       }
@@ -485,7 +475,7 @@ const listLeasingByDocument = async (req, res) => {
 };
 
 const listLeasingGeneral = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   const { contratoId, clienteId } = req.query;
 
@@ -530,51 +520,33 @@ const listLeasingGeneral = async (req, res) => {
         sqlContract = `
         SELECT A.ID, A.NRO_LEASING
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
-        LEFT JOIN (
-          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B
-            ON A.IDCLI = B.CLICVE
-            WHERE A.ID <> 86
-            AND B.CLINOM <> '*** ANULADO ***'
-          )PO
-          ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-          ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-          ON TUG.ID_RL = TRG.ID
-          WHERE TUG.USU IS NOT NULL
+        INNER JOIN (
+          SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
         ) TU
         ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
-        WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroA}
+        ${initWhere} ${filtroA}
       `;
 
         sqlDocument = `
         SELECT A.ID, A.NRO_LEASING
         FROM ${SCHEMA_BD}.TBL_LEASING_CAB A
-        LEFT JOIN (
-          SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-          FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-          LEFT JOIN (
-            SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-            FROM ${SCHEMA_BD}.PO_OPERACIONES A
-            INNER JOIN ${SCHEMA_BD}.TCLIE B
-            ON A.IDCLI = B.CLICVE
-            WHERE A.ID <> 86
-            AND B.CLINOM <> '*** ANULADO ***'
-          )PO
-          ON MOXU.IDOPERACION = PO.ID
-          LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-          ON MOXU.CH_CODI_USUARIO = TUG.USU
-          LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-          ON TUG.ID_RL = TRG.ID
-          WHERE TUG.USU IS NOT NULL
+        INNER JOIN (
+          SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM 
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
         ) TU
         ON CAST(A.ID_CLIENTE AS VARCHAR(11)) = TU.IDCLI
-        WHERE TU.ID_USU = ${idUser} ${initWhere} ${filtroB}
+        ${initWhere} ${filtroB}
       `;
       }
 
@@ -628,12 +600,13 @@ const listLeasingGeneral = async (req, res) => {
 };
 
 const detailLeasing = async (req, res) => {
-  const { leasingId, clienteId, contratoId ,tipoCont } = req.query;
+  const { leasingId, clienteId, contratoId, tipoCont } = req.query;
 
   if (!leasingId || !clienteId || !contratoId || !tipoCont)
     return res.status(400).json({
       success: false,
-      message: "Los parametros contratoId, tipoCont, leasingId y clienteId son obligatorios",
+      message:
+        "Los parametros contratoId, tipoCont, leasingId y clienteId son obligatorios",
     });
 
   try {
@@ -683,7 +656,12 @@ const detailLeasing = async (req, res) => {
       GROUP BY L.ID, L.NRO_LEASING, L.BANCO, L.CANT_VEH, L.FECHA_INI, L.FECHA_FIN, L.PERIODO_GRACIA, L.PDF, L.DESCRIPCION, L.TIPCON, C.CLINOM, C2.CLINOM
     `;
 
-      const result = await cn.query(sql, [clienteId, contratoId, tipoCont, leasingId]);
+      const result = await cn.query(sql, [
+        clienteId,
+        contratoId,
+        tipoCont,
+        leasingId,
+      ]);
 
       return result;
     });

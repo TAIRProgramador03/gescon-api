@@ -141,7 +141,7 @@ const documentPending = async (req, res) => {
 };
 
 const detailDocument = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   const { clienteId, documentoId } = req.query;
 
@@ -199,28 +199,20 @@ const detailDocument = async (req, res) => {
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET tad
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
           ON PO.ID = TAD.ID_OPE
-          LEFT JOIN (
-          	SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                LEFT JOIN (
-                  SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                  FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                  INNER JOIN ${SCHEMA_BD}.TCLIE B
-                  ON A.IDCLI = B.CLICVE
-                  WHERE A.ID <> 86
-                  AND B.CLINOM <> '*** ANULADO ***'
-                )PO
-                ON MOXU.IDOPERACION = PO.ID
-                LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                ON MOXU.CH_CODI_USUARIO = TUG.USU
-                LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                ON TUG.ID_RL = TRG.ID
-                WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+          	SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) C
           ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
           LEFT JOIN ${SCHEMA_BD}.TBLDOCUMENTO_CAB tdc
           ON tad.ID_CONTRATO = tdc.ID
-          WHERE PO.IDCLI = ? AND tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ? AND C.ID_USU = ${idUser}
+          WHERE PO.IDCLI = ? AND tad.CLASE_CONTRATO = 'H' AND tad.ID_CONTRATO = ?
         )
         `;
       }
@@ -287,7 +279,7 @@ const detailDocument = async (req, res) => {
 };
 
 const detailVehByDocu = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   const { clienteId, documentoId, tipoTerr } = req.query;
 
@@ -352,23 +344,15 @@ const detailVehByDocu = async (req, res) => {
           FROM ${SCHEMA_BD}.TBL_ASIGNACION_DET L
           LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
           ON L.ID_OPE = PO.ID
-          LEFT JOIN (
-              SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+              SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
             ) C
             ON PO.IDCLI = C.IDCLI AND C.ID_OPERACION = PO.ID
           LEFT JOIN ${SCHEMA_BD}.PO_VEHICULO V
@@ -377,7 +361,7 @@ const detailVehByDocu = async (req, res) => {
           ON V.IDMAR = M.ID
           LEFT JOIN ${SCHEMA_BD}.PO_MODELO MO
           ON V.IDMOD = MO.ID
-          WHERE PO.IDCLI = ? AND L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H' AND C.ID_USU = ${idUser}
+          WHERE PO.IDCLI = ? AND L.TP_TERRENO = ? AND L.ID_CONTRATO = ? AND L.CLASE_CONTRATO = 'H'
         `;
       }
 
