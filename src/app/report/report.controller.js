@@ -1808,7 +1808,7 @@ const contTotalVehicleMap = async (req, res) => {
 };
 
 const notifications = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
 
   try {
     const result = await withConnection(async (cn) => {
@@ -1847,50 +1847,32 @@ const notifications = async (req, res) => {
             (
               SELECT COUNT(*)
                 FROM ${SCHEMA_BD}.TBLCONTRATO_CAB TC
-                LEFT JOIN (
-                  SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
+                INNER JOIN (
+                  SELECT 
+                    DISTINCT T.CLICVE IDCLI, 
+                    TRIM(T.CLINOM) AS CLINOM 
+                  FROM ${SCHEMA_BD}.TCLIE T
+                  LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+                  ON PO.IDCLI = T.CLICVE
+                  WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
                 ) CL
                 ON TC.ID_CLIENTE = CL.IDCLI
-                WHERE TC.NRO_CONTRATO LIKE 'CPEN-%' AND CL.ID_USU = ${idUser}
+                WHERE TC.NRO_CONTRATO LIKE 'CPEN-%'
             ) AS TOTAL_CONTRATOS,
             (
                 SELECT COUNT(*)
                 FROM ${SCHEMA_BD}.TBLDOCUMENTO_CAB TD
-                LEFT JOIN (
-                  SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
-                  FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                  LEFT JOIN (
-                    SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                    FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                    INNER JOIN ${SCHEMA_BD}.TCLIE B
-                    ON A.IDCLI = B.CLICVE
-                    WHERE A.ID <> 86
-                    AND B.CLINOM <> '*** ANULADO ***'
-                  )PO
-                  ON MOXU.IDOPERACION = PO.ID
-                  LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                  ON MOXU.CH_CODI_USUARIO = TUG.USU
-                  LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                  ON TUG.ID_RL = TRG.ID
-                  WHERE TUG.USU IS NOT NULL
+                INNER JOIN (
+                  SELECT 
+                    DISTINCT T.CLICVE IDCLI, 
+                    TRIM(T.CLINOM) AS CLINOM 
+                  FROM ${SCHEMA_BD}.TCLIE T
+                  LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+                  ON PO.IDCLI = T.CLICVE
+                  WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
                 ) CL
                 ON TD.ID_CLIENTE = CL.IDCLI
-                WHERE TD.NRO_DOC LIKE 'DPEN-%' AND CL.ID_USU = ${idUser}
+                WHERE TD.NRO_DOC LIKE 'DPEN-%'
             ) AS TOTAL_DOCUMENTOS,
             (
                 SELECT COUNT(*)
@@ -1903,27 +1885,19 @@ const notifications = async (req, res) => {
                     LEFT JOIN (
                       SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU
                     FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-                    LEFT JOIN (
-                      SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-                      FROM ${SCHEMA_BD}.PO_OPERACIONES A
-                      INNER JOIN ${SCHEMA_BD}.TCLIE B
-                      ON A.IDCLI = B.CLICVE
-                      WHERE A.ID <> 86
-                      AND B.CLINOM <> '*** ANULADO ***'
-                    )PO
-                    ON MOXU.IDOPERACION = PO.ID
-                    LEFT JOIN ${SCHEMA_BD}.T_US_GC tug
-                    ON MOXU.CH_CODI_USUARIO = TUG.USU
-                    LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg
-                    ON TUG.ID_RL = TRG.ID
-                    WHERE TUG.USU IS NOT NULL
+                    INNER JOIN (
+                      SELECT 
+                        DISTINCT T.CLICVE IDCLI, 
+                        TRIM(T.CLINOM) AS CLINOM 
+                      FROM ${SCHEMA_BD}.TCLIE T
+                      LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+                      ON PO.IDCLI = T.CLICVE
+                      WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
                     ) CL
                     ON TAC.ID_CLIENTE = CL.IDCLI
                   JOIN ${SCHEMA_BD}.PO_VEHICULO PV
                   ON PV.ID = TAD.ID_VEH
-
-                  WHERE CL.ID_USU = ${idUser}
-                  AND TAD.ID_OPE <> PV.SECOPE
+                  WHERE TAD.ID_OPE <> PV.SECOPE
                   AND TAD.ID_OPE NOT IN (${OPERACIONES_TAIR.VENDIDAS}, ${OPERACIONES_TAIR.AJENAS}, ${OPERACIONES_TAIR.PERDIDAS})
                 ) X
             ) AS TOTAL_REASIGNACIONES

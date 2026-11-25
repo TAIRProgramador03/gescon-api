@@ -531,7 +531,7 @@ const listOperations = async (req, res) => {
 // };
 
 const listAssingByContract = async (req, res) => {
-  const { id: idUser, roleId } = req.user;
+  const { codEmp, roleId } = req.user;
   const { idContrato, idCliente, idLeasing, tipoTerr, fromDate, toDate } =
     req.query;
 
@@ -584,23 +584,18 @@ const listAssingByContract = async (req, res) => {
       let joinCliente;
       if (roleId == 3) {
         joinCliente = `
-          LEFT JOIN (
-            SELECT DISTINCT PO.IDCLI, PO.CLINOM, TUG.ID AS ID_USU, PO.ID AS ID_OPERACION
-            FROM ${SCHEMA_BD}.MAE_OPERACION_X_USUARIO moxu
-            LEFT JOIN (
-              SELECT DISTINCT A.IDCLI, B.CLINOM, A.ID
-              FROM ${SCHEMA_BD}.PO_OPERACIONES A
-              INNER JOIN ${SCHEMA_BD}.TCLIE B ON A.IDCLI = B.CLICVE
-              WHERE A.ID <> 86 AND B.CLINOM <> '*** ANULADO ***'
-            ) PO ON MOXU.IDOPERACION = PO.ID
-            LEFT JOIN ${SCHEMA_BD}.T_US_GC tug ON MOXU.CH_CODI_USUARIO = TUG.USU
-            LEFT JOIN ${SCHEMA_BD}.T_RL_GC trg ON TUG.ID_RL = TRG.ID
-            WHERE TUG.USU IS NOT NULL
+          INNER JOIN (
+            SELECT 
+                DISTINCT T.CLICVE IDCLI, 
+                TRIM(T.CLINOM) AS CLINOM,
+                PO.ID ID_OPERACION
+              FROM ${SCHEMA_BD}.TCLIE T
+              LEFT JOIN ${SCHEMA_BD}.PO_OPERACIONES PO
+              ON PO.IDCLI = T.CLICVE
+              WHERE TRIM(T.CLINOM) <> '*** ANULADO ***' AND PO.ID <> 86 AND PO.IDSUP = '${codEmp}'
           ) C
           ON O.IDCLI = C.IDCLI AND C.ID_OPERACION = O.ID
         `;
-        conditions.push("C.ID_USU = ?");
-        params.push(idUser);
       } else {
         joinCliente = `
           LEFT JOIN (
